@@ -5,7 +5,7 @@ This is a Discord Bot for my Discord Server. It creates a new text channel under
 
 - [Node](https://nodejs.org/en/)
 - [NPM](https://www.npmjs.com/)
-- [nodemon] (https://www.npmjs.com/package/nodemon)
+- [nodemon](https://www.npmjs.com/package/nodemon)
 ## Getting started
 
 First, make sure you have all the required tools installed on your local machine then continue with these steps.
