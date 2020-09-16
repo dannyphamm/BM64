@@ -9,7 +9,10 @@
   "author": "PRO_Danny",
   "license": "ISC",
   "dependencies": {
+    "@discordjs/opus": "^0.3.2",
     "discord.js": "^12.3.1",
-    "dotenv": "^8.2.0"
+    "distube": "^2.5.2",
+    "dotenv": "^8.2.0",
+    "plugapi": "^5.1.1"
   }
 }
