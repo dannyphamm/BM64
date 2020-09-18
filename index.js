@@ -90,8 +90,14 @@ client.on('voiceStateUpdate', (oldMember, newMember) => {
 })
 
 function checkExists(message, bot) {
-    let queue = distube.getQueue(message);
-    return queue.songs.some(song => song.id == bot.getMedia().cid);
+    try{
+        let queue = distube.getQueue(message);
+        return queue.songs.some(song => song.id == bot.getMedia().cid);
+    } catch(error) {
+        console.log(error);
+        return true;
+    }
+
 }
 
 client.on("message", async (message) => {
@@ -117,19 +123,14 @@ client.on("message", async (message) => {
                     console.log(`Joined ${room}`);
                     message.channel.send(`Joined ${room}`);
                     distube.play(message, "https://youtu.be/" + bot.getMedia().cid);
-                    try {
                         setInterval(() => {
                             if (!checkExists(message, bot)) {
                                 console.log("Adding song to Queue");
                                 distube.play(message, "https://youtu.be/" + bot.getMedia().cid);
                             } else {
-                                console.log("Exists in queue");
                             }
 
-                        }, 15000);
-                    } catch (error) {
-                        console.log(error);
-                    }
+                        }, 5000);
                 });
             } else {
                 console.log(`Error initializing plugAPI: ${err}`);
