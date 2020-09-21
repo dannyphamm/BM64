@@ -15,7 +15,7 @@ const distube = new DisTube(client, { searchSongs: false, emitNewSongOnly: false
 
 client.once('ready', () => {
     console.log('BM64 is Online');
-})
+});
 
 client.on('voiceStateUpdate', (oldMember, newMember) => {
     const newUserChannel = newMember.channelID
@@ -43,17 +43,14 @@ client.on('voiceStateUpdate', (oldMember, newMember) => {
                 channel.updateOverwrite(newMember.id,
                     {
                         VIEW_CHANNEL: true,
-                    })
+                    });
             })
         } else {
-
             channel.updateOverwrite(newMember.id,
                 {
                     VIEW_CHANNEL: true,
                 })
         }
-
-        console.log("JOIN" + newMember.id);
 
     } else if (oldUserChannel === config.voiceChannelID && newUserChannel !== config.voiceChannelID) {
         const channel = newMember.guild.channels.cache.find(channel => channel.name === "the-agency");
@@ -90,16 +87,31 @@ client.on('voiceStateUpdate', (oldMember, newMember) => {
 })
 
 function checkExists(message, bot) {
-    try{
+    try {
         let queue = distube.getQueue(message);
-        return queue.songs.some(song => song.id == bot.getMedia().cid);
-    } catch(error) {
+        console.log(queue.songs);
+        if (checkProvider(bot)[1] == "YOUTUBE") {
+            return queue.songs.some(song => song.id == bot.getMedia().cid);
+        }
+
+    } catch (error) {
         console.log(error);
         return true;
     }
-
 }
 
+function checkProvider(bot) {
+    if (isNaN(bot.getMedia().cid)) {
+        console.log("YouTube detected");
+        return [`"https://youtu.be/" + ${bot.getMedia().cid}`, "YOUTUBE"];
+    } else {
+        console.log("Soundcloud detected")
+        return [``, "SKIP"];
+        //Skipping because of DisTube limitation
+        //return [`${bot.getMedia().author} + " - " + ${bot.getMedia().title}`, "SOUNDCLOUD"];
+    }
+
+}
 client.on("message", async (message) => {
     if (message.author.bot) return;
     if (!message.content.startsWith(config.prefix)) return;
@@ -122,15 +134,20 @@ client.on("message", async (message) => {
                 bot.on(PlugAPI.events.ROOM_JOIN, (room) => {
                     console.log(`Joined ${room}`);
                     message.channel.send(`Joined ${room}`);
-                    distube.play(message, "https://youtu.be/" + bot.getMedia().cid);
-                        setInterval(() => {
+                    distube.play(message, checkProvider(bot)[0]);
+                    setInterval(() => {
+                        if(!message.member.voice.connection) {
+                            clearInterval();
+                        }
+                        // If Song is not "SKIP"
+                        if(!checkProvider(bot)[2] == "SKIP"){
+                            // If Song is not in queue then add
                             if (!checkExists(message, bot)) {
                                 console.log("Adding song to Queue");
-                                distube.play(message, "https://youtu.be/" + bot.getMedia().cid);
-                            } else {
+                                distube.play(message, checkProvider(bot)[0]);
                             }
-
-                        }, 5000);
+                        }
+                    }, 5000);
                 });
             } else {
                 console.log(`Error initializing plugAPI: ${err}`);
