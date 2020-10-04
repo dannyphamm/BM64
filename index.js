@@ -1,19 +1,29 @@
-const Discord = require(`discord.js`);
+const Discord = require('discord.js');
 const DisTube = require('distube');
-const PlugAPI = require('plugapi');
-require('dotenv').config();
+const fs = require("fs");
+const plugdj = require('./commands/plugdj');
+const config = require("./config.json")
 
 const client = new Discord.Client();
-config = {
-    prefix: ".",
-    token: process.env.TOKEN,
-    catergoryID: process.env.catergoryID,
-    voiceChannelID: process.env.VOICECHANNELID
-};
 
-const distube = new DisTube(client, { searchSongs: false, emitNewSongOnly: false, highWaterMark: 1 << 25 });
+client.config = require("./config.json")
+client.commands = new Discord.Collection()
+client.aliases = new Discord.Collection()
+client.emotes = config.emoji;
 
-client.once('ready', () => {
+client.distube = new DisTube(client, { 
+    searchSongs: false, 
+    emitNewSongOnly: false, 
+    highWaterMark: 1 << 25, 
+    youtubeCookie: "VISITOR_INFO1_LIVE=OA0X4cRu3cg; HSID=AezDZckonnjRvl-Ql; SSID=AF5uji9cM43LyYRwC; APISID=-whiJ7Z2waIZU6U-/AXViIN5zfolN9MX34; SAPISID=Q6fgMLbgV6j68a3I/AdDuwY_BeiQ9BA0xx; __Secure-3PAPISID=Q6fgMLbgV6j68a3I/AdDuwY_BeiQ9BA0xx; LOGIN_INFO=AFmmF2swRgIhAIH6xkm3_kmZ9QRpTJN5JqrIfuohcYqqxSYaH52RdxyTAiEA46hoo4grrHaaq0OJs4D5OhfLRQr3n4e5Ls77pKG7znI:QUQ3MjNmd1RYM2JIZGFIU2dyVjFmYkVUMjVnd0o3NnhsdXZDdFBoSWMwNno4OVVGaVNXVzlLaWRRNHlSeUdyUGptbkl0THQzYWdjaDQyenJnUVdBU3Y3WnNHNTBWNXdIRUh1TkRxQ1gzNFdoY1I5MFN1TGRFdGw4bVhTQkk3SGRQZG9mVndyUXVQVU5iMWFXbWlhRTR0ZTNCaUdKUjNYUi1aMzJFVlNlZXNNcXkyS0Z3VGNzNVB2SENBcUw2TmxiVnZNZV9BV3ZGLWpEdGN6S2h4TENVYVd0ckEtdk91Z0lIanNOZFpmcDJuZVpDd3dJSGEtY0loN3dzRi1la3UyTUhuRU1TZ2VVZmJJZg==; PREF=f6=400&al=en-GB; YSC=my6PNdln6F8; wide=0; SID=1gcFnbslHCVUVV72C9TG-VzVrvCbkCY2qbS4FaSOnhlnmU5K7ZpNm6Th-ivDphp4kncGRA.; __Secure-3PSID=1gcFnbslHCVUVV72C9TG-VzVrvCbkCY2qbS4FaSOnhlnmU5KlmyS1W2dW_I6jwe9-cUFtA.; SIDCC=AJi4QfEFpinlmJb8XKiF9RkPCRjZVrenvQ2izXdtIuLxc7LCtT_MiMsZP4hkpPBjf3XN1pH9005-; __Secure-3PSIDCC=AJi4QfEeRrgOPuYmpVVUlU6mb07DSTzMIQPsQcwT6YkmbaeXLTCfoLo3nf_OuMuCcytP_U0X_8Gl", 
+    youtubeIdentityToken: 'QUFFLUhqbEVmbTVvcmJKb0FfdHR0cm5jVlVkYTI1ZS1HZ3w='
+});
+
+client.distube.on("initQueue", queue => {
+    queue.autoplay = false;
+});
+
+client.on('ready', () => {
     console.log('BM64 is Online');
 });
 
@@ -59,148 +69,63 @@ client.on('voiceStateUpdate', (oldMember, newMember) => {
             channel.updateOverwrite(newMember.id, {
                 VIEW_CHANNEL: false,
             });
-            console.log("Running Final Fheck");
+            //console.log("Running Final Fheck");
 
             const vChannel = newMember.guild.channels.cache.find(channel => channel.id === config.voiceChannelID);
-            const channelBots = vChannel.members.size;
-            console.log(channelBots);
-            if (channelBots <= 0) {
-                console.log("Deleting text Channel countdown started");
+            if (vChannel.members.size <= 0) {
+                //console.log("Deleting text Channel countdown started");
                 setTimeout(function () {
                     const vChannel = newMember.guild.channels.cache.find(channel => channel.id === config.voiceChannelID);
-                    const channelBots = vChannel.members.size;
-                    if (channelBots <= 0) {
+                    if (vChannel.members.size <= 0) {
                         const channel = newMember.guild.channels.cache.find(channel => channel.name === "the-agency");
                         channel.delete();
-                        console.log("Deleting text channel");
-                    } else {
-                        console.log("Aborted")
+                        //console.log("Deleting text channel");
                     }
                 }, 3600000);
             }
-            console.log("LEAVE" + newMember.id);
+            //console.log("LEAVE" + newMember.id);
         } catch (error) {
             console.log(error);
         }
-
     }
 })
 
-function checkExists(message, bot) {
+
+
+fs.readdir("./commands/", (err, files) => {
+    let jsFiles = files.filter(f => f.split(".").pop() === "js")
+    if (jsFiles.length <= 0) return console.log("Could not find any commands!")
+    jsFiles.forEach((file) => {
+        let cmd = require(`./commands/${file}`)
+        console.log(`Loaded ${file}`)
+        client.commands.set(cmd.name, cmd)
+        if (cmd.aliases) cmd.aliases.forEach(alias => client.aliases.set(alias, cmd.name))
+    })
+})
+
+client.on('message', async message => {
+    let prefix = config.prefix
+    if (!message.content.startsWith(prefix)) return
+    const args = message.content.slice(prefix.length).trim().split(/ +/g)
+    const command = args.shift().toLowerCase();
+    let cmd = client.commands.get(command) || client.commands.get(client.aliases.get(command))
+    if (!cmd) return
     try {
-        let queue = distube.getQueue(message);
-        console.log(queue.songs);
-        if (checkProvider(bot)[1] == "YOUTUBE") {
-            return queue.songs.some(song => song.id == bot.getMedia().cid);
-        }
-
-    } catch (error) {
-        console.log(error);
-        return true;
+        cmd.run(client, message, args)
     }
-}
-
-function checkProvider(bot) {
-    if (isNaN(bot.getMedia().cid)) {
-        console.log("YouTube detected");
-        return [`"https://youtu.be/" + ${bot.getMedia().cid}`, "YOUTUBE"];
-    } else {
-        console.log("Soundcloud detected")
-        return [``, "SKIP"];
-        //Skipping because of DisTube limitation
-        //return [`${bot.getMedia().author} + " - " + ${bot.getMedia().title}`, "SOUNDCLOUD"];
+    catch (e) {
+        console.error(e)
+        message.reply("Error: " + e)
     }
 
-}
-client.on("message", async (message) => {
-    if (message.author.bot) return;
-    if (!message.content.startsWith(config.prefix)) return;
-    const args = message.content.slice(config.prefix.length).trim().split(/ +/g);
-    const command = args.shift();
-    var channel = message.member.voice.channel;
-    if (command == "join") {
-        if (!message.member.voice.connection) {
-            channel.join();
-        }
-    }
+})
 
-    if (command == "plugdj") {
-        bot = new PlugAPI({
-            guest: true
-        }, (err, bot) => {
-            if (!err) {
-                message.channel.send(`Attempting to join PlugDJ room. Standby`);
-                bot.connect(args[0]); // The part after https://plug.dj
-                bot.on(PlugAPI.events.ROOM_JOIN, (room) => {
-                    console.log(`Joined ${room}`);
-                    message.channel.send(`Joined ${room}`);
-                    distube.play(message, checkProvider(bot)[0]);
-                    setInterval(() => {
-                        if(!message.member.voice.connection) {
-                            clearInterval();
-                        }
-                        // If Song is not "SKIP"
-                        if(!checkProvider(bot)[2] == "SKIP"){
-                            // If Song is not in queue then add
-                            if (!checkExists(message, bot)) {
-                                console.log("Adding song to Queue");
-                                distube.play(message, checkProvider(bot)[0]);
-                            }
-                        }
-                    }, 5000);
-                });
-            } else {
-                console.log(`Error initializing plugAPI: ${err}`);
-                message.channel.send(`Could not join ${room}`);
-            }
-        });
-    }
-
-    if (command == "debug") {
-        let queue = distube.getQueue(message);
-        console.log(queue.songs)
-    }
-
-
-    if (command == "play")
-        distube.play(message, args.join(" "));
-
-    if (["repeat", "loop"].includes(command))
-        distube.setRepeatMode(message, parseInt(args[0]));
-
-    if (command == "stop") {
-        distube.stop(message);
-        message.channel.send("Stopped the music!");
-    }
-
-    if (command == "skip") {
-        distube.skip(message);
-        message.channel.send("Skipping music!");
-    }
-
-    if (command == "queue") {
-        let queue = distube.getQueue(message);
-        message.channel.send('Current queue:\n' + queue.songs.map((song, id) =>
-            `**${id + 1}**. ${song.name} - \`${song.formattedDuration}\``
-        ).join("\n"));
-    }
-
-    if ([`3d`, `bassboost`, `echo`, `karaoke`, `nightcore`, `vaporwave`].includes(command)) {
-        let filter = distube.setFilter(message, command);
-        message.channel.send("Current queue filter: " + (filter || "Off"));
-    }
-
-    if (command == "autoplay") {
-        let mode = distube.toggleAutoplay(message);
-        message.channel.send("Set autoplay mode to `" + (mode ? "On" : "Off") + "`");
-    }
-});
 
 // Queue status template
 const status = (queue) => `Volume: \`${queue.volume}%\` | Filter: \`${queue.filter || "Off"}\` | Loop: \`${queue.repeatMode ? queue.repeatMode == 2 ? "All Queue" : "This Song" : "Off"}\` | Autoplay: \`${queue.autoplay ? "On" : "Off"}\``;
 
 // DisTube event listeners, more in the documentation page
-distube
+client.distube
     .on("playSong", (message, queue, song) => message.channel.send(
         `Playing \`${song.name}\` - \`${song.formattedDuration}\`\nRequested by: ${song.user.username}\n${status(queue)}`
     ))
