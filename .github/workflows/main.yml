@@ -1,4 +1,5 @@
 name: main
+on: push 
 jobs:
   build:
     runs-on: ${{ matrix.operating-system }}
