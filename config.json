@@ -1,0 +1,16 @@
+{
+    "prefix": ".",
+    "token": "TokenID",
+    "catergoryID": "catergoryID",
+    "voiceChannelID": "voicechannelID",
+    "ytCookie:": "Cookie",
+    "ytIDToken:": "ID_Token",
+    "emoji": {
+        "play": "▶️",
+        "stop": "⏹️",
+        "queue": "📄",
+        "success": "☑️",
+        "repeat": "🔁",
+        "error": "❌"
+    }
+}
