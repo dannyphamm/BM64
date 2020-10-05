@@ -3,6 +3,8 @@ exports.run = (client, message, args) => {
     const bot = new PlugAPI({
         guest: true
     });
+
+    
     // Checks if song ID is queue and return boolean
     function checkExists(message) {
         try {
@@ -23,8 +25,8 @@ exports.run = (client, message, args) => {
             console.log("Soundcloud detected")
             return `https://w.soundcloud.com/player/?url=https%3A//api.soundcloud.com/tracks/${bot.getMedia().cid}`;
         }
-
     }
+
     try {
         if (!message.member.voice.channel) return message.channel.send(`${client.emotes.error} | You must be in a voice channel!`);
         message.channel.send(`Attempting to join PlugDJ room. Standby`);
@@ -48,4 +50,3 @@ exports.run = (client, message, args) => {
         message.channel.send(`${client.emotes.error} | Error: \`${e}\``)
     }
 }
-
