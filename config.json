@@ -1,0 +1,18 @@
+{
+    "prefix": ".",
+    "token": "",
+    "catergoryID": "",
+    "voiceChannelID": "",
+    "ytCookie:": "",
+    "ytIDToken:": "",
+    "emoji": {
+        "play": "▶️",
+        "stop": "⏹️",
+        "queue": "📄",
+        "success": "☑️",
+        "repeat": "🔁",
+        "error": "❌"
+    }
+}
+
+

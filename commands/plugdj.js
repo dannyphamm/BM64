@@ -1,12 +1,11 @@
 const PlugAPI = require('plugapi');
-const bot = new PlugAPI({
-    guest: true
-});
 module.exports = {
     name: "plugdj",
     aliases: ["pdj"],
     run: async (client, message, args) => {
-
+        const bot = new PlugAPI({
+            guest: true
+        });
         // Checks if song ID is queue and return boolean
         function checkExists(message) {
             try {
