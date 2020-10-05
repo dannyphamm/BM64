@@ -20,6 +20,8 @@ if (config.token == "") {
     searchSongs: false,
     emitNewSongOnly: false,
     highWaterMark: 1 << 25,
+    youtubeCookie: config.ytCookie,
+    youtubeIdentityToken: config.ytIDToken,
   });
 
   client.distube.on('initQueue', (queue) => {
