@@ -1,7 +1,4 @@
-module.exports = {
-    name: "autoplay",
-    aliases: ["ap", "auto"],
-    run: async (client, message, args) => {
+exports.run = (client, message, args) => {
       if (!message.member.voice.channel) return message.channel.send(`${client.emotes.error} | You must be in a voice channel!`)
       if (!client.distube.isPlaying(message)) return message.channel.send(`${client.emotes.error} | You must be in a voice channel!`)
       let mode = null;
@@ -19,4 +16,3 @@ module.exports = {
       mode = client.distube.toggleAutoplay(message);
       message.channel.send(`${client.emotes.repeat} | Set Autoplay to \`${mode}\``);
     }
-  }
