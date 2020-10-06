@@ -2,6 +2,7 @@ const Discord = require('discord.js');
 const DisTube = require('distube');
 const Enmap = require("enmap");
 const client = new Discord.Client();
+const PlugAPI = require('plugapi');
 config = require('./config.json');
 client.config = config;
 
@@ -24,6 +25,10 @@ if (config.token == "") {
     youtubeIdentityToken: config.ytIDToken,
   });
 
+  client.bot = new PlugAPI({
+    guest: true
+  });
+
   client.distube.on('initQueue', (queue) => {
     queue.autoplay = false;
   });
@@ -44,7 +49,7 @@ if (config.token == "") {
     // DisTubeOptions.searchSongs = true
     .on('searchResult', (message, result) => {
       let i = 0;
-      message.channel.send(`**Choose an option from below**\n${result.map((song) =>`**${++i}**. ${song.name} - \`${song.formattedDuration}\``).join('\n')}\n*Enter anything else or wait 60 seconds to cancel*`);
+      message.channel.send(`**Choose an option from below**\n${result.map((song) => `**${++i}**. ${song.name} - \`${song.formattedDuration}\``).join('\n')}\n*Enter anything else or wait 60 seconds to cancel*`);
     })
     // DisTubeOptions.searchSongs = true
     .on('searchCancel', (message) => message.channel.send(`Searching canceled`))
