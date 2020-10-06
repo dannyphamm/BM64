@@ -4,8 +4,6 @@ exports.run = (client, message, args) => {
         guest: true
     });
 
-    
-    // Checks if song ID is queue and return boolean
     function checkExists(message) {
         try {
             let queue = client.distube.getQueue(message);
@@ -25,8 +23,9 @@ exports.run = (client, message, args) => {
             console.log("Soundcloud detected")
             return `https://w.soundcloud.com/player/?url=https%3A//api.soundcloud.com/tracks/${bot.getMedia().cid}`;
         }
-    }
 
+    }
+    // Checks if song ID is queue and return boolean
     try {
         if (!message.member.voice.channel) return message.channel.send(`${client.emotes.error} | You must be in a voice channel!`);
         message.channel.send(`Attempting to join PlugDJ room. Standby`);
@@ -36,17 +35,21 @@ exports.run = (client, message, args) => {
             message.channel.send(`Joined ${room}`);
             client.distube.play(message, parseURL());
             setInterval(() => {
-                if (!message.member.voice.connection) {
+                if (!message.member.voice.channel) {
+                    console.log("left");
                     clearInterval();
+                } else {
+                    if (!checkExists(message)) {
+                        console.log("Adding song to Queue");
+                        client.distube.play(message, parseURL());
+                    }
                 }
                 // If Song is not in queue then add
-                if (!checkExists(message)) {
-                    console.log("Adding song to Queue");
-                    client.distube.play(message, parseURL());
-                }
             }, 5000);
         });
     } catch (e) {
         message.channel.send(`${client.emotes.error} | Error: \`${e}\``)
     }
 }
+
+
