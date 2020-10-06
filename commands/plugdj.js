@@ -40,8 +40,15 @@ exports.run = (client, message, args) => {
   // Checks if song ID is queue and return boolean
   try {
     if (!message.member.voice.channel) return message.channel.send(`${client.emotes.error} | You must be in a voice channel!`);
-    message.channel.send(`Attempting to join PlugDJ room. Standby`);
-    client.bot.connect(args[0]);
+    
+    if(client.bot.getHost() == null) {
+      message.channel.send(`Attempting to join PlugDJ room. Standby`);
+      client.bot.connect(args[0]);
+    } else {
+      message.channel.send(`Changing PlugDJ room. Standby`);
+      client.bot.changeRoom(args[0]);
+    }
+
     client.bot.on(PlugAPI.events.ROOM_JOIN, (room) => {
       console.log(`Joined ${room}`);
       message.channel.send(`Joined ${room}`);
