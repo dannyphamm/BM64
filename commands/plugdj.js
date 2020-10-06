@@ -1,5 +1,7 @@
 const PlugAPI = require('plugapi');
-
+const bot = new PlugAPI({
+  guest: true,
+});
 exports.run = (client, message, args) => {
   let checkForNewSong;
 
@@ -40,11 +42,11 @@ exports.run = (client, message, args) => {
   // Checks if song ID is queue and return boolean
   try {
     if (!message.member.voice.channel) return message.channel.send(`${client.emotes.error} | You must be in a voice channel!`);
-    
-    if(client.bot.getHost() == null) {
+
+    try {
       message.channel.send(`Attempting to join PlugDJ room. Standby`);
       client.bot.connect(args[0]);
-    } else {
+    } catch(e) {
       message.channel.send(`Changing PlugDJ room. Standby`);
       client.bot.changeRoom(args[0]);
     }
