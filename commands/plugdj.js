@@ -4,11 +4,11 @@ exports.run = (client, message, args) => {
     var checkForNewSong;
     const time = new Date().toLocaleTimeString();
 
-
     function stop() {
         //console.log(time + "left");
         clearInterval(checkForNewSong);
     }
+
     function checkExists(message) {
         try {
             let queue = client.distube.getQueue(message);
@@ -52,6 +52,7 @@ exports.run = (client, message, args) => {
                 }
                 // If Song is not in queue then add
             }, 10000);
+
         });
     } catch (e) {
         message.channel.send(`${client.emotes.error} | Error: \`${e}\``)
