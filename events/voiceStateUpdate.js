@@ -1,4 +1,4 @@
-const config = require("../config.json");
+const config = require('../config.json');
 
 module.exports = (client, oldMember, newMember) => {
   const newUserChannel = newMember.channelID;
@@ -21,18 +21,18 @@ module.exports = (client, oldMember, newMember) => {
         ],
       }).then((channel) => {
         channel.setTopic('This is a temporary text channel and will be removed when "The Agency" is empty');
-        channel.setParent(config.catergoryID, { lockPermissions: false });
+        channel.setParent(config.catergoryID, {lockPermissions: false});
         channel.send('Please use `-` to play music.');
         channel.updateOverwrite(newMember.id,
-          {
-            VIEW_CHANNEL: true,
-          });
+            {
+              VIEW_CHANNEL: true,
+            });
       });
     } else {
       channel.updateOverwrite(newMember.id,
-        {
-          VIEW_CHANNEL: true,
-        });
+          {
+            VIEW_CHANNEL: true,
+          });
     }
   } else if (oldUserChannel === config.voiceChannelID && newUserChannel !== config.voiceChannelID) {
     const channel = newMember.guild.channels.cache.find((channel) => channel.name === 'the-agency');
@@ -46,7 +46,7 @@ module.exports = (client, oldMember, newMember) => {
       const vChannel = newMember.guild.channels.cache.find((channel) => channel.id === config.voiceChannelID);
       if (vChannel.members.size <= 0) {
         // console.log("Deleting text Channel countdown started");
-        setTimeout(function () {
+        setTimeout(function() {
           const vChannel = newMember.guild.channels.cache.find((channel) => channel.id === config.voiceChannelID);
           if (vChannel.members.size <= 0) {
             const channel = newMember.guild.channels.cache.find((channel) => channel.name === 'the-agency');
@@ -60,4 +60,4 @@ module.exports = (client, oldMember, newMember) => {
       console.log(error);
     }
   }
-}
+};
