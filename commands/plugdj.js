@@ -2,7 +2,6 @@ const PlugAPI = require('plugapi');
 
 exports.run = (client, message, args) => {
   let checkForNewSong;
-  const time = new Date().toLocaleTimeString();
 
   /**
  * Stops the repeater
@@ -52,7 +51,8 @@ exports.run = (client, message, args) => {
           stop();
         } else {
           if (!checkExists(message)) {
-            console.log(time + 'Adding song to Queue');
+            console.log('Adding song to Queue');
+            // console.log(time + 'Adding song to Queue');
             client.distube.play(message, parseURL());
           } else {
             // console.log(time + "exists")
@@ -65,5 +65,3 @@ exports.run = (client, message, args) => {
     message.channel.send(`${client.emotes.error} | Error: \`${e}\``);
   }
 };
-
-
