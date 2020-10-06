@@ -4,14 +4,14 @@ This is a Discord Bot for my Discord Server. It creates a new text channel under
 
 ## Features
 
-- Music from a variety of providers. Eg. PlugDJ, YouTube, Spotify, SoundCloud
-- Temporary text channels
+-   Music from a variety of providers. Eg. PlugDJ, YouTube, Spotify, SoundCloud
+-   Temporary text channels
 
 ## Requirements
 
-- [Node.JS](https://nodejs.org/en/) 
-- [Node-GYP](https://github.com/nodejs/node-gyp) ```npm install -g node-gyp```
-- [nodemon](https://www.npmjs.com/package/nodemon) **optional** ```npm install -g nodemon```
+-   [Node.JS](https://nodejs.org/en/) 
+-   [Node-GYP](https://github.com/nodejs/node-gyp) ```npm install -g node-gyp```
+-   [nodemon](https://www.npmjs.com/package/nodemon) **optional** ```npm install -g nodemon```
 
 ## Getting started
 
