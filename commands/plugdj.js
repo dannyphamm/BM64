@@ -8,18 +8,18 @@ exports.run = (client, message, args) => {
 */
   function checkExists(media) {
     const queue = client.distube.getQueue(message);
-    console.log(queue);
+    //console.log(queue);
     // If the queue is not empty
     if (queue) {
-      console.log('Queue Exists 2');
+      //console.log('Queue Exists 2');
       // return boolean if found song or not
-      console.log(queue.songs.some((song) => song.id == media.cid));
+      //console.log(queue.songs.some((song) => song.id == media.cid));
       // If exists, return true else false
       return queue.songs.some((song) => song.id == media.cid);
     }
 
     if (!queue) {
-      console.log('Empty Queue 1');
+      //console.log('Empty Queue 1');
       // if the queue is empty
       client.distube.play(message, parseURL(media));
       return true;
@@ -32,10 +32,10 @@ exports.run = (client, message, args) => {
 */
   function parseURL(media) {
     if (media.format == 1) {
-      console.log('YouTube detected');
+      //console.log('YouTube detected');
       return `https://youtu.be/${media.cid}`;
     } else {
-      console.log('Soundcloud detected');
+      //console.log('Soundcloud detected');
       return `https://w.soundcloud.com/player/?url=https%3A//api.soundcloud.com/tracks/${media.cid}`;
     }
   }
@@ -49,16 +49,16 @@ exports.run = (client, message, args) => {
       client.bot.on(PlugAPI.events.ADVANCE, (data) => {
         const media = data.media;
         if (!checkExists(media)) {
-          console.log('Adding to Queue');
+          //console.log('Adding to Queue');
           client.distube.play(message, parseURL(media));
         }
       });
       client.bot.on(PlugAPI.events.ROOM_JOIN, (room) => {
-        console.log(`Joined ${room}`);
+        //console.log(`Joined ${room}`);
         message.channel.send(`Joined ${room}`);
       });
       client.bot.on(PlugAPI.events.ROOM_CHANGE, (room) => {
-        console.log(`Change ${room}`);
+        //console.log(`Change ${room}`);
         message.channel.send(`Change ${room}`);
       });
     } else {
