@@ -1,6 +1,6 @@
 const config = require('../config.json');
 
-module.exports = (client, oldMember, newMember) => {
+module.exports = (oldMember, newMember) => {
   const newUserChannel = newMember.channelID;
   const oldUserChannel = oldMember.channelID;
   if (oldUserChannel !== config.voiceChannelID && newUserChannel === config.voiceChannelID) {

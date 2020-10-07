@@ -1,6 +1,5 @@
 const fs = require('fs');
 
-
 module.exports = (client) => {
   fs.readdir('./events/', (err, files) => {
     if (err) return console.error;
@@ -10,6 +9,17 @@ module.exports = (client) => {
       const evtName = file.split('.')[0];
       console.log(`Loaded event '${evtName}'`);
       client.on(evtName, evt.bind(null, client));
+    });
+  });
+
+  fs.readdir('./events/plugdj/', (err, files) => {
+    if (err) return console.error;
+    files.forEach((file) => {
+      if (!file.endsWith('.js')) return;
+      const evt = require(`../events/plugdj/${file}`);
+      const evtName = file.split('.')[0];
+      console.log(`Loaded event '${evtName}'`);
+      client.bot.on(evtName, evt.bind(null, client));
     });
   });
 };

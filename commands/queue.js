@@ -1,4 +1,4 @@
-exports.run = (client, message, args) => {
+exports.run = (client, message) => {
   const queue = client.distube.getQueue(message);
   if (!queue) return message.channel.send(`${client.emotes.error} | There is nothing playing!`);
   const q = queue.songs.map((song, i) => {

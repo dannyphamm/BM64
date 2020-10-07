@@ -4,7 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "lint-md": "remark ."
+    "lint-md": "remark .",
+    "lint": "eslint . --fix"
   },
   "remarkConfig": {
     "plugins": ["remark-preset-lint-recommended"]

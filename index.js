@@ -13,9 +13,6 @@ if (config.token == '') {
   client.commands = new Enmap();
   client.aliases = new Discord.Collection();
   client.emotes = config.emoji;
-  require('./handlers/eventsHandler')(client);
-  require('./handlers/commandHandler')(client);
-
   client.distube = new DisTube(client, {
     searchSongs: false,
     emitNewSongOnly: false,
@@ -27,6 +24,9 @@ if (config.token == '') {
   client.bot = new PlugAPI({
     guest: true,
   });
+  require('./handlers/eventsHandler')(client);
+  require('./handlers/commandHandler')(client);
+
 
   client.distube.on('initQueue', (queue) => {
     queue.autoplay = false;
