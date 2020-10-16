@@ -36,11 +36,11 @@ if (config.token == '') {
   // DisTube event listeners, more in the documentation page
   client.distube
       .on('playSong', (message, queue, song) => {
-        let ms = Number(song.formattedDuration.split(':')[0]) * 60 * 1000 + Number(song.formattedDuration.split(':')[1]) * 1000;
+        const ms = Number(song.formattedDuration.split(':')[0]) * 60 * 1000 + Number(song.formattedDuration.split(':')[1]) * 1000;
         message.channel.send(
-          `Playing \`${song.name}\` - \`${song.formattedDuration}\`\nRequested by: ${song.user.username}\n${status(queue)}`).then(msg => msg.delete({timeout: ms}));
-          client.user.setActivity("Now playing: " + song.name);
-    })
+            `Playing \`${song.name}\` - \`${song.formattedDuration}\`\nRequested by: ${song.user.username}\n${status(queue)}`).then((msg) => msg.delete({timeout: ms}));
+        client.user.setActivity('Now playing: ' + song.name);
+      })
       .on('addSong', (message, queue, song) => message.channel.send(`Added ${song.name} - \`${song.formattedDuration}\` to the queue by ${song.user.username}`,
       ))
       .on('playList', (message, queue, playlist, song) => message.channel.send(`Play \`${playlist.title}\` playlist (${playlist.total_items} songs).\nRequested by: ${song.user.username}\nNow playing \`${song.name}\` - \`${song.formattedDuration}\`\n${status(queue)}`,
@@ -54,8 +54,10 @@ if (config.token == '') {
       })
   // DisTubeOptions.searchSongs = true
       .on('searchCancel', (message) => message.channel.send(`Searching canceled`))
-      .on('error', (message, err) => {message.channel.send('An error encountered: ' + err);
-    client.bot.close(false)});
+      .on('error', (message, err) => {
+        message.channel.send('An error encountered: ' + err);
+        client.bot.close(false);
+      });
   client.login(config.token);
 }
 
