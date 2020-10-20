@@ -56,7 +56,12 @@ if (config.token == '') {
       .on('searchCancel', (message) => message.channel.send(`Searching canceled`))
       .on('error', (message, err) => {
         message.channel.send('An error encountered: ' + err);
-        client.bot.close(false);
+        try {
+          client.bot.close(false);
+        } catch(e) {
+          console.log(e);
+        }
+        
       });
   client.login(config.token);
 }

@@ -52,10 +52,9 @@ exports.run = (client, message, args) => {
     message.channel.send(`Attempting to join PlugDJ room. Standby`);
     try {
       client.bot.close(false);
-    } catch (e) {
-      console.log('no sessions');
+    } catch(e) {
+      console.log(e);
     }
-
     console.log('connecting');
     client.bot.connect(args[0]);
 
