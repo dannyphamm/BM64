@@ -55,14 +55,7 @@ if (config.token == '') {
   // DisTubeOptions.searchSongs = true
       .on('searchCancel', (message) => message.channel.send(`Searching canceled`))
       .on('error', (message, err) => {
-        message.channel.send('An error encountered: ' + err);
-        // try {
-        //   client.bot.close(false);
-        // } catch(e) {
-        //   console.log(e);
-        // }
-        
-      });
+        message.channel.send('An error encountered: ' + err);});
   client.login(config.token);
 }
 
