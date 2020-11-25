@@ -39,7 +39,13 @@ if (config.token == '') {
         const ms = Number(song.formattedDuration.split(':')[0]) * 60 * 1000 + Number(song.formattedDuration.split(':')[1]) * 1000;
         message.channel.send(
             `Playing \`${song.name}\` - \`${song.formattedDuration}\`\nRequested by: ${song.user.username}\n${status(queue)}`).then((msg) => msg.delete({timeout: ms}));
-        client.user.setActivity(song.name, {type: "LISTENING"});
+            client.user.setPresence({
+              status: 'online',
+              activity: {
+                name: `${song.name}`,
+                type: 'LISTENING'
+              }
+            })
       })
       .on('addSong', (message, queue, song) => message.channel.send(`Added ${song.name} - \`${song.formattedDuration}\` to the queue by ${song.user.username}`,
       ))
@@ -54,6 +60,9 @@ if (config.token == '') {
       })
   // DisTubeOptions.searchSongs = true
       .on('searchCancel', (message) => message.channel.send(`Searching canceled`))
+      .on('finish', (message) => {
+          client.user.setActivity(null);
+      })
       .on('error', (message, err) => {
         message.channel.send('An error encountered: ' + err);});
   client.login(config.token);

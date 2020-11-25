@@ -4,6 +4,7 @@ exports.run = (client, message) => {
   client.distube.stop(message);
   try {
     client.bot.close(false);
+    client.user.setActivity(null);
   } catch(e) {
     console.log(e);
   }
