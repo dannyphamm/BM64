@@ -7,8 +7,8 @@ module.exports = (client) => {
     //get the mins of the current time
     var mins = new Date().getMinutes();
     var isSent = false;
-    if (!isSent) {
-      if (mins == "00" || mins % 10 == 00) {
+    if (mins == "00" || mins % 10 == 00) {
+      if (!isSent) {
         fetch('https://meme-api.herokuapp.com/gimme').then(response => response.json()).then(data => {
           const embed = new Discord.MessageEmbed()
             .setColor('#0099ff')
@@ -22,7 +22,8 @@ module.exports = (client) => {
           isSent = true;
         }
         )
-      } else {
+      }
+      else {
         isSent = false;
       }
     }
