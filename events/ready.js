@@ -6,7 +6,7 @@ module.exports = (client) => {
   function tick() {
     //get the mins of the current time
     var mins = new Date().getMinutes();
-    if (mins == "00" || mins == "30") {
+    if (mins == "00" || mins%10 ==00) {
       fetch('https://meme-api.herokuapp.com/gimme').then(response => response.json()).then(data => {
         const embed = new Discord.MessageEmbed()
           .setColor('#0099ff')
