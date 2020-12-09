@@ -2,11 +2,9 @@ const fetch = require('node-fetch');
 const Discord = require('discord.js');
 module.exports = (client) => {
   console.log('BM64 is Online');
-
+  var isSent = false;
   function tick() {
-    //get the mins of the current time
     var mins = new Date().getMinutes();
-    var isSent = false;
     if (mins == "00" || mins % 10 == 00) {
       if (!isSent) {
         fetch('https://meme-api.herokuapp.com/gimme').then(response => response.json()).then(data => {
@@ -20,15 +18,13 @@ module.exports = (client) => {
             .setFooter("r/" + data.subreddit + " | " + data.author);
           client.channels.cache.find(i => i.name === 'daily-memes').send(embed);
           isSent = true;
-        }
-        )
+        })
       }
-      else {
-        isSent = false;
-      }
+    } else {
+      isSent = false;
     }
   }
-  setInterval(tick, 1000);
+  setInterval(tick, 5000);
 };
 
 
