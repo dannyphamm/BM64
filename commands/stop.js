@@ -5,7 +5,7 @@ exports.run = (client, message) => {
   try {
     client.bot.close(false);
     client.user.setActivity(null);
-  } catch(e) {
+  } catch (e) {
     console.log(e);
   }
   message.channel.send(`${client.emotes.success} | Stopped!`);

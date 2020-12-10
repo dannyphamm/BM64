@@ -5,8 +5,6 @@ module.exports = (oldMember, newMember) => {
   const oldUserChannel = oldMember.channelID;
   // && newUserChannel === config.voiceChannelID
   if (oldUserChannel !== config.voiceChannelID ) {
-
-
     const channel = newMember.guild.channels.cache.find((channel) => channel.name === 'the-agency');
     if (channel == undefined || channel == null) {
       console.log('Creating text channel');

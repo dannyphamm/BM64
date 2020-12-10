@@ -52,7 +52,7 @@ exports.run = (client, message, args) => {
     message.channel.send(`Attempting to join PlugDJ room. Standby`);
     try {
       client.bot.close(false);
-    } catch(e) {
+    } catch (e) {
       console.log(e);
     }
     console.log('connecting');
