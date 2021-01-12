@@ -15,10 +15,6 @@ module.exports = (oldMember, newMember) => {
             id: newMember.guild.id,
             deny: ['VIEW_CHANNEL'],
           },
-          {
-            id: '184405311681986560',
-            allow: ['VIEW_CHANNEL', 'ADD_REACTIONS', 'SEND_MESSAGES'],
-          },
         ],
       }).then((channel) => {
         channel.setTopic('This is a temporary text channel and will be removed when "The Agency" is empty');
