@@ -16,14 +16,14 @@
   "license": "ISC",
   "dependencies": {
     "@discordjs/opus": "^0.3.3",
-    "discord.js": "^12.5.0",
-    "distube": "^2.8.3",
+    "discord.js": "^12.5.1",
+    "distube": "^2.8.8",
     "enmap": "^5.8.2",
-    "nodemon": "^2.0.6",
+    "nodemon": "^2.0.7",
     "plugapi": "^5.1.1"
   },
   "devDependencies": {
-    "eslint": "^7.14.0",
+    "eslint": "^7.17.0",
     "eslint-config-google": "^0.14.0",
     "remark-cli": "^9.0.0",
     "remark-preset-lint-recommended": "^5.0.0"

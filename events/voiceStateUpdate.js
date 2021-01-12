@@ -19,7 +19,7 @@ module.exports = (oldMember, newMember) => {
       }).then((channel) => {
         channel.setTopic('This is a temporary text channel and will be removed when "The Agency" is empty');
         channel.setParent(config.catergoryID, {lockPermissions: false});
-        channel.send('Please use `-` to play music.');
+        channel.send('Please use `.allow @user` to add a user for music etc.');
         channel.updateOverwrite(newMember.id,
             {
               VIEW_CHANNEL: true,
