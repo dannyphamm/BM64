@@ -5,16 +5,16 @@ module.exports = (oldState, newState) => {
   let newUserChannel = newState.channel
   let oldUserChannel = oldState.channel
 
-  //console.log(oldUserChannel)
-  if(oldUserChannel === undefined && newUserChannel !== undefined) {
-    console.log("joined")
-     // User Joins a voice channel
+  // //console.log(oldUserChannel)
+  // if(oldUserChannel === undefined && newUserChannel !== undefined) {
+  //   console.log("joined")
+  //    // User Joins a voice channel
 
-  } else if(newUserChannel === undefined){
-    console.log("left")
-    // User leaves a voice channel
+  // } else if(newUserChannel === undefined){
+  //   console.log("left")
+  //   // User leaves a voice channel
 
-  }
+  // }
 
 
 
