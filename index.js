@@ -2,7 +2,7 @@ const Discord = require('discord.js');
 const DisTube = require('distube');
 const Enmap = require('enmap');
 const client = new Discord.Client();
-const PlugAPI = require('plugapi');
+//const PlugAPI = require('plugapi');
 config = require('./config.json');
 client.config = config;
 
@@ -21,9 +21,10 @@ if (config.token == '') {
     youtubeIdentityToken: config.ytIDToken,
   });
 
-  client.bot = new PlugAPI({
-    guest: true,
-  });
+  // RIP PLUGDJ
+  // client.bot = new PlugAPI({
+  //   guest: true,
+  // });
   require('./handlers/eventsHandler')(client);
   require('./handlers/commandHandler')(client);
 
