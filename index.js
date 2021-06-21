@@ -4,8 +4,6 @@ const client = new Discord.Client()
 const config = require("./config.json")
 const SpotifyPlugin = require("@distube/spotify")
 const SoundCloudPlugin = require("@distube/soundcloud")
-const fs = require("fs")
-
 
 
 client.config = require("./config.json")
@@ -14,15 +12,22 @@ client.distube = new DisTube(client, {
     plugins: [new SpotifyPlugin(),new SoundCloudPlugin()]
 })
 
-require('./handlers/eventsHandler')(client);
 require('./handlers/commandHandler')(client);
 client.commands = new Discord.Collection()
 client.aliases = new Discord.Collection()
 client.emotes = config.emoji
-// client.distube.on('initQueue', (queue) => {
-//   queue.autoplay = false;
-// });
 
+const fs = require('fs');
+const eventFiles = fs.readdirSync('./events').filter(file => file.endsWith('.js'));
+
+for (const file of eventFiles) {
+	const event = require(`./events/${file}`);
+	if (event.once) {
+		client.once(event.name, (...args) => event.execute(...args, client));
+	} else {
+		client.on(event.name, (...args) => event.execute(...args, client));
+	}
+}
 
 const status = queue => `Volume: \`${queue.volume}%\` | Filter: \`${queue.filters.join(", ") || "Off"}\` | Loop: \`${queue.repeatMode ? queue.repeatMode === 2 ? "All Queue" : "This Song" : "Off"}\` | Autoplay: \`${queue.autoplay ? "On" : "Off"}\``
 client.distube

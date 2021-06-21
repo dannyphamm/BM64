@@ -1,5 +1,4 @@
 const fetch = require('node-fetch');
-const Discord = require('discord.js');
 module.exports = {
   name: 'ready',
   once: true,
@@ -11,9 +10,9 @@ module.exports = {
     function tick() {
       const mins = new Date().getMinutes();
       if (mins === 0 || mins % 10 === 0) {
-        if (!isSent) {
+       if (!isSent) {
           fetch('https://meme-api.herokuapp.com/gimme').then((response) => response.json()).then((data) => {
-            const embed = new Discord.MessageEmbed()
+            const embed = new client.MessageEmbed()
               .setColor('#0099ff')
               .setURL(data.postLink)
               .setAuthor(data.author)
@@ -25,11 +24,11 @@ module.exports = {
             isSent = true;
           });
         }
-      } else {
-        isSent = false;
+     } else {
+       isSent = false;
       }
     }
-    setInterval(tick, 5000);
+    setInterval(tick, 1);
   }
 }
 
