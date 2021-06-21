@@ -1,6 +1,15 @@
-exports.run = (client, message) => {
-  if (!message.member.voice.channel) return message.channel.send(`${client.emotes.error} | You must be in a voice channel!`);
-  if (!client.distube.isPlaying(message)) return message.channel.send(`${client.emotes.error} | There is nothing playing!`);
-  const queue = client.distube.skip(message);
-  message.channel.send(`${client.emotes.success} | Skipped! Now playing:\n${queue.songs[0].name}`);
-};
+  
+module.exports = {
+  name: "skip",
+  inVoiceChannel: true,
+  run: async (client, message, args) => {
+      const queue = client.distube.getQueue(message)
+      if (!queue) return message.channel.send(`${client.emotes.error} | There is nothing in the queue right now!`)
+      try {
+          const song = queue.skip()
+          message.channel.send(`${client.emotes.success} | Skipped! Now playing:\n${song.name}`)
+      } catch (e) {
+          message.channel.send(`${client.emotes.error} | ${e}`)
+      }
+  }
+}

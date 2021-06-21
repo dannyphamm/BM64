@@ -1,3 +1,6 @@
-exports.run = (message) => {
-  message.channel.send('pong!').catch(console.error);
-};
+module.exports = {
+  name: "ping",
+  run: async (client, message, args) => {
+      console.log("PONG")  
+  }
+}

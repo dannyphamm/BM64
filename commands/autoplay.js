@@ -1,17 +1,14 @@
-exports.run = (client, message, args) => {
-  if (!message.member.voice.channel || !client.distube.isPlaying(message)) return message.channel.send(`${client.emotes.error} | You must be in a voice channel!`);
-  let mode = null;
-  switch (args[0]) {
-    case 'off':
-      mode = 0;
-      break;
-    case 'song':
-      mode = 1;
-      break;
-    case 'queue':
-      mode = 2;
-      break;
+module.exports = {
+  name: "autoplay",
+  inVoiceChannel: true,
+  run: async (client, message, args) => {
+      const queue = client.distube.getQueue(message)
+      if (!queue) return message.channel.send(`${client.emotes.error} | There is nothing in the queue right now!`)
+      try {
+          const autoplay = queue.toggleAutoplay()
+          message.channel.send(`${client.emotes.success} | AutoPlay: \`${autoplay ? "On" : "Off"}\``)
+      } catch (e) {
+          message.channel.send(`${client.emotes.error} | ${e}`)
+      }
   }
-  mode = client.distube.toggleAutoplay(message);
-  message.channel.send(`${client.emotes.repeat} | Set Autoplay to \`${mode}\``);
-};
+}

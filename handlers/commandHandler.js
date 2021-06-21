@@ -1,14 +1,15 @@
 const fs = require('fs');
 
 module.exports = (client) => {
-  fs.readdir('./commands/', (err, files) => {
-    if (err) return console.error(err);
-    files.forEach((file) => {
-      if (!file.endsWith('.js')) return;
-      const props = require(`../commands/${file}`);
-      const commandName = file.split('.')[0];
-      console.log(`Attempting to load command ${commandName}`);
-      client.commands.set(commandName, props);
-    });
-  });
+  fs.readdir("./commands/", (err, files) => {
+    if (err) return console.log("Could not find any commands!")
+    const jsFiles = files.filter(f => f.split(".").pop() === "js")
+    if (jsFiles.length <= 0) return console.log("Could not find any commands!")
+    jsFiles.forEach(file => {
+        const cmd = require(`../commands/${file}`)
+        console.log(`Loaded ${file}`)
+        client.commands.set(cmd.name, cmd)
+        if (cmd.aliases) cmd.aliases.forEach(alias => client.aliases.set(alias, cmd.name))
+    })
+})
 };

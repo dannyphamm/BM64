@@ -1,12 +1,11 @@
-exports.run = (client, message, args) => {
-  if (!message.member.voice.channel) return message.channel.send(`${client.emotes.error} | You must be in a voice channel!`);
-  if (!client.distube.isPlaying(message)) return message.channel.send(`${client.emotes.error} | There is nothing playing!`);
-  const queue = client.distube.getQueue(message);
-  if (!queue.playing) {
-    queue.playing = true;
-    queue.connection.dispatcher.resume();
+module.exports = {
+  name: "resume",
+  aliases: ["resume", "unpause"],
+  inVoiceChannel: true,
+  run: async (client, message, args) => {
+      const queue = client.distube.getQueue(message)
+      if (!queue) return message.channel.send(`${client.emotes.error} | There is nothing in the queue right now!`)
+      queue.resume()
+      message.channel.send("Resumed the song for you :)")
   }
-  message.channel.send(`${client.emotes.success} | Now resuming: ${queue.songs[0].name}`);
-};
-
-
+}

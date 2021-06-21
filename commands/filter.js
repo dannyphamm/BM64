@@ -1,39 +1,13 @@
-exports.run = (client, message, args) => {
-  if (!message.member.voice.channel) return message.channel.send(`${client.emotes.error} | You must be in a voice channel!`);
-  if (!client.distube.isPlaying(message)) return message.channel.send(`${client.emotes.error} | You must be in a voice channel!`);
-  let mode = null;
-  switch (args[0]) {
-    case '3d':
-      mode = '3d';
-      break;
-    case 'bassboost':
-      mode = 'bassboost';
-      break;
-    case 'echo':
-      mode = 'echo';
-      break;
-    case 'flanger':
-      mode = 'flanger';
-      break;
-    case 'gate':
-      mode = 'gate';
-      break;
-    case 'haas':
-      mode = 'haas';
-      break;
-    case 'karaoke':
-      mode = 'karaoke';
-      break;
-    case 'nightcore':
-      mode = 'nightcore';
-      break;
-    case 'reverse':
-      mode = 'reverse';
-      break;
-    case 'vaporwave':
-      mode = 'vaporwave';
-      break;
+module.exports = {
+  name: "filter",
+  aliases: ["filters"],
+  inVoiceChannel: true,
+  run: async (client, message, args) => {
+      const queue = client.distube.getQueue(message)
+      if (!queue) return message.channel.send(`${client.emotes.error} | There is nothing in the queue right now!`)
+      if (args[0] === "off" && queue.filters?.length) queue.setFilter(false)
+      else if (Object.keys(client.distube.filters).includes(args[0])) queue.setFilter(args[0])
+      else if (args[0]) return message.channel.send(`${client.emotes.error} | Not a valid filter`)
+      message.channel.send(`Current Queue Filter: \`${queue.filters.join(", ") || "Off"}\``)
   }
-  const filter = distube.setFilter(message, mode);
-  message.channel.send(`${client.emotes.repeat} | Current queue filter: " + (${filter} || "Off")`);
-};
+}
