@@ -7,36 +7,36 @@ module.exports = {
     const channel = client.channels.cache.get('786226183276462110');
 
     try {
+      const webhooks = await channel.fetchWebhooks();
+      const webhook = webhooks.first();
       /**
      * Create embed message and send to chat
      */
-       const embed =  new Discord.MessageEmbed().setTitle('Back Online')
-       .setColor('#0099ff');
       function tick() {
         const mins = new Date().getMinutes();
         const seconds = new Date().getSeconds();
         if ((mins === 0 || mins % 10 === 0) && seconds == 0) {
           fetch('https://meme-api.herokuapp.com/gimme').then((response) => response.json()).then((data) => {
-           embed = new Discord.MessageEmbed()
-              .setColor('#0099ff').setDescription("test")
+            const embed = new Discord.MessageEmbed()
+              .setColor('#0099ff')
               .setURL(data.postLink)
               .setAuthor(data.author)
               .setTitle(data.title)
               .setImage(data.url)
               .setTimestamp()
               .setFooter('r/' + data.subreddit + ' | ' + data.author);
+            webhook.send({
+              username: 'Daily Memer',
+              avatarURL: 'https://i.imgur.com/wSTFkRM.png',
+              embeds: [embed],
+            })
           });
         }
       }
-      setInterval(tick, 30000);
-      const webhooks = await channel.fetchWebhooks();
-      const webhook = webhooks.first();
 
-      await webhook.send( {
-        username: 'Daily Memer',
-        avatarURL: 'https://i.imgur.com/wSTFkRM.png',
-        embeds: [embed],
-      });
+      setInterval(() => {
+        tick()
+      }, 30000);
 
     } catch (error) {
       console.error('Error trying to send: ', error);
