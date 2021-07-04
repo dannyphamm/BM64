@@ -15,7 +15,6 @@ module.exports = {
       function tick() {
         const mins = new Date().getMinutes();
         const seconds = new Date().getSeconds();
-        console.log(seconds)
         if ((mins === 0 || mins % 10 === 0) && seconds == 0) {
           fetch('https://meme-api.herokuapp.com/gimme').then((response) => response.json()).then((data) => {
             const embed = new Discord.MessageEmbed()
