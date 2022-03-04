@@ -93,7 +93,10 @@ module.exports = {
         if (hours === 13 && mins === 0 && seconds === 20) {
           console.log("trigger")
           fetch(`https://api.wordnik.com/v4/words.json/wordOfTheDay?api_key=${config.wordofDayKey}`).then((response) => response.json()).then((data) => {
-
+            const embed0 = new Discord.MessageEmbed()
+              .setColor('#0099ff')
+              .setTitle(data.word)
+              .setFooter('Powered by BM64');
             const embed = new Discord.MessageEmbed()
               .setColor('#0099ff')
               .setTitle(data.word + " Definitions")
@@ -101,7 +104,6 @@ module.exports = {
                 createDefinitions(data.definitions),
                 data.note && { name: 'Note', value: data.note },
               )
-              .setTimestamp()
               .setFooter('Powered by BM64');
             const embed1 = new Discord.MessageEmbed()
               .setColor('#0099ff')
@@ -114,7 +116,7 @@ module.exports = {
             webhook1.send({
               username: 'Word Of The Day',
               avatarURL: 'https://i.imgur.com/wSTFkRM.png',
-              embeds: [embed, embed1],
+              embeds: [embed0, embed, embed1],
             })
           })
         }
