@@ -21,7 +21,8 @@
         "@distube/spotify": "^0.4.0",
         "discord.js": "^12.5.3",
         "distube": "^3.0.0-alpha.8",
-        "nodemon": "^2.0.9"
+        "nodemon": "^2.0.9",
+        "ytdl-core": "^4.8.3"
     },
     "devDependencies": {
         "eslint": "^7.29.0",
