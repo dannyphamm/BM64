@@ -1,9 +1,9 @@
-const DisTube = require("distube")
+//const DisTube = require("distube")
 const Discord = require("discord.js")
 const client = new Discord.Client()
 const config = require("./config.json")
-const SpotifyPlugin = require("@distube/spotify")
-const SoundCloudPlugin = require("@distube/soundcloud")
+//const SpotifyPlugin = require("@distube/spotify")
+//const SoundCloudPlugin = require("@distube/soundcloud")
 const fs = require("fs")
 
 client.config = require("./config.json")
