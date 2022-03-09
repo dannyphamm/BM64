@@ -1,7 +1,6 @@
 const config = require("../config.json")
 module.exports = {
   name: 'message',
-  once: true,
   execute(message) {
     const prefix = config.prefix
     if (!message.content.startsWith(prefix)) return

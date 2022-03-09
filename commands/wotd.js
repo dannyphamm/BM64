@@ -5,7 +5,6 @@ const config = require('../config.json');
 
 module.exports = {
   name: "wotd",
-  once: true,
   run: async (client, message, args) => {
     const msg = await message.channel.send(`${client.emotes.loading} | Pinging...`);
     const wotd = await fetch(`https://api.wordnik.com/v4/words.json/wordOfTheDay?api_key=${config.wordofDayKey}`)
