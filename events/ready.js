@@ -60,11 +60,14 @@ module.exports = {
   async execute(client) {
     const channel = client.channels.cache.get('786226183276462110');
     const wordofday = client.channels.cache.get(config.wordOfDayID)
+    const fact = client.channels.cache.get(config.factChannelID)
     try {
       const webhooks1 = await wordofday.fetchWebhooks();
       const webhook1 = webhooks1.first();
       const webhooks = await channel.fetchWebhooks();
       const webhook = webhooks.first();
+      const webhooks2 = await fact.fetchWebhooks();
+      const webhook2 = webhooks2.first();
       /**
      * Create embed message and send to chat
      */
@@ -86,6 +89,18 @@ module.exports = {
               username: 'Daily Memer',
               avatarURL: 'https://i.imgur.com/wSTFkRM.png',
               embeds: [embed],
+            })
+          });
+          fetch('https://api.api-ninjas.com/v1/facts?limit=1', {headers: {'X-Api-Key': config.factKey }}).then((response) => response.json()).then((data) => {
+            const embed1 = new Discord.MessageEmbed()
+              .setColor('#0099ff')
+              .setDescription(data[0].fact)
+              .setTimestamp()
+              .setFooter('Powered by BM64');
+            webhook2.send({
+              username: `Phalan's Facts`,
+              avatarURL: 'https://i.imgur.com/wSTFkRM.png',
+              embeds: [embed1],
             })
           });
         }
