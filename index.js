@@ -1,70 +1,37 @@
-//const DisTube = require("distube")
-const Discord = require("discord.js")
-const client = new Discord.Client()
-const config = require("./config.json")
-//const SpotifyPlugin = require("@distube/spotify")
-//const SoundCloudPlugin = require("@distube/soundcloud")
-const fs = require("fs")
+// Require the necessary discord.js classes
+const fs = require('node:fs');
+const path = require('node:path');
+const { Client, Collection, Intents } = require('discord.js');
+const { token } = require('./config.json');
 
-client.config = require("./config.json")
-// client.distube = new DisTube(client, {
-//   emitNewSongOnly: true,
-//   plugins: [new SpotifyPlugin(), new SoundCloudPlugin()],
-//   youtubeCookie: config.youtubeCookie,
-//   updateYouTubeDL: false,
+// Create a new client instance
+const client = new Client({ intents: [Intents.FLAGS.GUILDS, Intents.FLAGS.GUILD_MESSAGES] });
 
-// })
 
-client.commands = new Discord.Collection()
-client.aliases = new Discord.Collection()
-client.emotes = config.emoji
+client.commands = new Collection();
+const commandsPath = path.join(__dirname, 'commands');
+const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
 
-fs.readdir("./commands/", (err, files) => {
-  if (err) return console.log("Could not find any commands!")
-  const jsFiles = files.filter(f => f.split(".").pop() === "js")
-  if (jsFiles.length <= 0) return console.log("Could not find any commands!")
-  jsFiles.forEach(file => {
-    const cmd = require(`./commands/${file}`)
-    console.log(`Loaded ${file}`)
-    client.commands.set(cmd.name, cmd)
-    if (cmd.aliases) cmd.aliases.forEach(alias => client.aliases.set(alias, cmd.name))
-  })
-})
+const eventsPath = path.join(__dirname, 'events');
+const eventFiles = fs.readdirSync(eventsPath).filter(file => file.endsWith('.js'));
 
-const eventFiles = fs.readdirSync('./events').filter(file => file.endsWith('.js'));
 for (const file of eventFiles) {
-  const event = require(`./events/${file}`);
-  if (event.once) {
-    client.once(event.name, (...args) => event.execute(...args, client));
-  } else {
-    client.on(event.name, (...args) => event.execute(...args, client));
-  }
+	const filePath = path.join(eventsPath, file);
+	const event = require(filePath);
+    console.log("Loaded Event:", event.name)
+	if (event.once) {
+		client.once(event.name, (...args) => event.execute(...args));
+	} else {
+		client.on(event.name, (...args) => event.execute(...args));
+	}
+}
+for (const file of commandFiles) {
+    const filePath = path.join(commandsPath, file);
+    const command = require(filePath);
+    console.log("Loaded Command:", command.data.name)
+    client.commands.set(command.data.name, command);
 }
 
-const status = queue => `Volume: \`${queue.volume}%\` | Filter: \`${queue.filters.join(", ") || "Off"}\` | Loop: \`${queue.repeatMode ? queue.repeatMode === 2 ? "All Queue" : "This Song" : "Off"}\` | Autoplay: \`${queue.autoplay ? "On" : "Off"}\``
-// client.distube
-//   .on("playSong", (queue, song) => queue.textChannel.send(
-//     `${client.emotes.play} | Playing \`${song.name}\` - \`${song.formattedDuration}\`\nRequested by: ${song.user}\n${status(queue)}`
-//   ))
-//   .on("addSong", (queue, song) => queue.textChannel.send(
-//     `${client.emotes.success} | Added ${song.name} - \`${song.formattedDuration}\` to the queue by ${song.user}`
-//   ))
-//   .on("addList", (queue, playlist) => queue.textChannel.send(
-//     `${client.emotes.success} | Added \`${playlist.name}\` playlist (${playlist.songs.length} songs) to queue\n${status(queue)}`
-//   ))
-//   // DisTubeOptions.searchSongs = true
-//   .on("searchResult", (message, result) => {
-//     let i = 0
-//     message.channel.send(`**Choose an option from below**\n${result.map(song => `**${++i}**. ${song.name} - \`${song.formattedDuration}\``).join("\n")}\n*Enter anything else or wait 60 seconds to cancel*`)
-//   })
-//   // DisTubeOptions.searchSongs = true
-//   .on("searchCancel", message => message.channel.send(`${client.emotes.error} | Searching canceled`))
-//   .on("error", (channel, e) => {
-//     channel.send(`${client.emotes.error} | An error encountered: ${e}`)
-//     console.error(e)
-//   })
-//   .on("empty", channel => channel.send("Voice channel is empty! Leaving the channel..."))
-//   .on("searchNoResult", message => message.channel.send(`${client.emotes.error} | No result found!`))
-//   .on("finish", queue => queue.textChannel.send("Finished!"))
-client.login(config.token);
 
+// Login to Discord with your client's token
+client.login(token);

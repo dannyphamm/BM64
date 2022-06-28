@@ -1,27 +1,17 @@
 {
-    "name": "bm64",
-    "version": "1.0.0",
-    "description": "",
-    "main": "index.js",
-    "scripts": {
-        "lint-md": "remark .",
-        "lint": "eslint . --fix"
-    },
-    "remarkConfig": {
-        "plugins": [
-            "remark-preset-lint-recommended"
-        ]
-    },
-    "author": "PRO_Danny",
-    "license": "ISC",
-    "dependencies": {
-        "discord.js": "^12.5.3",
-        "nodemon": "^2.0.9"
-    },
-    "devDependencies": {
-        "eslint": "^7.29.0",
-        "eslint-config-google": "^0.14.0",
-        "remark-cli": "^9.0.0",
-        "remark-preset-lint-recommended": "^5.0.0"
-    }
+  "name": "bm64",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@discordjs/builders": "^0.15.0",
+    "@discordjs/rest": "^0.5.0",
+    "discord-api-types": "^0.35.0",
+    "discord.js": "^13.8.1"
+  }
 }

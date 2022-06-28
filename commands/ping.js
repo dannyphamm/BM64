@@ -1,14 +1,10 @@
-const fetch = require('node-fetch');
-const Discord = require('discord.js');
-const config = require('../config.json');
-
+const { SlashCommandBuilder } = require('@discordjs/builders');
 
 module.exports = {
-  name: "ping",
-  once: true,
-  run: async (client, message, args) => {
-    const msg = await message.channel.send(`${client.emotes.loading} | Pinging...`);
-    const ping = Math.round(msg.createdTimestamp - message.createdTimestamp);
-    msg.edit(`${client.emotes.success} | Pong! \`${ping}ms\``);
-  }
-}
+	data: new SlashCommandBuilder()
+		.setName('ping')
+		.setDescription('Replies with Pong!'),
+	async execute(interaction) {
+		return interaction.reply('Pong!');
+	},
+};
