@@ -3,9 +3,11 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { Client, Collection, Intents } = require('discord.js');
 const { token } = require('./config.json');
-
+const { YtDlpPlugin } = require("@distube/yt-dlp")
+const DisTube = require("distube");
+const { GatewayIntentBits } = require('discord-api-types/v10');
 // Create a new client instance
-const client = new Client({ intents: [Intents.FLAGS.GUILDS, Intents.FLAGS.GUILD_MESSAGES] });
+const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.GuildVoiceStates] });
 
 
 client.commands = new Collection();
@@ -32,6 +34,28 @@ for (const file of commandFiles) {
     client.commands.set(command.data.name, command);
 }
 
-
+const distube = new DisTube.DisTube(client, { youtubeDL: false, plugins: [new YtDlpPlugin()] })
+distube.on('error', (channel, e) => {
+    if (channel) channel.send(`An error encountered: ${e}`)
+    else console.error(e)
+})
+distube.on("initQueue", queue => {
+    queue.autoplay = false;
+    queue.volume = 100;
+	queue.voice.setSelfDeaf(false)
+});
+distube.on("empty", queue => {
+	queue.voice.setSelfDeaf(true)
+})
+distube.on("finish", queue => {
+	queue.voice.setSelfDeaf(true)
+})
+distube.on("addSong", (queue, song) => queue.textChannel.send(
+    `Added ${song.name} - \`${song.formattedDuration}\` to the queue by ${song.user}.`
+));
+distube.on("playSong", (queue, song) => queue.textChannel.send(
+    `Playing \`${song.name}\` - \`${song.formattedDuration}\`\nRequested by: ${song.user}`
+));
+client.distube = distube;
 // Login to Discord with your client's token
 client.login(token);
