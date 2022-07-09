@@ -6,6 +6,7 @@ const { token } = require('./config.json');
 const { YtDlpPlugin } = require("@distube/yt-dlp")
 const DisTube = require("distube");
 const { GatewayIntentBits } = require('discord-api-types/v10');
+const { SpotifyPlugin } = require('@distube/spotify')
 // Create a new client instance
 const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.GuildVoiceStates] });
 
@@ -18,14 +19,14 @@ const eventsPath = path.join(__dirname, 'events');
 const eventFiles = fs.readdirSync(eventsPath).filter(file => file.endsWith('.js'));
 
 for (const file of eventFiles) {
-	const filePath = path.join(eventsPath, file);
-	const event = require(filePath);
+    const filePath = path.join(eventsPath, file);
+    const event = require(filePath);
     console.log("Loaded Event:", event.name)
-	if (event.once) {
-		client.once(event.name, (...args) => event.execute(...args));
-	} else {
-		client.on(event.name, (...args) => event.execute(...args));
-	}
+    if (event.once) {
+        client.once(event.name, (...args) => event.execute(...args));
+    } else {
+        client.on(event.name, (...args) => event.execute(...args));
+    }
 }
 for (const file of commandFiles) {
     const filePath = path.join(commandsPath, file);
@@ -34,7 +35,13 @@ for (const file of commandFiles) {
     client.commands.set(command.data.name, command);
 }
 
-const distube = new DisTube.DisTube(client, { youtubeDL: false, plugins: [new YtDlpPlugin()] })
+const distube = new DisTube.DisTube(client, {
+    youtubeDL: false, plugins: [
+        new YtDlpPlugin(),
+        new SpotifyPlugin({
+            emitEventsAfterFetching: true
+        })]
+})
 distube.on('error', (channel, e) => {
     if (channel) channel.send(`An error encountered: ${e}`)
     else console.error(e)
@@ -42,13 +49,13 @@ distube.on('error', (channel, e) => {
 distube.on("initQueue", queue => {
     queue.autoplay = false;
     queue.volume = 100;
-	queue.voice.setSelfDeaf(false)
+    queue.voice.setSelfDeaf(false)
 });
 distube.on("empty", queue => {
-	queue.voice.setSelfDeaf(true)
+    queue.voice.setSelfDeaf(true)
 })
 distube.on("finish", queue => {
-	queue.voice.setSelfDeaf(true)
+    queue.voice.setSelfDeaf(true)
 })
 distube.on("addSong", (queue, song) => queue.textChannel.send(
     `Added ${song.name} - \`${song.formattedDuration}\` to the queue by ${song.user}.`
