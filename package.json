@@ -19,6 +19,7 @@
         "discord.js": "13.8.1",
         "distube": "3.3.4",
         "libsodium-wrappers": "^0.7.10",
-        "music-lyrics": "^2.0.2"
+        "music-lyrics": "^2.0.2",
+        "twitter-api-v2": "^1.12.5"
     }
 }

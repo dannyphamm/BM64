@@ -6,7 +6,8 @@ const { token } = require('./config.json');
 const { YtDlpPlugin } = require("@distube/yt-dlp")
 const DisTube = require("distube");
 const { GatewayIntentBits } = require('discord-api-types/v10');
-const { SpotifyPlugin } = require('@distube/spotify')
+const { SpotifyPlugin } = require('@distube/spotify');
+
 // Create a new client instance
 const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.GuildVoiceStates] });
 
@@ -63,6 +64,8 @@ distube.on("addSong", (queue, song) => queue.textChannel.send(
 distube.on("playSong", (queue, song) => queue.textChannel.send(
     `Playing \`${song.name}\` - \`${song.formattedDuration}\`\nRequested by: ${song.user}`
 ));
+
+
 client.distube = distube;
 // Login to Discord with your client's token
 client.login(token);
