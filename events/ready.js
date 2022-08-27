@@ -19,12 +19,16 @@ module.exports = {
             expansions: ["attachments.media_keys"],
             "media.fields": ["url", "variants"]
         })
+
+        stream.on(ETwitterStreamEvent.Error, error => {
+            console.log(error)
+        })
         stream.on(ETwitterStreamEvent.Data, data => {
             webhook1.send({
                 username: 'Shitposter',
                 avatarURL: 'https://i.imgur.com/wSTFkRM.png',
                 files: [ {
-                    attachment: data.includes?.media[0]?.variants?.filter(data => data.content_type === "video/mp4")[0]?.url
+                    attachment: data.includes?.media[0]?.variants?.filter(data => data.content_type === "video/mp4").sort((a, b) => b.bit_rate - a.bit_rate)[0]?.url
                 }]
             })
         })
