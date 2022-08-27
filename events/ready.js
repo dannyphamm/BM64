@@ -24,6 +24,8 @@ module.exports = {
             console.log(error)
         })
         stream.on(ETwitterStreamEvent.Data, data => {
+            console.log("New Tweet:" + data.includes?.media[0]?.variants?.filter(data => data.content_type === "video/mp4"))
+            console.log("Selected:" + data.includes?.media[0]?.variants?.filter(data => data.content_type === "video/mp4").sort((a, b) => b.bit_rate - a.bit_rate)[0]?.bit_rate)
             webhook1.send({
                 username: 'Shitposter',
                 avatarURL: 'https://i.imgur.com/wSTFkRM.png',
