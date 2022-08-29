@@ -17,18 +17,24 @@ const commandsPath = path.join(__dirname, 'commands');
 const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
 
 const eventsPath = path.join(__dirname, 'events');
-const eventFiles = fs.readdirSync(eventsPath).filter(file => file.endsWith('.js'));
+const servicesPath = path.join(__dirname, 'services');
 
-for (const file of eventFiles) {
-    const filePath = path.join(eventsPath, file);
-    const event = require(filePath);
-    console.log("Loaded Event:", event.name)
-    if (event.once) {
-        client.once(event.name, (...args) => event.execute(...args));
-    } else {
-        client.on(event.name, (...args) => event.execute(...args));
+const events = [eventsPath, servicesPath]
+
+for (const eventPath of events) {
+    const files = fs.readdirSync(eventPath).filter(file => file.endsWith('.js'));
+    for (const file of files) {
+        const filePath = path.join(eventPath, file);
+        const event = require(filePath);
+        console.log("Loaded Event:", event.name)
+        if (event.once) {
+            client.once(event.name, (...args) => event.execute(...args));
+        } else {
+            client.on(event.name, (...args) => event.execute(...args));
+        }
     }
 }
+
 for (const file of commandFiles) {
     const filePath = path.join(commandsPath, file);
     const command = require(filePath);
@@ -64,7 +70,6 @@ distube.on("addSong", (queue, song) => queue.textChannel.send(
 distube.on("playSong", (queue, song) => queue.textChannel.send(
     `Playing \`${song.name}\` - \`${song.formattedDuration}\`\nRequested by: ${song.user}`
 ));
-
 
 client.distube = distube;
 // Login to Discord with your client's token
