@@ -1,5 +1,6 @@
 const { TwitterApi, ETwitterStreamEvent } = require('twitter-api-v2');
 const { twitterauth } = require('../config.json');
+const util = require('util')
 module.exports = {
     name: 'ready',
     once: true,
@@ -19,13 +20,11 @@ module.exports = {
             expansions: ["attachments.media_keys"],
             "media.fields": ["url", "variants"]
         })
-
+        stream.autoReconnect = true;
         stream.on(ETwitterStreamEvent.Error, error => {
-            console.log(error)
+            console.log(util.inspect(error,true,10))
         })
         stream.on(ETwitterStreamEvent.Data, data => {
-            console.log("New Tweet:" + data.includes?.media[0]?.variants?.filter(data => data.content_type === "video/mp4"))
-            console.log("Selected:" + data.includes?.media[0]?.variants?.filter(data => data.content_type === "video/mp4").sort((a, b) => b.bit_rate - a.bit_rate)[0]?.bit_rate)
             webhook1.send({
                 username: 'Shitposter',
                 avatarURL: 'https://i.imgur.com/wSTFkRM.png',
