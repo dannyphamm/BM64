@@ -8,6 +8,7 @@ const DisTube = require("distube");
 const { GatewayIntentBits } = require('discord-api-types/v10');
 const { SpotifyPlugin } = require('@distube/spotify');
 
+
 // Create a new client instance
 const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.GuildVoiceStates] });
 
@@ -19,7 +20,7 @@ const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('
 const eventsPath = path.join(__dirname, 'events');
 const servicesPath = path.join(__dirname, 'services');
 
-const events = [eventsPath, servicesPath]
+const events = [eventsPath]
 
 for (const eventPath of events) {
     const files = fs.readdirSync(eventPath).filter(file => file.endsWith('.js'));
