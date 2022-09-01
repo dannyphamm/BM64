@@ -5,8 +5,8 @@ module.exports = {
     async execute(interaction) {
         console.log(`${interaction.user.tag} in #${interaction.channel.name} triggered an interaction.`);
         // v14 interaction.type == InteractionType.ApplicationCommandAutocomplete
-        if (interaction.isAutocomplete()) {
-            if (interaction.commandName === 'toggle') {
+        if (interaction.type == InteractionType.ApplicationCommandAutocomplete) {
+            if (interaction.commandName === 'toggle' ||interaction.commandName === 'create') {
                 const focusedOption = interaction.options.getFocused(true);
                 let choices;
                 if (focusedOption.name === 'module') {
@@ -16,10 +16,10 @@ module.exports = {
                         }
                     })
                 }
-                if (focusedOption.name === 'theme') {
-                    choices = ['halloween', 'christmas', 'summer'];
+                if (focusedOption.name === 'service') {
+                    console.log("here")
+                    choices = ['hourly-shitposts'];
                 }
-
                 // Sanitize Array
                 choices = choices.filter(function (element) {
                     return element !== undefined;
@@ -31,7 +31,7 @@ module.exports = {
             }
         }
         // v14 interaction.type == InteractionType.ApplicationCommand
-        if (interaction.isCommand()) {
+        if (interaction.type == InteractionType.ApplicationCommand) {
             const command = interaction.client.commands.get(interaction.commandName);
             const disabled = false;
             if (!command) return;
