@@ -14,18 +14,21 @@ module.exports = {
 	async execute(interaction) {
 		const type = interaction.options.getString('service')
 		const ch = interaction.guild.channels.cache.find(c => c.name === type)
-		if(type === 'hourly-shitposts') {
-			if(ch) return interaction.reply(`Channel already exists!`);;
-			await interaction.guild.channels.create({ 
+		if (type === 'hourly-shitposts') {
+			if (ch) return interaction.reply(`Channel already exists!`);;
+			await interaction.guild.channels.create({
 				name: type,
-				reason: 'Needed a cool new channel' })
-			ch.createWebhook({
-				name: 'Snek',
-				avatar: 'https://i.imgur.com/mI8XcpG.jpg',
-				reason: 'Needed a cool new Webhook'
+				reason: 'Needed a cool new channel'
+			}).then((channel) => {
+				channel.createWebhook({
+					name: 'Snek',
+					avatar: 'https://i.imgur.com/mI8XcpG.jpg',
+					reason: 'Needed a cool new Webhook'
+				})
+					.then(webhook => console.log(`Created webhook ${webhook}`))
+					.catch(console.error);
 			})
-				.then(webhook => console.log(`Created webhook ${webhook}`))
-				.catch(console.error);
+
 		}
 		return interaction.reply(`test`);
 	},

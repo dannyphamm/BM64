@@ -8,10 +8,20 @@ const loadTwitter = async (client) => {
     const twitterClient = new TwitterApi(twitterauth)
     await twitterClient.v2.updateStreamRules({
         add: [
-            { value: 'from:hourly_shitpost' },
+            { value: 'from:hourly_shitpost', tag: 'from:hourly_shitpost' },
+            { value: 'from:dannypham13', tag: 'from:dannypham13' }
         ],
     });
 
+    // const deleteRules = await twitterClient.v2.updateStreamRules({
+    //     delete: {
+    //       ids: ['1565386496994992128', '1565386496994992129'],
+    //     },
+    //   });
+    const rules = await twitterClient.v2.streamRules();
+
+    // Log every rule ID
+    console.log(rules.data.map(rule => rule.id));
     const stream = await twitterClient.v2.searchStream({
         expansions: ["attachments.media_keys"],
         "media.fields": ["url", "variants"]
@@ -20,12 +30,15 @@ const loadTwitter = async (client) => {
     stream.on(ETwitterStreamEvent.Error, error => {
         console.log(util.inspect(error, true, 10))
     })
-    stream.on(ETwitterStreamEvent.Data, data => {
+    stream.on(ETwitterStreamEvent.Data, async (data) => {
+        console.log("data received", data)
         client.guilds.cache.forEach(async (guild) => {
-            let text = guild.channels.cache.find(c => c.name === 'hourly-shitposts')
-            if (!text) return
+            let text = await guild.channels.cache.find(c => c.name === 'hourly-shitposts')
+            if (!text) return;
             const webhooks = await text.fetchWebhooks()
+            if (webhooks.size === 0) return;
             const webhooktoken = webhooks.find(wh => wh.token)
+            console.log("hourly-shitposts", "Sending data  to: " + guild.name)
             webhooktoken.send({
                 username: 'Shitposter',
                 avatarURL: 'https://i.imgur.com/wSTFkRM.png',
@@ -38,8 +51,8 @@ const loadTwitter = async (client) => {
     })
 }
 
-module.exports = { 
-    loadTwitter: function(client) {
+module.exports = {
+    loadTwitter: function (client) {
         loadTwitter(client)
     }
- }
+}
