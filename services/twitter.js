@@ -1,7 +1,5 @@
 const { TwitterApi, ETwitterStreamEvent } = require('twitter-api-v2');
 const { twitterauth } = require('../config.json');
-const util = require('util')
-
 
 const loadTwitter = async (client) => {
     console.log('LOAD TWITTER!');
@@ -28,7 +26,7 @@ const loadTwitter = async (client) => {
     })
     stream.autoReconnect = true;
     stream.on(ETwitterStreamEvent.Error, error => {
-        console.log(util.inspect(error, true, 10))
+        console.log("ERROR", error)
     })
     stream.on(ETwitterStreamEvent.Data, async (data) => {
         console.log("data received", data)
