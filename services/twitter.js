@@ -6,16 +6,19 @@ const loadTwitter = async (client) => {
     const twitterClient = new TwitterApi(twitterauth)
     await twitterClient.v2.updateStreamRules({
         add: [
-            { value: 'from:hourly_shitpost', tag: 'from:hourly_shitpost' },
-            { value: 'from:dannypham13', tag: 'from:dannypham13' }
+            { value: 'has:video_link (from:hourly_shitpost OR from:dannypham13 OR from:hi1ar10us OR from:Lmfaoos) ', tag: 'from:memes' }
         ],
     });
 
     // const deleteRules = await twitterClient.v2.updateStreamRules({
     //     delete: {
-    //       ids: ['1565386496994992128', '1565386496994992129'],
+    //         ids: ['1568253860753588224',
+    //             '1568253860753588225',
+    //             '1568253860753588226',
+    //             '1568254871253692416',
+    //             '1568254871253692417'],
     //     },
-    //   });
+    // });
     const rules = await twitterClient.v2.streamRules();
 
     // Log every rule ID
@@ -29,7 +32,6 @@ const loadTwitter = async (client) => {
         console.log("ERROR", error)
     })
     stream.on(ETwitterStreamEvent.Data, async (data) => {
-        console.log("data received", data)
         client.guilds.cache.forEach(async (guild) => {
             let text = await guild.channels.cache.find(c => c.name === 'hourly-shitposts')
             if (!text) return;
