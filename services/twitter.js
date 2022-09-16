@@ -6,17 +6,13 @@ const loadTwitter = async (client) => {
     const twitterClient = new TwitterApi(twitterauth)
     await twitterClient.v2.updateStreamRules({
         add: [
-            { value: 'has:video_link (from:hourly_shitpost OR from:dannypham13 OR from:hi1ar10us OR from:Lmfaoos) ', tag: 'from:memes' }
+            { value: 'has:video_link (from:hourly_shitpost OR from:dannypham13 OR from:hi1ar10us OR from:Lmfaoos OR from:30SECVlDEOS) ', tag: 'from:memes' }
         ],
     });
 
     // const deleteRules = await twitterClient.v2.updateStreamRules({
     //     delete: {
-    //         ids: ['1568253860753588224',
-    //             '1568253860753588225',
-    //             '1568253860753588226',
-    //             '1568254871253692416',
-    //             '1568254871253692417'],
+    //         ids: ['1568255837180956673', '1570632737014546433'],
     //     },
     // });
     const rules = await twitterClient.v2.streamRules();
