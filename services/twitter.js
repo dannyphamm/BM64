@@ -4,11 +4,11 @@ const { twitterauth } = require('../config.json');
 const loadTwitter = async (client) => {
     console.log('LOAD TWITTER!');
     const twitterClient = new TwitterApi(twitterauth)
-    await twitterClient.v2.updateStreamRules({
-        add: [
-            { value: 'has:video_link (from:hourly_shitpost OR from:dannypham13 OR from:hi1ar10us OR from:Lmfaoos OR from:30SECVlDEOS) ', tag: 'from:memes' }
-        ],
-    });
+    // await twitterClient.v2.updateStreamRules({
+    //     add: [
+    //         { value: 'has:video_link (from:hourly_shitpost OR from:dannypham13 OR from:hi1ar10us OR from:Lmfaoos OR from:30SECVlDEOS) ', tag: 'from:memes' }
+    //     ],
+    // });
 
     // const deleteRules = await twitterClient.v2.updateStreamRules({
     //     delete: {
@@ -41,6 +41,8 @@ const loadTwitter = async (client) => {
                 files: [{
                     attachment: data.includes?.media[0]?.variants?.filter(data => data.content_type === "video/mp4").sort((a, b) => b.bit_rate - a.bit_rate)[0]?.url
                 }]
+            }).catch(error => {
+                console.log("File too big")
             })
         })
 
