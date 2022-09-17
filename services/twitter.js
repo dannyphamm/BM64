@@ -4,15 +4,15 @@ const { twitterauth } = require('../config.json');
 const loadTwitter = async (client) => {
     console.log('LOAD TWITTER!');
     const twitterClient = new TwitterApi(twitterauth)
-    // await twitterClient.v2.updateStreamRules({
-    //     add: [
-    //         { value: 'has:video_link (from:hourly_shitpost OR from:dannypham13 OR from:hi1ar10us OR from:Lmfaoos OR from:30SECVlDEOS) ', tag: 'from:memes' }
-    //     ],
-    // });
+    await twitterClient.v2.updateStreamRules({
+        add: [
+            { value: 'has:video_link (from:hourly_shitpost OR from:dannypham13 OR from:hi1ar10us OR from:Lmfaoos OR from:30SECVlDEOS OR from:BeratStuff OR from:hourly_absurd)', tag: 'from:memes' }
+        ],
+    });
 
     // const deleteRules = await twitterClient.v2.updateStreamRules({
     //     delete: {
-    //         ids: ['1568255837180956673', '1570632737014546433'],
+    //         tags: [ 'from:memes' ],
     //     },
     // });
     const rules = await twitterClient.v2.streamRules();
