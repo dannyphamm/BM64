@@ -17,7 +17,7 @@ module.exports = {
         const queue = interaction.client.distube.getQueue(interaction.guild.id)
         if (!queue) return interaction.reply(`There is nothing in the queue right now!`)
         try {
-            const choice = Integer.parse(interaction.options.get('type').value)
+            const choice = parseInt(interaction.options.get('type').value)
             queue.setRepeatMode(choice)
             if (choice === 0) {
                 return interaction.reply(`Repeat mode set to: OFF`)
