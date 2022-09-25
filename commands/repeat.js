@@ -9,15 +9,15 @@ module.exports = {
                 .setDescription('The gif category')
                 .setRequired(true)
                 .addChoices(
-                    { name: 'Off', value: 0 },
-                    { name: 'Song', value: 1 },
-                    { name: 'Queue', value: 2 },
+                    { name: 'Off', value: '0' },
+                    { name: 'Song', value: '1' },
+                    { name: 'Queue', value: '2' },
                 )),
     async execute(interaction) {
         const queue = interaction.client.distube.getQueue(interaction.guild.id)
         if (!queue) return interaction.reply(`There is nothing in the queue right now!`)
         try {
-            const choice = interaction.options.get('type').value
+            const choice = Integer.parse(interaction.options.get('type').value)
             queue.setRepeatMode(choice)
             if (choice === 0) {
                 return interaction.reply(`Repeat mode set to: OFF`)
