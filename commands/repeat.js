@@ -9,9 +9,9 @@ module.exports = {
                 .setDescription('The gif category')
                 .setRequired(true)
                 .addChoices(
-                    { name: 'Off', value: '0' },
-                    { name: 'Song', value: '1' },
-                    { name: 'Queue', value: '2' },
+                    { name: 'Off', value: 0 },
+                    { name: 'Song', value: 1 },
+                    { name: 'Queue', value: 2 },
                 )),
     async execute(interaction) {
         const queue = interaction.client.distube.getQueue(interaction.guild.id)
