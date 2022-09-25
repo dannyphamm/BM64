@@ -4,7 +4,7 @@ const path = require('node:path');
 const { Client, Collection, Intents } = require('discord.js');
 const { token } = require('./config.json');
 const { YtDlpPlugin } = require("@distube/yt-dlp")
-const {DisTube} = require("distube");
+const { DisTube } = require("distube");
 const { GatewayIntentBits } = require('discord-api-types/v10');
 const { SpotifyPlugin } = require('@distube/spotify');
 
@@ -43,12 +43,17 @@ for (const file of commandFiles) {
     client.commands.set(command.data.name, command);
 }
 
-const distube = new DisTube(client,{
+const distube = new DisTube(client, {
     plugins: [
-        new YtDlpPlugin({update: false}),
+        new YtDlpPlugin({ update: false }),
         new SpotifyPlugin({
             emitEventsAfterFetching: true
-        })]
+        })
+    ],
+    ytdlOptions: {
+        filter: 'audioonly',
+        quality: 'highestaudio',
+    }
 })
 distube.on('error', (channel, e) => {
     if (channel) channel.send(`An error encountered: ${e}`)
