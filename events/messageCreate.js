@@ -2,7 +2,9 @@
 module.exports = {
     name: 'messageCreate',
     execute(message) {
-        if(message.channel.type === 'GUILD_VOICE') {
+        console.log(message.channel.type)
+        if(message.channel.type === 2) {
+            console.log(message)
             setTimeout(()=> {
                 message.delete()
             }, 900000)
