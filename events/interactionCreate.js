@@ -17,8 +17,7 @@ module.exports = {
                     })
                 }
                 if (focusedOption.name === 'service') {
-                    console.log("here")
-                    choices = ['hourly-shitposts'];
+                    choices = ['hourly-shitposts','shaped-internet'];
                 }
                 // Sanitize Array
                 choices = choices.filter(function (element) {

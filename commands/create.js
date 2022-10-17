@@ -30,6 +30,23 @@ module.exports = {
 			})
 
 		}
-		return interaction.reply(`test`);
+
+		if (type === 'shaped-internet') {
+			if (ch) return interaction.reply(`Channel already exists!`);;
+			await interaction.guild.channels.create({
+				name: type,
+				reason: 'Needed a cool new channel'
+			}).then((channel) => {
+				channel.createWebhook({
+					name: 'Snek',
+					avatar: 'https://i.imgur.com/mI8XcpG.jpg',
+					reason: 'Needed a cool new Webhook'
+				})
+					.then(webhook => console.log(`Created webhook ${webhook}`))
+					.catch(console.error);
+			})
+
+		}
+		return interaction.reply(`Created`);
 	},
 };
