@@ -29,15 +29,15 @@ const loadTwitter = async (client) => {
     })
 
     stream.on(ETwitterStreamEvent.Error, error => {
-        console.log("ERROR RECONNECTION", error)
+        console.dir(error, { depth: null })
         stream.close()
         setTimeout(() => {
+            console.log("reconnecting")
             stream.reconnect()
         }, 20000);
     })
 
     stream.on(ETwitterStreamEvent.Data, async (data) => {
-        console.log(data.includes?.media)
         client.guilds.cache.forEach(async (guild) => {
             if (data.matching_rules.some(e => e.tag === "from:memes")) {
                 let text = await guild.channels.cache.find(c => c.name === 'hourly-shitposts')
