@@ -14,7 +14,7 @@ const loadTwitter = async (client) => {
     });
     await twitterClient.v2.updateStreamRules({
         add: [
-            { value: 'has:video_link (from:hourly_shitpost OR from:dannypham13 OR from:hi1ar10us OR from:Lmfaoos OR from:30SECVlDEOS OR from:BeratStuff OR from:hourly_absurd)', tag: 'from:memes' },
+            { value: 'has:video_link (from:hourly_shitpost OR from:dannypham13 OR from:hi1ar10us OR from:Lmfaoos OR from:30SECVlDEOS OR from:BeratStuff OR from:hourly_absurd OR from:hourly_crappost)', tag: 'from:memes' },
             { value: 'has:media (from:ShapedInternet OR from:dannypham13)', tag: 'from:internet' }
         ],
     });
