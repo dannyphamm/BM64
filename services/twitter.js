@@ -6,6 +6,7 @@ const loadTwitter = async (client) => {
     const twitterClient = new TwitterApi(twitterauth)
     const rules = await twitterClient.v2.streamRules();
     console.log(rules.data.map(rule => rule.id))
+    twitterClient.autoReconnect = true
     const deleteRules = await twitterClient.v2.updateStreamRules({
         delete: {
             ids: rules.data.map(rule => rule.id),
@@ -30,10 +31,9 @@ const loadTwitter = async (client) => {
 
     stream.on(ETwitterStreamEvent.Error, error => {
         console.dir(error, { depth: null })
-        stream.close()
-        setTimeout(() => {
+        setTimeout(async () => {
             console.log("reconnecting")
-            stream.reconnect()
+            await stream.reconnect()
         }, 20000);
     })
 
