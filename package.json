@@ -5,7 +5,8 @@
     "main": "index.js",
     "scripts": {
         "lint-md": "remark .",
-        "lint": "eslint . --fix"
+        "lint": "eslint . --fix",
+        "test": "echo \"No test specified\""
     },
     "remarkConfig": {
         "plugins": [
