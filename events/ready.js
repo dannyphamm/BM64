@@ -76,7 +76,7 @@ module.exports = {
         const seconds = new Date().getSeconds();
         const hours = new Date().getHours();
         if ((mins === 0 || mins % 10 === 0) && seconds == 0) {
-          fetch('https://meme-api.herokuapp.com/gimme').then((response) => response.json()).then((data) => {
+          fetch('https://meme-api.com/gimme').then((response) => response.json()).then((data) => {
             const embed = new Discord.MessageEmbed()
               .setColor('#0099ff')
               .setURL(data.postLink)
