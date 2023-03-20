@@ -1,5 +1,5 @@
 const { WebhookClient } = require('discord.js');
-
+const config = require('./config.json');
 const loadRandomFacts = async (client) => {
     async function sendHook() {
         const fetch = await import('node-fetch');
