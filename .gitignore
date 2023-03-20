@@ -2,3 +2,4 @@ config.json
 node_modules
 .env
 pnpm-lock.yaml
+package-lock.json
