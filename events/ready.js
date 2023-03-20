@@ -1,4 +1,4 @@
-const randomFacts = require('../services/randomFacts');
+const randomFacts = require('../services/randomfacts');
 const redditmemes = require('../services/redditmemes');
 const twitter = require('../services/twitter');
 const wordoftheday = require('../services/wordoftheday');
