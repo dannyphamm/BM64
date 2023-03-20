@@ -11,7 +11,9 @@ jobs:
     steps:
     - name: Check out repository
       uses: actions/checkout@v2
-
+      with:
+        node-version: 16
+  
     - name: Set up Node.js
       uses: actions/setup-node@v2
       with:
@@ -20,8 +22,8 @@ jobs:
     - name: Install dependencies
       run: npm install
 
-    - name: Run script
+    - name: Register commands to Beta
       run: node ./deploy-commands-actions.js
       env:
-        BM64_DEV_CLIENTID: ${{ secrets.BM64_DEV_CLIENTID }}
-        BM64_DEV_TOKEN: ${{ secrets.BM64_DEV_TOKEN }}
+        BM64_BETA_CLIENTID: ${{ secrets.BM64_BETA_CLIENTID }}
+        BM64_BETA_TOKEN: ${{ secrets.BM64_BETA_TOKEN }}
