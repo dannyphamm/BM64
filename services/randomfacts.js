@@ -1,25 +1,21 @@
 const { WebhookClient } = require('discord.js');
 
-const loadRedditMemes = async (client) => {
+const loadRandomFacts = async (client) => {
     async function sendHook() {
         const fetch = await import('node-fetch');
 
-        fetch.default('https://meme-api.com/gimme')
+        fetch.default('https://api.api-ninjas.com/v1/facts?limit=1', {headers: {'X-Api-Key': config.factKey }})
             .then(response => response.json())
             .then(async data => {
                 const exampleEmbed = {
-                    title: data.title,
-                    url: data.url,
-                    image: {
-                        url: data.url,
-                    },
+                    description: data[0].fact,
                     color: 0x7289da,
                     timestamp: new Date().toISOString(),
                     footer: {
-                        text: 'r/' + data.subreddit + ' • ' + data.author + ' • ' + 'Powered by BM64',
+                        text: 'Powered by BM64',
                     }
                 };
-                const channel = await client.channels.cache.find(c => c.name === 'daily-memes');
+                const channel = await client.channels.cache.find(c => c.name === 'phalans-facts');
                 if (!channel) return;
                 const webhooks = await channel.fetchWebhooks();
                 if (webhooks.size === 0) return;
@@ -47,8 +43,8 @@ const loadRedditMemes = async (client) => {
 }
 
 module.exports = {
-    loadRedditMemes: function (client) {
-        loadRedditMemes(client)
+    loadRandomFacts: function (client) {
+        loadRandomFacts(client)
     }
 }
 
