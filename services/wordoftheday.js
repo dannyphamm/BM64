@@ -73,7 +73,7 @@ const loadWordOfTheDay = async (client) => {
                     }
                 };
                 const definitions = {
-                    title: data.word.charAt(0).toUppercase() + data.word.slice(1) + " Definitions",
+                    title: data.word+ " Definitions",
                     color: 0x7289da,
                     fields: createDefinitions(data),
                     footer: {
@@ -82,7 +82,7 @@ const loadWordOfTheDay = async (client) => {
                 };
 
                 const examples = {
-                    title: data.word.charAt(0).toUppercase() + data.word.slice(1) + " Examples",
+                    title: data.word + " Examples",
                     color: 0x7289da,
                     fields: createExamples(data.examples),
                     timestamp: new Date().toISOString(),
