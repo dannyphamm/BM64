@@ -4,7 +4,7 @@ const loadRedditMemes = async (client) => {
     async function sendHook() {
         const fetch = await import('node-fetch');
 
-        fetch.default('https://meme-api.com/gimme')
+        await fetch.default('https://meme-api.com/gimme')
             .then(response => response.json())
             .then(async data => {
                 const exampleEmbed = {

@@ -4,9 +4,10 @@ const loadRandomFacts = async (client) => {
     async function sendHook() {
         const fetch = await import('node-fetch');
 
-        fetch.default('https://api.api-ninjas.com/v1/facts?limit=1', {headers: {'X-Api-Key': config.factKey }})
+        await fetch.default('https://api.api-ninjas.com/v1/facts?limit=1', {headers: {'X-Api-Key': config.factKey }})
             .then(response => response.json())
             .then(async data => {
+
                 const exampleEmbed = {
                     description: data[0].fact,
                     color: 0x7289da,

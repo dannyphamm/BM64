@@ -1,9 +1,8 @@
 const { WebhookClient } = require('discord.js');
 const config = require("../config.json")
-function createDefinitions(def) {
+function createDefinitions(data) {
     const array = [];
-
-    for (let i of def.data) {
+    for (let i of data.definitions) {
         array.push(
             {
                 name: `Source`,
@@ -61,11 +60,11 @@ const loadWordOfTheDay = async (client) => {
     async function sendHook() {
         const fetch = await import('node-fetch');
 
-        fetch.default(`https://api.wordnik.com/v4/words.json/wordOfTheDay?api_key=${config.wordofDayKey}`)
+        await fetch.default(`https://api.wordnik.com/v4/words.json/wordOfTheDay?api_key=${config.wordofDayKey}`)
             .then(response => response.json())
             .then(async data => {
                 const word = {
-                    title: data.word,
+                    title: data.word.charAt(0).toUpperCase() + data.word.slice(1),
                     url: data.url,
                     color: 0x7289da,
                     footer: {
@@ -73,7 +72,7 @@ const loadWordOfTheDay = async (client) => {
                     }
                 };
                 const definitions = {
-                    title: data.word+ " Definitions",
+                    title: data.word.charAt(0).toUpperCase() + data.word.slice(1) + " Definitions",
                     color: 0x7289da,
                     fields: createDefinitions(data),
                     footer: {
@@ -82,7 +81,7 @@ const loadWordOfTheDay = async (client) => {
                 };
 
                 const examples = {
-                    title: data.word + " Examples",
+                    title: data.word.charAt(0).toUpperCase() + data.word.slice(1) + " Examples",
                     color: 0x7289da,
                     fields: createExamples(data.examples),
                     timestamp: new Date().toISOString(),
