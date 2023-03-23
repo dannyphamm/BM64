@@ -4,26 +4,31 @@ const loadRandomFacts = async (client) => {
     async function sendHook() {
         const fetch = await import('node-fetch');
 
-        await fetch.default('https://api.api-ninjas.com/v1/facts?limit=1', {headers: {'X-Api-Key': config.factKey }})
+        await fetch.default('https://api.api-ninjas.com/v1/facts?limit=1', { headers: { 'X-Api-Key': config.factKey } })
             .then(response => response.json())
             .then(async data => {
+                console.log(data);
+                if (data[0].fact) {
+                    const exampleEmbed = {
+                        description: data[0].fact,
+                        color: 0x7289da,
+                        timestamp: new Date().toISOString(),
+                        footer: {
+                            text: 'Powered by BM64',
+                        }
+                    };
+                    const channel = await client.channels.cache.find(c => c.name === 'phalans-facts');
+                    if (!channel) return;
+                    const webhooks = await channel.fetchWebhooks();
+                    if (webhooks.size === 0) return;
+                    const webhook = new WebhookClient({ id: webhooks.first().id, token: webhooks.first().token });
+                    webhook.send({
+                        embeds: [exampleEmbed],
+                    });
+                } else {
+                    console.log(data)
+                }
 
-                const exampleEmbed = {
-                    description: data[0].fact,
-                    color: 0x7289da,
-                    timestamp: new Date().toISOString(),
-                    footer: {
-                        text: 'Powered by BM64',
-                    }
-                };
-                const channel = await client.channels.cache.find(c => c.name === 'phalans-facts');
-                if (!channel) return;
-                const webhooks = await channel.fetchWebhooks();
-                if (webhooks.size === 0) return;
-                const webhook = new WebhookClient({ id: webhooks.first().id, token: webhooks.first().token });
-                webhook.send({
-                    embeds: [exampleEmbed],
-                });
             })
             .catch(error => {
                 console.error('Error fetching meme:', error);
