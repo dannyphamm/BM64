@@ -7,8 +7,7 @@ const loadRandomFacts = async (client) => {
         await fetch.default('https://api.api-ninjas.com/v1/facts?limit=1', { headers: { 'X-Api-Key': config.factKey } })
             .then(response => response.json())
             .then(async data => {
-                console.log(data);
-                if (data[0].fact) {
+                if (data[0] && !data.hasOwnProperty('message')) {
                     const exampleEmbed = {
                         description: data[0].fact,
                         color: 0x7289da,
@@ -25,10 +24,7 @@ const loadRandomFacts = async (client) => {
                     webhook.send({
                         embeds: [exampleEmbed],
                     });
-                } else {
-                    console.log(data)
-                }
-
+                } 
             })
             .catch(error => {
                 console.error('Error fetching meme:', error);
