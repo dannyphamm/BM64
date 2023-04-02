@@ -4,9 +4,9 @@
     "description": "",
     "main": "index.js",
     "scripts": {
-        "test": "echo \"Error: no test specified\""
+        "test": "echo \"Error: no test specified\"",
         "lint-md": "remark .",
-        "lint": "eslint . --fix",
+        "lint": "eslint . --fix"
     },
     "author": "",
     "license": "ISC",
