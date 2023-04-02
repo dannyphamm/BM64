@@ -4,19 +4,24 @@
     "description": "",
     "main": "index.js",
     "scripts": {
+        "test": "echo \"Error: no test specified\""
         "lint-md": "remark .",
         "lint": "eslint . --fix",
-        "test": "echo \"No test specified\""
     },
-    "remarkConfig": {
-        "plugins": [
-            "remark-preset-lint-recommended"
-        ]
-    },
-    "author": "PRO_Danny",
+    "author": "",
     "license": "ISC",
     "dependencies": {
-        "discord.js": "^13.8.1"
+        "@discordjs/builders": "^1.5.0",
+        "@discordjs/opus": "^0.9.0",
+        "@discordjs/voice": "^0.15.0",
+        "@distube/spotify": "^1.5.1",
+        "@distube/yt-dlp": "^1.1.3",
+        "discord-api-types": "^0.35.0",
+        "discord.js": "^14.8.0",
+        "distube": "^4.0.4",
+        "genius-lyrics": "^4.4.3",
+        "libsodium-wrappers": "^0.7.11",
+        "node-fetch": "^3.3.1"
     },
     "devDependencies": {
         "eslint": "^8.18.0",
