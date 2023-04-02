@@ -1,11 +1,11 @@
-
+const sentMessages = new Map();
 module.exports = {
-    name: 'messageCreate',
-    execute(message) {
-        if(message.channel.type === 2) {
-            setTimeout(()=> {
-                message.delete()
-            }, 900000)
-        }  
-    },
+  name: 'messageCreate',
+  async execute(message) {
+    if (message.channel.type === 2) {
+      setTimeout(() => {
+        message.delete()
+      }, 900000)
+    }
+  },
 };
