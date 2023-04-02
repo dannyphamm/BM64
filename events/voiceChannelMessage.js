@@ -11,13 +11,10 @@ module.exports = {
         }
 
         if (oldChannel && oldChannel.members.size === 0) { // channel became empty
-            const channelId = oldChannel.id;
             const fetchedMessages = await oldChannel.messages.fetch();
-            const channelMessage = fetchedMessages.find(msg => msg.channelId === channelId);
 
-            if (channelMessage) {
-                channelMessage.delete();
-            }
+            const firstMessage = fetchedMessages.last()
+            firstMessage.delete();
         }
     },
 };
