@@ -1,16 +1,20 @@
 // Require the necessary discord.js classes
 const fs = require('node:fs');
 const path = require('node:path');
-const { Client, Collection, Intents } = require('discord.js');
+const { Client, Collection, IntentsBitField  } = require('discord.js');
 const { token } = require('./config.json');
 const { YtDlpPlugin } = require("@distube/yt-dlp")
 const { DisTube } = require("distube");
-const { GatewayIntentBits } = require('discord-api-types/v10');
 const { SpotifyPlugin } = require('@distube/spotify');
 const Genius = require("genius-lyrics");
 const GeniusClient = new Genius.Client();
 // Create a new client instance
-const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.GuildVoiceStates] });
+const myIntents = new IntentsBitField();
+myIntents.add(IntentsBitField.Flags.Guilds, IntentsBitField.Flags.GuildMessages, IntentsBitField.Flags.GuildVoiceStates);
+const client = new Client(
+    {
+        intents: myIntents
+    });
 
 
 client.commands = new Collection();
@@ -34,19 +38,19 @@ fs.readdir(eventPath, (err, files) => {
 const commandsPath = path.join(__dirname, 'commands');
 
 const loadCommands = (dir) => {
-  const files = fs.readdirSync(dir);
-  for (const file of files) {
-    const filePath = path.join(dir, file);
-    const stat = fs.lstatSync(filePath);
+    const files = fs.readdirSync(dir);
+    for (const file of files) {
+        const filePath = path.join(dir, file);
+        const stat = fs.lstatSync(filePath);
 
-    if (stat.isDirectory()) {
-      loadCommands(filePath);
-    } else if (file.endsWith('.js')) {
-      const command = require(filePath);
-      console.log("Loaded Command:", command.data.name)
-      client.commands.set(command.data.name, command);
+        if (stat.isDirectory()) {
+            loadCommands(filePath);
+        } else if (file.endsWith('.js')) {
+            const command = require(filePath);
+            console.log("Loaded Command:", command.data.name)
+            client.commands.set(command.data.name, command);
+        }
     }
-  }
 };
 
 loadCommands(commandsPath);
