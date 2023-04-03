@@ -1,7 +1,9 @@
+const log = require('../utils/utils')
 const randomFacts = require('../services/randomfacts');
 const redditmemes = require('../services/redditmemes');
 const twitter = require('../services/twitter');
 const wordoftheday = require('../services/wordoftheday');
+
 module.exports = {
     name: 'ready',
     once: true,
@@ -11,7 +13,7 @@ module.exports = {
         redditmemes.loadRedditMemes(client)
         randomFacts.loadRandomFacts(client)
         wordoftheday.loadWordOfTheDay(client)
-        console.log('Ready!');
+        log('Ready!');
     },
 };
 
