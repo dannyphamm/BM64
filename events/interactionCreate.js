@@ -17,7 +17,10 @@ module.exports = {
                     })
                 }
                 if (focusedOption.name === 'service') {
-                    choices = ['hourly-shitposts','shaped-internet', 'kdrama'];
+                    choices = ['hourly-shitposts','shaped-internet'];
+                }
+                if(focusedOption.name === 'webhook') {
+                    choices = ['kdrama']
                 }
                 // Sanitize Array
                 choices = choices.filter(function (element) {
