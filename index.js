@@ -9,6 +9,7 @@ const { SpotifyPlugin } = require('@distube/spotify');
 const log  = require("./utils/utils");
 const Genius = require("genius-lyrics");
 const GeniusClient = new Genius.Client();
+const MongoConnection = require('./utils/db');
 // Create a new client instance
 const myIntents = new IntentsBitField();
 myIntents.add(IntentsBitField.Flags.Guilds, IntentsBitField.Flags.GuildMessages, IntentsBitField.Flags.GuildVoiceStates);
@@ -89,7 +90,13 @@ distube.on("addSong", (queue, song) => queue.textChannel.send(
 distube.on("playSong", (queue, song) => queue.textChannel.send(
     `Playing \`${song.name}\` - \`${song.formattedDuration}\`\nRequested by: ${song.user}`
 ));
+
 client.genius = GeniusClient;
 client.distube = distube;
+const connectToDB = async() => {
+    await MongoConnection.connect();
+    client.mongodb = MongoConnection;
+}
+connectToDB()
 // Login to Discord with your client's token
 client.login(token);
