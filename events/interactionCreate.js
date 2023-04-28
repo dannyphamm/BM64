@@ -1,9 +1,9 @@
 const { InteractionType } = require("discord-api-types/v10");
-
+const log = require('../utils/utils')
 module.exports = {
     name: 'interactionCreate',
     async execute(interaction) {
-        console.log(`${interaction.user.tag} in #${interaction.channel.name} triggered an interaction.`);
+        log(`${interaction.user.tag} in #${interaction.channel.name} triggered an interaction.`);
         // v14 interaction.type == InteractionType.ApplicationCommandAutocomplete
         if (interaction.type == InteractionType.ApplicationCommandAutocomplete) {
             if (interaction.commandName === 'toggle' ||interaction.commandName === 'create') {
@@ -18,6 +18,9 @@ module.exports = {
                 }
                 if (focusedOption.name === 'service') {
                     choices = ['hourly-shitposts','shaped-internet'];
+                }
+                if(focusedOption.name === 'webhook') {
+                    choices = ['kdrama']
                 }
                 // Sanitize Array
                 choices = choices.filter(function (element) {

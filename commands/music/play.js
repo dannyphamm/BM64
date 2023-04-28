@@ -18,3 +18,4 @@ module.exports = {
 		 return interaction.reply(`${interaction.options.getString("name")} added!`, { ephemeral: true });
 	},
 };
+
