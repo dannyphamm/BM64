@@ -40,7 +40,7 @@ const loadKdrama = async (client) => {
                 const imageBuffer = Buffer.from(buffer);
                 const attachment = new AttachmentBuilder(imageBuffer, { name: 'discordjs.jpg' });
                 const embed = new EmbedBuilder()
-                    .setTitle(`NEW DRAMA DETECTED:  \n ${title}`)
+                    .setTitle(`NEW DRAMA DETECTED:\n${title}`)
                     .setDescription(`Episode ${newEpisodes[i]} is released`)
                     .setColor(0x7289da)
                     .setThumbnail('attachment://discordjs.jpg')
@@ -69,7 +69,7 @@ const loadKdrama = async (client) => {
                 const imageBuffer = Buffer.from(buffer);
                 const attachment = new AttachmentBuilder(imageBuffer, { name: 'discordjs.jpg' });
                 const embed = new EmbedBuilder()
-                    .setTitle(`NEW EPISODE DETECTED:  \n ${title}`)
+                    .setTitle(`NEW EPISODE DETECTED:\n${title}`)
                     .setDescription(`Episode ${newEpisodes[i]} is released`)
                     .setColor(0x7289da)
                     .setThumbnail('attachment://discordjs.jpg')
