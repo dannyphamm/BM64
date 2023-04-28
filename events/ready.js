@@ -9,9 +9,10 @@ module.exports = {
     name: 'ready',
     once: true,
     async execute(client) {
-        // API Deprecated
+        
         if (config.mode !== 'DEV') {
-            twitter.loadTwitter(client)
+            // API Deprecated
+            //twitter.loadTwitter(client)
             redditmemes.loadRedditMemes(client)
             randomFacts.loadRandomFacts(client)
             wordoftheday.loadWordOfTheDay(client)
