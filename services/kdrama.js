@@ -32,11 +32,11 @@ const loadKdrama = async (client) => {
         newTitles.forEach(async (title, i) => {
             const index = titles.indexOf(title);
             if (index === -1) {
-
-                console.log(`New title "${title}" found with episode ${newEpisodes[i]}.`);
-                kdramaCollection.insertOne({ title, episode: newEpisodes[i], banner: buffer, link: config.kdramaURL + newLink[i] + "/Episode-" + newEpisodes[i] });
                 const imageURL = newBanner[i]
                 const buffer = await fetch.default(config.kdramaURL + imageURL).then(response => { return response.arrayBuffer() })
+                console.log(`New title "${title}" found with episode ${newEpisodes[i]}.`);
+                kdramaCollection.insertOne({ title, episode: newEpisodes[i], banner: buffer, link: config.kdramaURL + newLink[i] + "/Episode-" + newEpisodes[i] });
+                
                 const imageBuffer = Buffer.from(buffer);
                 const attachment = new AttachmentBuilder(imageBuffer, { name: 'discordjs.jpg' });
                 const embed = new EmbedBuilder()
