@@ -1,4 +1,5 @@
 const log = require('../utils/utils')
+const config = require('../config.json')
 module.exports = {
     name: 'voiceStateUpdate',
     async execute(oldState, newState) {
