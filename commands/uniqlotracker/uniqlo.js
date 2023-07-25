@@ -1,7 +1,6 @@
 const { SlashCommandBuilder } = require('@discordjs/builders');
 const { AttachmentBuilder, EmbedBuilder, ButtonBuilder, ActionRowBuilder } = require('discord.js');
 const { insertPrice, getPriceHistory, getUniqloItem } = require('../../utils/uniqloApi');
-const config = require('../../config');
 const { createCanvas, loadImage } = require('@napi-rs/canvas');
 const { trackUniqloItems } = require('../../services/uniqlo');
 
@@ -43,6 +42,7 @@ module.exports = {
           ),
 
     async execute(interaction) {
+        const config = require('../../config');
         const subcommand = interaction.options.getSubcommand();
         if (subcommand === 'track') {
             // Handle the track subcommand
