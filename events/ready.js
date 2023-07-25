@@ -5,11 +5,13 @@ const twitter = require('../services/twitter');
 const wordoftheday = require('../services/wordoftheday');
 const kdrama = require('../services/kdrama');
 const config = require('../config.json');
+const { trackUniqloItems } = require('../services/uniqlo');
+const schedule = require('node-schedule');
 module.exports = {
     name: 'ready',
     once: true,
-    async execute(client) {
-        
+    execute(client) {
+
         if (config.mode !== 'DEV') {
             // API Deprecated
             //twitter.loadTwitter(client)
@@ -18,8 +20,14 @@ module.exports = {
             wordoftheday.loadWordOfTheDay(client)
             kdrama.loadKdrama(client)
         }
-
-
+        console.log("UniqloTracker: Scheduled job to run every hour.")
+        schedule.scheduleJob('*/10 * * * * *', async () => {
+            try {
+                await trackUniqloItems(client);
+            } catch (error) {
+                console.error(error);
+            }
+        });
         log('Ready!');
     },
 };

@@ -1,12 +1,12 @@
 // Require the necessary discord.js classes
 const fs = require('node:fs');
 const path = require('node:path');
-const { Client, Collection, IntentsBitField  } = require('discord.js');
+const { Client, Collection, IntentsBitField } = require('discord.js');
 const { token } = require('./config.json');
 const { YtDlpPlugin } = require("@distube/yt-dlp")
 const { DisTube } = require("distube");
 const { SpotifyPlugin } = require('@distube/spotify');
-const log  = require("./utils/utils");
+const log = require("./utils/utils");
 const Genius = require("genius-lyrics");
 const GeniusClient = new Genius.Client();
 const MongoConnection = require('./utils/db');
@@ -18,7 +18,11 @@ const client = new Client(
         intents: myIntents
     });
 
-
+const connectToDB = async () => {
+    await MongoConnection.connect();
+    client.mongodb = MongoConnection;
+}
+connectToDB()
 client.commands = new Collection();
 
 const eventPath = path.resolve(__dirname, 'events');
@@ -28,7 +32,7 @@ fs.readdir(eventPath, (err, files) => {
     files.filter(file => file.endsWith('.js')).forEach(file => {
         const filePath = path.join(eventPath, file);
         const event = require(filePath);
-            log(`Loaded Event: ${event.name}`)
+        log(`Loaded Event: ${event.name}`)
         if (event.once) {
             client.once(event.name, (...args) => event.execute(...args));
         } else {
@@ -93,10 +97,6 @@ distube.on("playSong", (queue, song) => queue.textChannel.send(
 
 client.genius = GeniusClient;
 client.distube = distube;
-const connectToDB = async() => {
-    await MongoConnection.connect();
-    client.mongodb = MongoConnection;
-}
-connectToDB()
+
 // Login to Discord with your client's token
 client.login(token);
