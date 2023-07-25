@@ -160,7 +160,7 @@ module.exports = {
 
         } else if (subcommand === 'pricehistory') {
             // Handle the pricehistory subcommand
-            const itemId = interaction.options.getString('id');
+            const itemId = interaction.options.getString('itemid');
             const uniqloCollection = interaction.client.mongodb.db.collection(config.mongodbDBUniqlo);
             const existingItem = await uniqloCollection.findOne({ itemId });
             if (!existingItem) {
@@ -282,7 +282,7 @@ module.exports = {
             await interaction.followUp({ files: [attachment] })
         } else if (subcommand === 'update') {
             // Handle the update subcommand
-            const itemId = interaction.options.getString('id');
+            const itemId = interaction.options.getString('itemid');
             if (itemId) {
 
                 const uniqloCollection = interaction.client.mongodb.db.collection(config.mongodbDBUniqlo);
