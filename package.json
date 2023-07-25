@@ -19,7 +19,6 @@
         "@napi-rs/canvas": "^0.1.41",
         "axios": "^1.4.0",
         "chart.js": "^4.3.1",
-        "chartjs-node-canvas": "^4.1.6",
         "cheerio": "^1.0.0-rc.12",
         "discord-api-types": "^0.35.0",
         "discord.js": "^14.11.0",
