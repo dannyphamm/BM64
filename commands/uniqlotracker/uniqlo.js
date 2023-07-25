@@ -3,7 +3,7 @@ const { AttachmentBuilder, EmbedBuilder, ButtonBuilder, ActionRowBuilder } = req
 const { insertPrice, getPriceHistory, getUniqloItem } = require('../../utils/uniqloApi');
 const { createCanvas, loadImage } = require('@napi-rs/canvas');
 const { trackUniqloItems } = require('../../services/uniqlo');
-const Chart = require('chart.js');
+const Chart = require('chart.js/auto');
 
 module.exports = {
     data: new SlashCommandBuilder()
