@@ -21,7 +21,7 @@ module.exports = {
             kdrama.loadKdrama(client)
         }
         console.log("UniqloTracker: Scheduled job to run every hour.")
-        schedule.scheduleJob('*/10 * * * * *', async () => {
+        schedule.scheduleJob('0 * * * * *', async () => {
             try {
                 await trackUniqloItems(client);
             } catch (error) {
