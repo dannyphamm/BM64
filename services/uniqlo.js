@@ -44,12 +44,13 @@ async function trackUniqloItems(client) {
     }
 }
 async function fetchSaleItems(client, gender, discordId) {
+    console.log("Running")
     try {
         // Fetch the current state of the sale items API
         const response = await axios.get(`${config.uniqloApiUrl}/products?path=${gender}&flagCodes=discount%2Cdiscount&limit=1000&offset=0`);
-        
+
         // If response is not 200 then return
-        if (response.status !== 200) return;
+        if (response.status !== 200) return (log("Error fetching sale items", response.status));
 
         // Retrieve the previous state of the sale items from your database
         const collection = await client.mongodb.db.collection(`sale-items-${gender}`);
@@ -75,7 +76,8 @@ async function fetchSaleItems(client, gender, discordId) {
             }
             return acc;
         }, []);
-        if(addedItems.length === 0 && removedItems.length === 0 && changedItems.length === 0) return;
+        console.log(addedItems.length, removedItems.length, changedItems.length)
+        if (addedItems.length === 0 && removedItems.length === 0 && changedItems.length === 0) return;
         // Log any differences found
         const addedItemsEmbed = new EmbedBuilder()
             .setColor('#0099ff')
@@ -93,12 +95,21 @@ async function fetchSaleItems(client, gender, discordId) {
             **Base:** ${item[0].prices.base.value}\t\t**New Base:** ${item[1].prices.base.value} \t\t **Diff:** ${parseInt(item[1].prices.base.value) - parseInt(item[0].prices.base.value)}\n
             **Promo:** ${item[0].prices.promo.value}\t\t**New Promo:** ${item[1].prices.promo.value} **Diff:** ${parseInt(item[1].prices.promo.value) - parseInt(item[0].prices.promo.value)}`).join('\n\n') || 'None');
         // Update the database with the new state
-        for(const item of removedItems) {
-            await collection.deleteOne({ id: item.productId });
-        }
-        for (const item of response.data.result.items) {
+        for (const item of addedItems) {
             await collection.updateOne({ id: item.productId }, { $set: item }, { upsert: true });
         }
+        for (const item of removedItems) {
+            await collection.deleteOne({ id: item.productId });
+        }
+        // Update the database for changeditems
+
+        changedItems.map(async item => {
+            log("Updating item", item[0].productId)
+            await collection.updateOne({ id: item[0].productId }, { $set: item[1] }, { upsert: true });
+        })
+
+
+
         await client.channels.cache.get(discordId).send({ embeds: [addedItemsEmbed, removedItemsEmbed, changedItemsEmbed] });
     } catch (error) {
         console.error(error);
