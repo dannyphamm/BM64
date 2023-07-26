@@ -55,7 +55,7 @@ module.exports = {
             }
 
             const item = await getUniqloItem(itemId);
-            const itemUrl = `https://www.uniqlo.com/au/en/product/${itemId}.html`;
+            const itemUrl = `https://www.uniqlo.com/au/en/products/${itemId}`;
             const basePrice = item.prices.base.value;
             const promoPrice = item.prices.promo ? item.prices.promo.value : null;
 
@@ -171,7 +171,7 @@ module.exports = {
             const item = await getUniqloItem(itemId);
             const historyEmbed = new EmbedBuilder()
                 .setTitle(`Price history for Uniqlo item ${itemId}`)
-                .setURL(`https://www.uniqlo.com/au/en/product/${itemId}.html`)
+                .setURL(`https://www.uniqlo.com/au/en/products/${itemId}`)
                 .setDescription(`Price history for ${item.name}.`)
                 .setColor('#0099ff');
             for (const price of prices) {
@@ -305,7 +305,7 @@ module.exports = {
                     // Send an alert to a Discord channel
                     const alertEmbed = new EmbedBuilder()
                         .setTitle(`Price change for Uniqlo item ${itemId}`)
-                        .setURL(`https://www.uniqlo.com/au/en/product/${itemId}.html`)
+                        .setURL(`https://www.uniqlo.com/au/en/products/${itemId}`)
                         .setDescription(`The price of ${item.name} has changed.`)
                         .addFields(
                             { name: 'Old Base Price', value: `$${parseInt(existingItem.prices[existingItem.prices.length - 1].basePrice).toFixed(2)}`, inline: true },
@@ -347,7 +347,7 @@ module.exports = {
               const latestPrice = item.prices[item.prices.length - 1];
               embed.addFields(
                 { name: 'Item ID', value: item.itemId, inline: true },
-                { name: 'Item Name', value: `[${item.title}](https://www.uniqlo.com/au/en/product/${item.itemId}.html)`, inline: true },
+                { name: 'Item Name', value: `[${item.title}](https://www.uniqlo.com/au/en/products/${item.itemId})`, inline: true },
                 { name: '\u200B', value: '\u200B', inline: true},
                 { name: 'Base Price', value: `$${parseInt(latestPrice.basePrice).toFixed(2)}`, inline: true },
                 { name: 'Promo Price', value: `$${parseInt(latestPrice.promoPrice || 0).toFixed(2)}`, inline: true},

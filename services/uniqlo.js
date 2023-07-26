@@ -23,7 +23,7 @@ async function trackUniqloItems(client) {
             const item = await getUniqloItem(itemId);
             const alertEmbed = new EmbedBuilder()
                 .setTitle(`Price change for Uniqlo item ${itemId}`)
-                .setURL(`https://www.uniqlo.com/au/en/product/${itemId}.html`)
+                .setURL(`https://www.uniqlo.com/au/en/products/${itemId}`)
                 .setDescription(`The price of ${item.name} has changed.`)
                 .addFields(
                     { name: 'Old Base Price', value: `$${parseInt(latestPrice.basePrice || 0).toFixed(2)}`, inline: true },
@@ -80,16 +80,16 @@ async function fetchSaleItems(client, gender, discordId) {
         const addedItemsEmbed = new EmbedBuilder()
             .setColor('#0099ff')
             .setTitle(`Added items`)
-            .setDescription(addedItems.map(item => `**[${item.name}](https://www.uniqlo.com/au/en/product/${item.productId}.html)**\nBase: ${item.prices.base.value}\nPromo: ${item.prices.promo.value}`).join('\n\n') || 'None');
+            .setDescription(addedItems.map(item => `**[${item.name}](https://www.uniqlo.com/au/en/products/${item.productId})**\nBase: ${item.prices.base.value}\nPromo: ${item.prices.promo.value}`).join('\n\n') || 'None');
 
         const removedItemsEmbed = new EmbedBuilder()
             .setColor('#0099ff')
             .setTitle(`Removed items`)
-            .setDescription(removedItems.map(item => `**[${item.name}](https://www.uniqlo.com/au/en/product/${item.productId}.html)**\nBase: ${item.prices.base.value}\nPromo: ${item.prices.promo.value}`).join('\n\n') || 'None');
+            .setDescription(removedItems.map(item => `**[${item.name}](https://www.uniqlo.com/au/en/products/${item.productId})**\nBase: ${item.prices.base.value}\nPromo: ${item.prices.promo.value}`).join('\n\n') || 'None');
         const changedItemsEmbed = new EmbedBuilder()
             .setColor('#0099ff')
             .setTitle(`Changed items`)
-            .setDescription(changedItems.map(item => `**[${item[0].name}](https://www.uniqlo.com/au/en/product/${item[0].productId}.html)**\n
+            .setDescription(changedItems.map(item => `**[${item[0].name}](https://www.uniqlo.com/au/en/products/${item[0].productId})**\n
             **Base:** ${item[0].prices.base.value}\t\t**New Base:** ${item[1].prices.base.value} \t\t **Diff:** ${parseInt(item[1].prices.base.value) - parseInt(item[0].prices.base.value)}\n
             **Promo:** ${item[0].prices.promo.value}\t\t**New Promo:** ${item[1].prices.promo.value} **Diff:** ${parseInt(item[1].prices.promo.value) - parseInt(item[0].prices.promo.value)}`).join('\n\n') || 'None');
         // Update the database with the new state
