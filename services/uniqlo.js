@@ -93,6 +93,9 @@ async function fetchSaleItems(client, gender, discordId) {
             **Base:** ${item[0].prices.base.value}\t\t**New Base:** ${item[1].prices.base.value} \t\t **Diff:** ${parseInt(item[1].prices.base.value) - parseInt(item[0].prices.base.value)}\n
             **Promo:** ${item[0].prices.promo.value}\t\t**New Promo:** ${item[1].prices.promo.value} **Diff:** ${parseInt(item[1].prices.promo.value) - parseInt(item[0].prices.promo.value)}`).join('\n\n') || 'None');
         // Update the database with the new state
+        for(const item of removedItems) {
+            await collection.deleteOne({ id: item.productId });
+        }
         for (const item of response.data.result.items) {
             await collection.updateOne({ id: item.productId }, { $set: item }, { upsert: true });
         }
