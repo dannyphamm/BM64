@@ -1,8 +1,8 @@
-const schedule = require('node-schedule');
 const { EmbedBuilder } = require('discord.js');
 const { getUniqloItem, getLatestPrices, insertPrice } = require('../utils/uniqloApi');
 const config = require('../config');
-
+const axios = require('axios');
+const { log } = require('../utils/utils');
 async function trackUniqloItems(client) {
     const uniqloCollection = await client.mongodb.db.collection(config.mongodbDBUniqlo);
     const itemIds = await uniqloCollection.distinct('itemId');
@@ -39,10 +39,75 @@ async function trackUniqloItems(client) {
             const channel = client.channels.cache.get(config.discordChannelId);
             channel.send({ embeds: [alertEmbed] });
         } else {
-            console.log(`Item ${itemId} has not changed price.`);
+            log(`Item ${itemId} has not changed price.`);
         }
     }
 }
+async function fetchSaleItems(client, gender, discordId) {
+    try {
+        // Fetch the current state of the sale items API
+        const response = await axios.get(`${config.uniqloApiUrl}/products?path=${gender}&flagCodes=discount%2Cdiscount&limit=1000&offset=0`);
+        
+        // If response is not 200 then return
+        if (response.status !== 200) return;
 
+        // Retrieve the previous state of the sale items from your database
+        const collection = await client.mongodb.db.collection(`sale-items-${gender}`);
+        const previousState = await collection.find().toArray();
+        if (previousState.length === 0) {
+            log("Inserting data into database", response.data.result.items.length)
+            for (const item of response.data.result.items) {
+                await collection.updateOne({ id: item.productId }, { $set: item }, { upsert: true });
+            }
+            return;
+        }
+        // Compare the two states to find any differences
+        const addedItems = response.data.result.items.filter(item => !previousState.find(i => i.productId === item.productId));
+        const removedItems = previousState.filter(item => !response.data.result.items.find(i => i.productId === item.productId));
+        const changedItems = response.data.result.items.reduce((acc, item) => {
+            const previousItem = previousState.find(i => i.productId === item.productId);
+            if (previousItem && (previousItem.prices.base.value !== item.prices.base.value || previousItem.prices.promo.value !== item.prices.promo.value)) {
+                const priceDiff = {
+                    base: previousItem.prices.base.value - item.prices.base.value,
+                    promo: previousItem.prices.promo.value - item.prices.promo.value
+                };
+                acc.push([previousItem, item, priceDiff]);
+            }
+            return acc;
+        }, []);
+        if(addedItems.length === 0 && removedItems.length === 0 && changedItems.length === 0) return;
+        // Log any differences found
+        const addedItemsEmbed = new EmbedBuilder()
+            .setColor('#0099ff')
+            .setTitle(`Added items`)
+            .setDescription(addedItems.map(item => `**[${item.name}](https://www.uniqlo.com/au/en/product/${item.productId}.html)**\nBase: ${item.prices.base.value}\nPromo: ${item.prices.promo.value}`).join('\n\n') || 'None');
 
-module.exports = { trackUniqloItems };
+        const removedItemsEmbed = new EmbedBuilder()
+            .setColor('#0099ff')
+            .setTitle(`Removed items`)
+            .setDescription(removedItems.map(item => `**[${item.name}](https://www.uniqlo.com/au/en/product/${item.productId}.html)**\nBase: ${item.prices.base.value}\nPromo: ${item.prices.promo.value}`).join('\n\n') || 'None');
+        const changedItemsEmbed = new EmbedBuilder()
+            .setColor('#0099ff')
+            .setTitle(`Changed items`)
+            .setDescription(changedItems.map(item => `**[${item[0].name}](https://www.uniqlo.com/au/en/product/${item[0].productId}.html)**\n
+            **Base:** ${item[0].prices.base.value}\t\t**New Base:** ${item[1].prices.base.value} \t\t **Diff:** ${parseInt(item[1].prices.base.value) - parseInt(item[0].prices.base.value)}\n
+            **Promo:** ${item[0].prices.promo.value}\t\t**New Promo:** ${item[1].prices.promo.value} **Diff:** ${parseInt(item[1].prices.promo.value) - parseInt(item[0].prices.promo.value)}`).join('\n\n') || 'None');
+        // Update the database with the new state
+        for (const item of response.data.result.items) {
+            await collection.updateOne({ id: item.productId }, { $set: item }, { upsert: true });
+        }
+        await client.channels.cache.get(discordId).send({ embeds: [addedItemsEmbed, removedItemsEmbed, changedItemsEmbed] });
+    } catch (error) {
+        console.error(error);
+    }
+}
+
+async function maleSaleItems(client) {
+    await fetchSaleItems(client, '6991', config.maleSaleDiscordId);
+}
+
+async function femaleSaleItems(client) {
+    await fetchSaleItems(client, '6990', config.femaleSaleDiscordId);
+}
+
+module.exports = { trackUniqloItems, maleSaleItems, femaleSaleItems };

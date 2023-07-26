@@ -5,7 +5,7 @@ const twitter = require('../services/twitter');
 const wordoftheday = require('../services/wordoftheday');
 const kdrama = require('../services/kdrama');
 const config = require('../config.json');
-const { trackUniqloItems } = require('../services/uniqlo');
+const { trackUniqloItems, femaleSaleItems, maleSaleItems } = require('../services/uniqlo');
 const schedule = require('node-schedule');
 module.exports = {
     name: 'ready',
@@ -20,10 +20,21 @@ module.exports = {
             wordoftheday.loadWordOfTheDay(client)
             kdrama.loadKdrama(client)
         }
-        console.log("UniqloTracker: Scheduled job to run every hour.")
+        log("UniqloTracker: Scheduled job to run every hour.")
         schedule.scheduleJob('0 * * * * *', async () => {
             try {
+                log("Running UniqloSale")
                 await trackUniqloItems(client);
+            } catch (error) {
+                console.error(error);
+            }
+        });
+        log("UniqloSale: Scheduled job to run every hour.")
+        schedule.scheduleJob('*/30 * * * * *', async () => {
+            try {
+                log("Running UniqloSale")
+                await femaleSaleItems(client);
+                await maleSaleItems(client);
             } catch (error) {
                 console.error(error);
             }
