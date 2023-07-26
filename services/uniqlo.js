@@ -2,7 +2,7 @@ const { EmbedBuilder } = require('discord.js');
 const { getUniqloItem, getLatestPrices, insertPrice } = require('../utils/uniqloApi');
 const config = require('../config');
 const axios = require('axios');
-const { log } = require('../utils/utils');
+const log = require('../utils/utils')
 async function trackUniqloItems(client) {
     const uniqloCollection = await client.mongodb.db.collection(config.mongodbDBUniqlo);
     const itemIds = await uniqloCollection.distinct('itemId');
