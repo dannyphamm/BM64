@@ -96,21 +96,20 @@ async function fetchSaleItems(client, gender, discordId) {
             **Promo:** ${item[0].prices.promo.value}\t\t**New Promo:** ${item[1].prices.promo.value} **Diff:** ${parseInt(item[1].prices.promo.value) - parseInt(item[0].prices.promo.value)}`).join('\n\n') || 'None');
         // Update the database with the new state
         for (const item of addedItems) {
+            await client.channels.cache.get(discordId).send({ embeds: [addedItemsEmbed] });
             await collection.updateOne({ id: item.productId }, { $set: item }, { upsert: true });
         }
         for (const item of removedItems) {
+            await client.channels.cache.get(discordId).send({ embeds: [removedItemsEmbed] });
             await collection.deleteOne({ id: item.productId });
         }
         // Update the database for changeditems
 
         changedItems.map(async item => {
+            await client.channels.cache.get(discordId).send({ embeds: [changedItemsEmbed] });
             log("Updating item", item[0].productId)
             await collection.updateOne({ id: item[0].productId }, { $set: item[1] }, { upsert: true });
         })
-
-
-
-        await client.channels.cache.get(discordId).send({ embeds: [addedItemsEmbed, removedItemsEmbed, changedItemsEmbed] });
     } catch (error) {
         console.error(error);
     }
