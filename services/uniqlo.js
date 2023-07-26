@@ -111,9 +111,11 @@ async function fetchSaleItems(client, gender, discordId) {
             await collection.updateOne({ id: item[0].productId }, { $set: item[1] }, { upsert: true });
         })
 
-if(addItems.length > 0) {
+if(addedItems.length > 0) {
 await client.channels.cache.get(discordId).send({ embeds: [addedItemsEmbed] });
-}if(removedItems.length > 0) {
+}
+
+if(removedItems.length > 0) {
 await client.channels.cache.get(discordId).send({ embeds: [removedItemsEmbed] });
 }
 
