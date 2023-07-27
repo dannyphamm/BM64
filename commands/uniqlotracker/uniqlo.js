@@ -2,7 +2,7 @@ const { SlashCommandBuilder } = require('@discordjs/builders');
 const { AttachmentBuilder, EmbedBuilder, ButtonBuilder, ActionRowBuilder } = require('discord.js');
 const { insertPrice, getPriceHistory, getUniqloItem } = require('../../utils/uniqloApi');
 const { createCanvas, loadImage } = require('@napi-rs/canvas');
-const { trackUniqloItems, femaleSaleItems } = require('../../services/uniqlo');
+const { trackUniqloItems, femaleSaleItems,maleSaleItems } = require('../../services/uniqlo');
 const Chart = require('chart.js/auto');
 
 module.exports = {
@@ -285,9 +285,10 @@ module.exports = {
             const itemId = interaction.options.getString('itemid');
             const saleOnly = interaction.options.getBoolean('sale') || false;
             if (saleOnly) {
+await interaction.reply('Updating')
                 await femaleSaleItems(interaction.client);
                 await maleSaleItems(interaction.client);
-                return interaction.reply('Sale items updated.');
+                return interaction.followUp('Sale items updated.');
             }
             if (itemId) {
 
