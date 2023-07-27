@@ -2,7 +2,7 @@ const { SlashCommandBuilder } = require('@discordjs/builders');
 const { AttachmentBuilder, EmbedBuilder, ButtonBuilder, ActionRowBuilder } = require('discord.js');
 const { insertPrice, getPriceHistory, getUniqloItem } = require('../../utils/uniqloApi');
 const { createCanvas, loadImage } = require('@napi-rs/canvas');
-const { trackUniqloItems, femaleSaleItems } = require('../../services/uniqlo');
+const { trackUniqloItems, femaleSaleItems,maleSaleItems } = require('../../services/uniqlo');
 const Chart = require('chart.js/auto');
 
 module.exports = {
