@@ -2,33 +2,8 @@ const { EmbedBuilder, AttachmentBuilder } = require('discord.js');
 const { getUniqloItem, getLatestPrices, insertPrice } = require('../utils/uniqloApi');
 const config = require('../config');
 const axios = require('axios');
-const { log, error } = require('../utils/utils')
-const { createCanvas, loadImage } = require('@napi-rs/canvas');
-async function imageAttachment(images, name) {
-    if (images.length === 0) return null
-    const gridSize = Math.ceil(Math.sqrt(images.length));
-    const gridWidth = gridSize * 200;
-    const gridHeight = gridSize * 200;
+const { log, error, imageAttachment } = require('../utils/utils')
 
-    const imageBuffers = await Promise.all(images.map(async (imageURL) => {
-        const response = await axios.get(imageURL);
-        const buffer = await response.data.arrayBuffer();
-        return buffer;
-    }));
-
-    const canvas = createCanvas(gridWidth, gridHeight);
-    const ctx = canvas.getContext('2d');
-
-    for (let i = 0; i < imageBuffers.length; i++) {
-        const img = await loadImage(Buffer.from(imageBuffers[i]));
-        const x = (i % gridSize) * 200;
-        const y = Math.floor(i / gridSize) * 200;
-        ctx.drawImage(img, x, y, 200, 200);
-    }
-
-    const attachment = await new AttachmentBuilder(canvas.toBuffer('image/png'), { name: name + '.png' });
-    return attachment
-}
 async function trackUniqloItems(client) {
     const uniqloCollection = await client.mongodb.db.collection(config.mongodbDBUniqlo);
     const itemIds = await uniqloCollection.distinct('itemId');
@@ -98,6 +73,7 @@ async function fetchSaleItems(client, gender, discordId) {
         log(addedItems.length, removedItems.length, changedItems.length)
         if (addedItems.length === 0 && removedItems.length === 0 && changedItems.length === 0) return;
         //get the first image url from each item
+        
         const addedItemsImage = await imageAttachment(addedItems.map(item => item.images.main[0].url), "added-items");
         const removedItemsImage = await imageAttachment(removedItems.map(item => item.images.main[0].url), "removed-items");
         const changedItemsImage = await imageAttachment(changedItems.map(item => item[1].images.main[0].url), "changed-items");

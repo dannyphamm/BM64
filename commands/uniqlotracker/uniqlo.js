@@ -4,6 +4,7 @@ const { insertPrice, getPriceHistory, getUniqloItem } = require('../../utils/uni
 const { createCanvas, loadImage } = require('@napi-rs/canvas');
 const { trackUniqloItems, femaleSaleItems,maleSaleItems } = require('../../services/uniqlo');
 const Chart = require('chart.js/auto');
+const { imageAttachment } = require('../../utils/utils');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -88,27 +89,7 @@ module.exports = {
             }
 
             const imageUrls = item.images.main.map(image => image.url);
-            const gridSize = Math.ceil(Math.sqrt(imageUrls.length));
-            const gridWidth = gridSize * 200;
-            const gridHeight = gridSize * 200;
-
-            const imageBuffers = await Promise.all(imageUrls.map(async (imageUrl) => {
-                const response = await fetch(imageUrl);
-                const buffer = await response.arrayBuffer();
-                return buffer;
-            }));
-
-            const canvas = createCanvas(gridWidth, gridHeight);
-            const ctx = canvas.getContext('2d');
-
-            for (let i = 0; i < imageBuffers.length; i++) {
-                const img = await loadImage(Buffer.from(imageBuffers[i]));
-                const x = (i % gridSize) * 200;
-                const y = Math.floor(i / gridSize) * 200;
-                ctx.drawImage(img, x, y, 200, 200);
-            }
-
-            const attachment = await new AttachmentBuilder(canvas.toBuffer('image/png'), { name: 'combined-image.png' });
+            const image = await imageAttachment(imageUrls, 'combined-image.png');
 
             const confirmEmbed = new EmbedBuilder()
                 .setTitle(`Track Uniqlo item ${item.name}?`)
@@ -136,7 +117,7 @@ module.exports = {
                 .setStyle('Danger');
             const confirmRow = new ActionRowBuilder()
                 .addComponents(confirmButton, cancelButton);
-            const confirmMessage = await interaction.reply({ embeds: [confirmEmbed], components: [confirmRow], fetchReply: true, files: [attachment] });
+            const confirmMessage = await interaction.reply({ embeds: [confirmEmbed], components: [confirmRow], fetchReply: true, files: [image] });
             const filter = i => i.user.id === interaction.user.id && (i.customId === 'confirm' || i.customId === 'cancel');
             const collector = confirmMessage.createMessageComponentCollector({ filter, time: 15000 });
             collector.on('collect', async i => {
