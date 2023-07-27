@@ -9,7 +9,7 @@ async function getUniqloItem(itemId) {
 }
 // getlatestprice
 async function getLatestPrices(itemId) {
-    
+
     const item = await getUniqloItem(itemId);
     const basePrice = item.prices.base.value;
     const promoPrice = item.prices.promo ? item.prices.promo.value : null;
@@ -17,13 +17,13 @@ async function getLatestPrices(itemId) {
 }
 
 
-const insertPrice = async (client, itemId, basePrice, promoPrice, title) => {
+const insertPrice = async (client, itemId, basePrice, promoPrice, title, imageURL) => {
     const config = require('../config');
     const uniqloCollection = client.mongodb.db.collection(config.mongodbDBUniqlo);
     const timestamp = new Date();
     await uniqloCollection.updateOne({ itemId, title }, {
         $push: { prices: { timestamp, basePrice, promoPrice } },
-        $set: { lastUpdated: timestamp },
+        $set: { lastUpdated: timestamp, imageURL },
     }, { upsert: true });
 };
 module.exports = { getUniqloItem, insertPrice, getLatestPrices };

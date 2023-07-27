@@ -1,8 +1,34 @@
-const { EmbedBuilder } = require('discord.js');
+const { EmbedBuilder, AttachmentBuilder } = require('discord.js');
 const { getUniqloItem, getLatestPrices, insertPrice } = require('../utils/uniqloApi');
 const config = require('../config');
 const axios = require('axios');
 const { log, error } = require('../utils/utils')
+const { createCanvas, loadImage } = require('@napi-rs/canvas');
+async function imageAttachment(images, name) {
+    if (images.length === 0) return null
+    const gridSize = Math.ceil(Math.sqrt(images.length));
+    const gridWidth = gridSize * 200;
+    const gridHeight = gridSize * 200;
+
+    const imageBuffers = await Promise.all(images.map(async (imageURL) => {
+        const response = await fetch(imageURL);
+        const buffer = await response.arrayBuffer();
+        return buffer;
+    }));
+
+    const canvas = createCanvas(gridWidth, gridHeight);
+    const ctx = canvas.getContext('2d');
+
+    for (let i = 0; i < imageBuffers.length; i++) {
+        const img = await loadImage(Buffer.from(imageBuffers[i]));
+        const x = (i % gridSize) * 200;
+        const y = Math.floor(i / gridSize) * 200;
+        ctx.drawImage(img, x, y, 200, 200);
+    }
+
+    const attachment = await new AttachmentBuilder(canvas.toBuffer('image/png'), { name: name + '.png' });
+    return attachment
+}
 async function trackUniqloItems(client) {
     const uniqloCollection = await client.mongodb.db.collection(config.mongodbDBUniqlo);
     const itemIds = await uniqloCollection.distinct('itemId');
@@ -17,7 +43,7 @@ async function trackUniqloItems(client) {
 
         if (basePrice !== latestPrice.basePrice || promoPrice !== latestPrice.promoPrice) {
             // Save the new price to MongoDB
-            await insertPrice(client, itemId, basePrice, promoPrice, item.name);
+            await insertPrice(client, itemId, basePrice, promoPrice, item.name, existingItem.imageURL);
 
             // Send an alert to a Discord channel
             const item = await getUniqloItem(itemId);
@@ -71,23 +97,30 @@ async function fetchSaleItems(client, gender, discordId) {
         }, []);
         log(addedItems.length, removedItems.length, changedItems.length)
         if (addedItems.length === 0 && removedItems.length === 0 && changedItems.length === 0) return;
+        //get the first image url from each item
+        const addedItemsImage = await imageAttachment(addedItems.map(item => item.images.main[0].url), "added-items");
+        const removedItemsImage = await imageAttachment(removedItems.map(item => item.images.main[0].url), "removed-items");
+        const changedItemsImage = await imageAttachment(changedItems.map(item => item[1].images.main[0].url), "changed-items");
         // Log any differences found
         const addedItemsEmbed = new EmbedBuilder()
             .setColor('#0099ff')
+            .setImage(`attachment://added-items.png`)
             .setTitle(`Added items`)
             .setDescription(addedItems.map(item => `**[${item.name}](https://www.uniqlo.com/au/en/products/${item.productId})**\nBase: ${item.prices.base.value}\nPromo: ${item.prices.promo.value}`).join('\n\n') || 'None');
 
         const removedItemsEmbed = new EmbedBuilder()
             .setColor('#0099ff')
             .setTitle(`Removed items`)
+            .setImage(`attachment://removed-items.png`)
             .setDescription(removedItems.map(item => `**[${item.name}](https://www.uniqlo.com/au/en/products/${item.productId})**\nBase: ${item.prices.base.value}\nPromo: ${item.prices.promo.value}`).join('\n\n') || 'None');
         const changedItemsEmbed = new EmbedBuilder()
             .setColor('#0099ff')
             .setTitle(`Changed items`)
+            .setImage(`attachment://changed-items.png`)
             .setDescription(changedItems.map(item => `**[${item[0].name}](https://www.uniqlo.com/au/en/products/${item[0].productId})**\n
             **Base:** ${item[0].prices.base.value}\t\t**New Base:** ${item[1].prices.base.value} \t\t **Diff:** ${parseInt(item[1].prices.base.value) - parseInt(item[0].prices.base.value)}\n
             **Promo:** ${item[0].prices.promo.value}\t\t**New Promo:** ${item[1].prices.promo.value} **Diff:** ${parseInt(item[1].prices.promo.value) - parseInt(item[0].prices.promo.value)}`).join('\n\n') || 'None');
-        // Update the database with the new state
+        //Update the database with the new state
         for (const item of addedItems) {
 
             await collection.updateOne({ id: item.productId }, { $set: item }, { upsert: true });
@@ -105,15 +138,15 @@ async function fetchSaleItems(client, gender, discordId) {
         })
 
         if (addedItems.length > 0) {
-            await client.channels.cache.get(discordId).send({ embeds: [addedItemsEmbed] });
+            await client.channels.cache.get(discordId).send({ embeds: [addedItemsEmbed], files: [addedItemsImage] });
         }
 
         if (removedItems.length > 0) {
-            await client.channels.cache.get(discordId).send({ embeds: [removedItemsEmbed] });
+            await client.channels.cache.get(discordId).send({ embeds: [removedItemsEmbed], files: [removedItemsImage] });
         }
 
         if (changedItems.length > 0) {
-            await client.channels.cache.get(discordId).send({ embeds: [changedItemsEmbed] });
+            await client.channels.cache.get(discordId).send({ embeds: [changedItemsEmbed], files: [changedItemsImage] });
         }
     } catch (e) {
         error(e);

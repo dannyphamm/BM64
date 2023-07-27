@@ -2,7 +2,7 @@ const { SlashCommandBuilder } = require('@discordjs/builders');
 const { AttachmentBuilder, EmbedBuilder, ButtonBuilder, ActionRowBuilder } = require('discord.js');
 const { insertPrice, getPriceHistory, getUniqloItem } = require('../../utils/uniqloApi');
 const { createCanvas, loadImage } = require('@napi-rs/canvas');
-const { trackUniqloItems } = require('../../services/uniqlo');
+const { trackUniqloItems, femaleSaleItems } = require('../../services/uniqlo');
 const Chart = require('chart.js/auto');
 
 module.exports = {
@@ -36,11 +36,15 @@ module.exports = {
                     option.setName('itemid')
                         .setDescription('The ID of the Uniqlo item to update (optional)')
                 )
+                .addBooleanOption(option =>
+                    option.setName('sale')
+                        .setDescription('Only update items that are on sale')
+                )
         ).addSubcommand(subcommand =>
             subcommand
-              .setName('list')
-              .setDescription('List all tracked Uniqlo items with their current price')
-          ),
+                .setName('list')
+                .setDescription('List all tracked Uniqlo items with their current price')
+        ),
 
     async execute(interaction) {
         const config = require('../../config');
@@ -104,7 +108,7 @@ module.exports = {
                 ctx.drawImage(img, x, y, 200, 200);
             }
 
-            const attachment = await new AttachmentBuilder(canvas.toBuffer('image/png'), {name: 'combined-image.png'});
+            const attachment = await new AttachmentBuilder(canvas.toBuffer('image/png'), { name: 'combined-image.png' });
 
             const confirmEmbed = new EmbedBuilder()
                 .setTitle(`Track Uniqlo item ${item.name}?`)
@@ -120,7 +124,7 @@ module.exports = {
                 )
             }
             confirmEmbed.setImage(`attachment://combined-image.png`).addFields(
-                { name: 'Confirm to add this item to tracking.', value: '\u200B'},
+                { name: 'Confirm to add this item to tracking.', value: '\u200B' },
             );
             const confirmButton = new ButtonBuilder()
                 .setCustomId('confirm')
@@ -137,7 +141,8 @@ module.exports = {
             const collector = confirmMessage.createMessageComponentCollector({ filter, time: 15000 });
             collector.on('collect', async i => {
                 if (i.customId === 'confirm') {
-                    await insertPrice(interaction.client, item.productId, basePrice, promoPrice, item.name);
+                    await insertPrice(interaction.client, item.productId, basePrice, promoPrice, item.name, item.images.main[0].url);
+
                     i.update({ content: `Uniqlo item ${itemId} has been added to tracking.`, components: [] });
                 } else {
                     i.update({ content: 'Cancelled.', components: [] });
@@ -159,27 +164,8 @@ module.exports = {
             }
             const prices = existingItem.prices;
             const item = await getUniqloItem(itemId);
-            const historyEmbed = new EmbedBuilder()
-                .setTitle(`Price history for Uniqlo item ${itemId}`)
-                .setURL(`https://www.uniqlo.com/au/en/products/${itemId}`)
-                .setDescription(`Price history for ${item.name}.`)
-                .setColor('#0099ff');
-            for (const price of prices) {
-                const date = new Date(price.timestamp).toLocaleString();
-                historyEmbed.addFields(
-                    { name: 'Date', value: date, inline: true },
-                    { name: 'Base Price', value: `$${parseInt(price.basePrice).toFixed(2)}`, inline: true },
-                );
-                if (price.promoPrice !== null) {
-                    historyEmbed.addFields(
-                        { name: 'Promo Price', value: `$${parseInt(price.promoPrice).toFixed(2)}`, inline: true }
-                    );
-                } else {
-                    historyEmbed.addFields(
-                        { name: '\u200B', value: '\u200B', inline: true }
-                    );
-                }
-            }
+
+
 
             // Create a canvas for the graph
             const canvas = createCanvas(600, 400);
@@ -192,7 +178,6 @@ module.exports = {
             const maxPrice = Math.max(...basePrices.concat(promoPrices).filter(price => price !== null));
             const minPrice = Math.min(...basePrices.concat(promoPrices).filter(price => price !== null));
             const priceRange = maxPrice - minPrice;
-            await interaction.reply({ embeds: [historyEmbed] });
             const plugin = {
                 id: 'customCanvasBackgroundColor',
                 beforeDraw: (chart, args, options) => {
@@ -268,12 +253,42 @@ module.exports = {
             });
             chart.update()
             const attachment = new AttachmentBuilder(canvas.toBuffer('image/png'), { name: 'pricehistory.png' });
-
-
-            await interaction.followUp({ files: [attachment] })
+            const response = await fetch(existingItem.imageURL);
+            const buffer = await response.arrayBuffer();
+            const attachment1 = await new AttachmentBuilder(Buffer.from(buffer), { name: 'image.png' });
+            const historyEmbed = new EmbedBuilder()
+                .setTitle(`Price history for Uniqlo item ${itemId}`)
+                .setURL(`https://www.uniqlo.com/au/en/products/${itemId}`)
+                .setDescription(`Price history for ${item.name}.`)
+                .setThumbnail('attachment://image.png')
+                .setImage('attachment://pricehistory.png')
+                .setColor('#0099ff');
+                for (const price of prices) {
+                    const date = new Date(price.timestamp).toLocaleString();
+                    historyEmbed.addFields(
+                        { name: 'Date', value: date, inline: true },
+                        { name: 'Base Price', value: `$${parseInt(price.basePrice).toFixed(2)}`, inline: true },
+                    );
+                    if (price.promoPrice !== null) {
+                        historyEmbed.addFields(
+                            { name: 'Promo Price', value: `$${parseInt(price.promoPrice).toFixed(2)}`, inline: true }
+                        );
+                    } else {
+                        historyEmbed.addFields(
+                            { name: '\u200B', value: '\u200B', inline: true }
+                        );
+                    }
+                }
+            return interaction.reply({ embeds: [historyEmbed], files: [attachment1, attachment] })
         } else if (subcommand === 'update') {
             // Handle the update subcommand
             const itemId = interaction.options.getString('itemid');
+            const saleOnly = interaction.options.getBoolean('sale') || false;
+            if (saleOnly) {
+                await femaleSaleItems(interaction.client);
+                await maleSaleItems(interaction.client);
+                return interaction.reply('Sale items updated.');
+            }
             if (itemId) {
 
                 const uniqloCollection = interaction.client.mongodb.db.collection(config.mongodbDBUniqlo);
@@ -285,7 +300,7 @@ module.exports = {
 
                 // Get the current price of the item
                 const item = await getUniqloItem(itemId);
-                const basePrice = (parseInt(item.prices.base.value) + 5).toString();
+                const basePrice = item.prices.base.value;
                 const promoPrice = item.prices.promoPrice ? item.prices.promo.value : null;
 
                 // Check if the price has changed
@@ -315,7 +330,7 @@ module.exports = {
                     existingItem.prices[existingItem.prices.length - 1].basePrice = basePrice;
                     existingItem.prices[existingItem.prices.length - 1].promoPrice = promoPrice;
                     // Save the new price to MongoDB
-                    await insertPrice(interaction.client, itemId, basePrice, promoPrice, item.name);
+                    await insertPrice(interaction.client, itemId, basePrice, promoPrice, item.name, item.images.main[0].url);
 
                     return interaction.reply('The price has changed. The new price has been saved to the database and an alert has been sent to the Discord channel.');
                 } else {
@@ -324,28 +339,28 @@ module.exports = {
             } else {
                 // Update all tracked items
                 await trackUniqloItems(interaction.client);
-                interaction.reply('All tracked Uniqlo items have been updated.');
+                return interaction.reply('All tracked Uniqlo items have been updated.');
             }
         } else if (subcommand === 'list') {
             // Handle the list subcommand
             const uniqloCollection = interaction.client.mongodb.db.collection(config.mongodbDBUniqlo);
             const items = await uniqloCollection.find().toArray();
             const embed = new EmbedBuilder()
-              .setTitle('Tracked Uniqlo Items')
-              .setColor('#0099ff');
+                .setTitle('Tracked Uniqlo Items')
+                .setColor('#0099ff');
             for (const item of items) {
-              const latestPrice = item.prices[item.prices.length - 1];
-              embed.addFields(
-                { name: 'Item ID', value: item.itemId, inline: true },
-                { name: 'Item Name', value: `[${item.title}](https://www.uniqlo.com/au/en/products/${item.itemId})`, inline: true },
-                { name: '\u200B', value: '\u200B', inline: true},
-                { name: 'Base Price', value: `$${parseInt(latestPrice.basePrice).toFixed(2)}`, inline: true },
-                { name: 'Promo Price', value: `$${parseInt(latestPrice.promoPrice || 0).toFixed(2)}`, inline: true},
-                { name: '\u200B', value: '\u200B', inline: true},
-                { name: '\u200B', value: '\u200B'},
+                const latestPrice = item.prices[item.prices.length - 1];
+                embed.addFields(
+                    { name: 'Item ID', value: item.itemId, inline: true },
+                    { name: 'Item Name', value: `[${item.title}](https://www.uniqlo.com/au/en/products/${item.itemId})`, inline: true },
+                    { name: '\u200B', value: '\u200B', inline: true },
+                    { name: 'Base Price', value: `$${parseInt(latestPrice.basePrice).toFixed(2)}`, inline: true },
+                    { name: 'Promo Price', value: `$${parseInt(latestPrice.promoPrice || 0).toFixed(2)}`, inline: true },
+                    { name: '\u200B', value: '\u200B', inline: true },
+                    { name: '\u200B', value: '\u200B' },
                 );
             }
-            interaction.reply({ embeds: [embed] });
-          }
+            return interaction.reply({ embeds: [embed] });
+        }
     }
 };

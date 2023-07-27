@@ -25,8 +25,8 @@ module.exports = {
             try {
                 log("Running UniqloSale")
                 await trackUniqloItems(client);
-            } catch (error) {
-                error(error);
+            } catch (e) {
+                error(e);
             }
         });
         log("UniqloSale: Scheduled job to run every hour.")
@@ -35,10 +35,12 @@ module.exports = {
                 log("Running UniqloSale")
                 await femaleSaleItems(client);
                 await maleSaleItems(client);
-            } catch (error) {
-                error(error);
+            } catch (e) {
+                error(e);
             }
         });
+        // femaleSaleItems(client);
+        // maleSaleItems(client);
         log('Ready!');
     },
 };
