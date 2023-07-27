@@ -11,8 +11,8 @@ async function imageAttachment(images, name) {
     const gridHeight = gridSize * 200;
 
     const imageBuffers = await Promise.all(images.map(async (imageURL) => {
-        const response = await await axios.get(imageURL);
-        const buffer = await response.arrayBuffer();
+        const response = await axios.get(imageURL);
+        const buffer = await response.data.arrayBuffer();
         return buffer;
     }));
 
