@@ -285,9 +285,10 @@ module.exports = {
             const itemId = interaction.options.getString('itemid');
             const saleOnly = interaction.options.getBoolean('sale') || false;
             if (saleOnly) {
+await interaction.reply('Updating')
                 await femaleSaleItems(interaction.client);
                 await maleSaleItems(interaction.client);
-                return interaction.reply('Sale items updated.');
+                return interaction.followUp('Sale items updated.');
             }
             if (itemId) {
 
