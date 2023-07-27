@@ -2,7 +2,7 @@ const { EmbedBuilder } = require('discord.js');
 const { getUniqloItem, getLatestPrices, insertPrice } = require('../utils/uniqloApi');
 const config = require('../config');
 const axios = require('axios');
-const {log, error} = require('../utils/utils')
+const { log, error } = require('../utils/utils')
 async function trackUniqloItems(client) {
     const uniqloCollection = await client.mongodb.db.collection(config.mongodbDBUniqlo);
     const itemIds = await uniqloCollection.distinct('itemId');
@@ -47,10 +47,8 @@ async function fetchSaleItems(client, gender, discordId) {
     try {
         // Fetch the current state of the sale items API
         const response = await axios.get(`${config.uniqloApiUrl}/products?path=${gender}&flagCodes=discount%2Cdiscount&limit=1000&offset=0`);
-
         // If response is not 200 then return
         if (response.status !== 200) return (log("Error fetching sale items", response.status));
-
         // Retrieve the previous state of the sale items from your database
         const collection = await client.mongodb.db.collection(`sale-items-${gender}`);
         const previousState = await collection.find().toArray();
@@ -67,15 +65,11 @@ async function fetchSaleItems(client, gender, discordId) {
         const changedItems = response.data.result.items.reduce((acc, item) => {
             const previousItem = previousState.find(i => i.productId === item.productId);
             if (previousItem && (previousItem.prices.base.value !== item.prices.base.value || previousItem.prices.promo.value !== item.prices.promo.value)) {
-                const priceDiff = {
-                    base: previousItem.prices.base.value - item.prices.base.value,
-                    promo: previousItem.prices.promo.value - item.prices.promo.value
-                };
-                acc.push([previousItem, item, priceDiff]);
+                acc.push([previousItem, item]);
             }
             return acc;
         }, []);
-       log(addedItems.length, removedItems.length, changedItems.length)
+        log(addedItems.length, removedItems.length, changedItems.length)
         if (addedItems.length === 0 && removedItems.length === 0 && changedItems.length === 0) return;
         // Log any differences found
         const addedItemsEmbed = new EmbedBuilder()
