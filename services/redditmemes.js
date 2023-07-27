@@ -1,4 +1,5 @@
 const { WebhookClient } = require('discord.js');
+const { error } = require('../utils/utils');
 
 const loadRedditMemes = async (client) => {
     async function sendHook() {
@@ -28,8 +29,8 @@ const loadRedditMemes = async (client) => {
                     embeds: [exampleEmbed],
                 });
             })
-            .catch(error => {
-                console.error('Error fetching meme:', error);
+            .catch(e => {
+                error('Error fetching meme:', e);
             });
     }
 

@@ -1,5 +1,6 @@
 const { WebhookClient } = require('discord.js');
-const config = require("../config.json")
+const config = require("../config.json");
+const { error } = require('../utils/utils');
 const loadRandomFacts = async (client) => {
     async function sendHook() {
         const fetch = await import('node-fetch');
@@ -26,8 +27,8 @@ const loadRandomFacts = async (client) => {
                     });
                 } 
             })
-            .catch(error => {
-                console.error('Error fetching meme:', error);
+            .catch(e => {
+                error('Error fetching meme:', e);
             });
     }
 

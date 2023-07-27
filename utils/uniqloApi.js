@@ -1,9 +1,9 @@
 const axios = require('axios');
+const { log } = require('./utils');
 
 
 async function getUniqloItem(itemId) {
     const config = require('../config');
-    console.log(`${config.uniqloApiUrl}/products/${itemId}`)
     const response = await axios.get(`${config.uniqloApiUrl}/products/${itemId}`);
     return response.data.result.items[0];
 }

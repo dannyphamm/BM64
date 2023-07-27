@@ -1,5 +1,6 @@
 const { WebhookClient } = require('discord.js');
-const config = require("../config.json")
+const config = require("../config.json");
+const { error } = require('../utils/utils');
 function createDefinitions(data) {
     const array = [];
     for (let i of data.definitions) {
@@ -98,8 +99,8 @@ const loadWordOfTheDay = async (client) => {
                     embeds: [word, definitions, examples],
                 });
             })
-            .catch(error => {
-                console.error('Error fetching meme:', error);
+            .catch(e => {
+                error('Error fetching meme:', e);
             });
     }
 

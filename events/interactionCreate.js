@@ -1,5 +1,5 @@
 const { InteractionType } = require("discord-api-types/v10");
-const log = require('../utils/utils')
+const {log, error} = require('../utils/utils')
 module.exports = {
     name: 'interactionCreate',
     async execute(interaction) {
@@ -42,8 +42,8 @@ module.exports = {
                     return await interaction.reply({ content: 'This module is disabled', ephemeral: true });
                 }
                 await command.execute(interaction);
-            } catch (error) {
-                console.error(error);
+            } catch (e) {
+                error(e);
                 await interaction.reply({ content: 'There was an error while executing this command!', ephemeral: true });
             }
         }

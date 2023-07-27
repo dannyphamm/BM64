@@ -1,4 +1,5 @@
 const { SlashCommandBuilder } = require('@discordjs/builders');
+const { error, log } = require('../utils/utils');
 
 module.exports = {
 	data: new SlashCommandBuilder()
@@ -28,8 +29,8 @@ module.exports = {
 					avatar: 'https://i.imgur.com/mI8XcpG.jpg',
 					reason: 'Needed a cool new Webhook'
 				})
-					.then(webhook => console.log(`Created webhook ${webhook}`))
-					.catch(console.error);
+					.then(webhook => log(`Created webhook ${webhook}`))
+					.catch(error);
 			})
 
 		}
@@ -45,8 +46,8 @@ module.exports = {
 					avatar: 'https://i.imgur.com/mI8XcpG.jpg',
 					reason: 'Needed a cool new Webhook'
 				})
-					.then(webhook => console.log(`Created webhook ${webhook}`))
-					.catch(console.error);
+					.then(webhook => log(`Created webhook ${webhook}`))
+					.catch(error);
 			})
 
 		}
@@ -58,8 +59,8 @@ module.exports = {
 					avatar: 'https://i.imgur.com/mI8XcpG.jpg',
 					reason: 'Needed a cool new Webhook'
 				})
-					.then(webhook => console.log(`Created webhook ${webhook}`))
-					.catch(console.error);
+					.then(webhook => log(`Created webhook ${webhook}`))
+					.catch(error);
 		}
 		return interaction.reply(`Created`);
 	},

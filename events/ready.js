@@ -1,7 +1,7 @@
-const log = require('../utils/utils')
+const {log, error} = require('../utils/utils')
 const randomFacts = require('../services/randomfacts');
 const redditmemes = require('../services/redditmemes');
-const twitter = require('../services/twitter');
+
 const wordoftheday = require('../services/wordoftheday');
 const kdrama = require('../services/kdrama');
 const config = require('../config.json');
@@ -26,7 +26,7 @@ module.exports = {
                 log("Running UniqloSale")
                 await trackUniqloItems(client);
             } catch (error) {
-                console.error(error);
+                error(error);
             }
         });
         log("UniqloSale: Scheduled job to run every hour.")
@@ -36,7 +36,7 @@ module.exports = {
                 await femaleSaleItems(client);
                 await maleSaleItems(client);
             } catch (error) {
-                console.error(error);
+                error(error);
             }
         });
         log('Ready!');

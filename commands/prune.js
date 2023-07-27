@@ -1,5 +1,5 @@
 const { SlashCommandBuilder } = require('@discordjs/builders');
-
+const { error } = require('../utils/utils');
 module.exports = {
 	data: new SlashCommandBuilder()
 		.setName('prune')
@@ -11,11 +11,10 @@ module.exports = {
 		if (amount < 1 || amount > 99) {
 			return interaction.reply({ content: 'You need to input a number between 1 and 99.', ephemeral: true });
 		}
-		await interaction.channel.bulkDelete(amount, true).catch(error => {
-			console.error(error);
+		await interaction.channel.bulkDelete(amount, true).catch(e => {
+			error(e);
 			interaction.reply({ content: 'There was an error trying to prune messages in this channel!', ephemeral: true });
 		});
-
 		return interaction.reply({ content: `Successfully pruned \`${amount}\` messages.`, ephemeral: true });
 	},
 };

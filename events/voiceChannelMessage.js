@@ -1,4 +1,4 @@
-const log = require('../utils/utils')
+const {log} = require('../utils/utils')
 const config = require('../config.json')
 module.exports = {
     name: 'voiceStateUpdate',

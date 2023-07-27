@@ -11,7 +11,6 @@ module.exports = {
             adapterCreator: interaction.guild.voiceAdapterCreator,
         });
         
-        // console.log(interaction.guild.voiceAdapterCreator)
 		return interaction.reply(`Joined Channel`);
 	},
 };

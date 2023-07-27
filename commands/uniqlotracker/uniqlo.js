@@ -83,11 +83,7 @@ module.exports = {
                 });
             }
 
-
-
-
             const imageUrls = item.images.main.map(image => image.url);
-            console.log(imageUrls)
             const gridSize = Math.ceil(Math.sqrt(imageUrls.length));
             const gridWidth = gridSize * 200;
             const gridHeight = gridSize * 200;
@@ -109,12 +105,6 @@ module.exports = {
             }
 
             const attachment = await new AttachmentBuilder(canvas.toBuffer('image/png'), {name: 'combined-image.png'});
-
-
-            // reply with embed
-            //await interaction.reply({ files: [attachment] });
-            //await interaction.followUp({ embeds: [embed] });
-
 
             const confirmEmbed = new EmbedBuilder()
                 .setTitle(`Track Uniqlo item ${item.name}?`)

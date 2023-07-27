@@ -1,6 +1,7 @@
 const cheerio = require('cheerio');
 const config = require('../config');
 const { AttachmentBuilder, ButtonBuilder, WebhookClient, EmbedBuilder, ActionRowBuilder, ButtonStyle } = require('discord.js');
+const { log } = require('../utils/utils');
 const loadKdrama = async (client) => {
     async function runHook() {
         const fetch = await import('node-fetch');
@@ -34,7 +35,7 @@ const loadKdrama = async (client) => {
             if (index === -1) {
                 const imageURL = newBanner[i]
                 const buffer = await fetch.default(config.kdramaURL + imageURL).then(response => { return response.arrayBuffer() })
-                console.log(`New title "${title}" found with episode ${newEpisodes[i]}.`);
+                log(`New title "${title}" found with episode ${newEpisodes[i]}.`);
                 kdramaCollection.insertOne({ title, episode: newEpisodes[i], banner: buffer, link: config.kdramaURL + newLink[i] + "/Episode-" + newEpisodes[i] });
                 
                 const imageBuffer = Buffer.from(buffer);
@@ -62,7 +63,7 @@ const loadKdrama = async (client) => {
                 });
             } else if (newEpisodes[i] > episodes[index]) {
 
-                console.log(`New episode ${newEpisodes[i]} found for title "${title}".`);
+                log(`New episode ${newEpisodes[i]} found for title "${title}".`);
                 kdramaCollection.updateOne({ _id: kdramas[index]._id }, { $set: { episode: newEpisodes[i] } });
                 const imageURL = newBanner[i]
                 const buffer = await fetch.default(config.kdramaURL + imageURL).then(response => { return response.arrayBuffer() })

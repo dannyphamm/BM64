@@ -1,5 +1,6 @@
 const { MongoClient } = require('mongodb');
 const config = require('../config');
+const { log, error } = require('./utils');
 
 const MONGODB_URI = config.mongodbURI;
 const MONGODB_DB_NAME = config.mongodbDBName;
@@ -24,9 +25,10 @@ class MongoConnection {
 
       await this.client.connect();
       this.db = this.client.db(MONGODB_DB_NAME);
-      console.log('Connected to MongoDB');
+      log('Connected to MongoDB');
+      
     } catch (err) {
-      console.error('Error connecting to MongoDB:', err);
+      error('Error connecting to MongoDB:', err);
     }
   }
 }
