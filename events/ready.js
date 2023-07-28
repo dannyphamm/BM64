@@ -21,7 +21,7 @@ module.exports = {
             kdrama.loadKdrama(client)
         }
         log("UniqloTracker: Scheduled job to run every hour.")
-        schedule.scheduleJob('* 0 * * * *', async () => {
+        schedule.scheduleJob('0 0 * * * *', async () => {
             try {
                 log("Running UniqloSale")
                 await trackUniqloItems(client);
@@ -30,7 +30,7 @@ module.exports = {
             }
         });
         log("UniqloSale: Scheduled job to run every hour.")
-        schedule.scheduleJob('* 0 * * * *', async () => {
+        schedule.scheduleJob('0 0 * * * *', async () => {
             try {
                 log("Running UniqloSale")
                 await femaleSaleItems(client);

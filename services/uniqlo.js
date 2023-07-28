@@ -109,8 +109,6 @@ async function fetchSaleItems(client, gender, discordId) {
         // Update the database for changeditems
 
         changedItems.map(async item => {
-
-            log("Updating item", item[0].productId)
             await collection.updateOne({ id: item[0].productId }, { $set: item[1] }, { upsert: true });
         })
 
