@@ -15,13 +15,14 @@ async function trackUniqloItems(client) {
         }
         const latestPrice = existingItem.prices[existingItem.prices.length - 1];
         let { basePrice, promoPrice } = await getLatestPrices(itemId);
-
+        
         if (basePrice !== latestPrice.basePrice || promoPrice !== latestPrice.promoPrice) {
             // Save the new price to MongoDB
+            const item = await getUniqloItem(itemId);
             await insertPrice(client, itemId, basePrice, promoPrice, item.name, existingItem.imageURL);
 
             // Send an alert to a Discord channel
-            const item = await getUniqloItem(itemId);
+            
             const alertEmbed = new EmbedBuilder()
                 .setTitle(`Price change for Uniqlo item ${itemId}`)
                 .setURL(`https://www.uniqlo.com/au/en/products/${itemId}`)
