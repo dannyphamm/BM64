@@ -1,6 +1,6 @@
 const { WebhookClient } = require('discord.js');
 const config = require("../config.json");
-const { error } = require('../utils/utils');
+const { error,log } = require('../utils/utils');
 const randomFactsService = async (client) => {
     const fetch = await import('node-fetch');
 
@@ -16,7 +16,7 @@ const randomFactsService = async (client) => {
                         text: 'Powered by BM64',
                     }
                 };
-                const channel = await client.channels.cache.find(c => c.name === 'phalans-facts');
+                const channel = await client.channels.cache.find(c => c.name === '💯phalans-facts💯');
                 if (!channel) return;
                 const webhooks = await channel.fetchWebhooks();
                 if (webhooks.size === 0) return;

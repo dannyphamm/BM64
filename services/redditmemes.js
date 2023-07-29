@@ -19,7 +19,7 @@ const redditMemesService = async (client) => {
                         text: 'r/' + data.subreddit + ' • ' + data.author + ' • ' + 'Powered by BM64',
                     }
                 };
-                const channel = await client.channels.cache.find(c => c.name === 'daily-memes');
+                const channel = await client.channels.cache.find(c => c.name === '😂daily-memes😂');
                 if (!channel) return;
                 const webhooks = await channel.fetchWebhooks();
                 if (webhooks.size === 0) return;

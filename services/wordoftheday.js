@@ -89,7 +89,7 @@ const wordOfTheDayService = async (client) => {
                     text: 'Powered by BM64',
                 }
             };
-            const channel = await client.channels.cache.find(c => c.name === 'word-of-the-day');
+            const channel = await client.channels.cache.find(c => c.name === '💬word-of-the-day💬');
             if (!channel) return;
             const webhooks = await channel.fetchWebhooks();
             if (webhooks.size === 0) return;
