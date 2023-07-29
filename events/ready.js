@@ -1,12 +1,12 @@
-const {log, error} = require('../utils/utils')
-const randomFacts = require('../services/randomfacts');
-const redditmemes = require('../services/redditmemes');
-
-const wordoftheday = require('../services/wordoftheday');
-const kdrama = require('../services/kdrama');
-const config = require('../config.json');
-const { trackUniqloItems, femaleSaleItems, maleSaleItems } = require('../services/uniqlo');
+const { log, error } = require('../utils/utils')
 const schedule = require('node-schedule');
+const config = require('../config.json');
+const { randomFactsService } = require('../services/randomfacts');
+const { redditMemesService } = require('../services/redditmemes');
+const { wordOfTheDayService } = require('../services/wordoftheday');
+const { kdramaTrackerService } = require('../services/kdrama');
+const { trackUniqloItems, femaleSaleItems, maleSaleItems } = require('../services/uniqlo');
+
 module.exports = {
     name: 'ready',
     once: true,
@@ -15,32 +15,48 @@ module.exports = {
         if (config.mode !== 'DEV') {
             // API Deprecated
             //twitter.loadTwitter(client)
-            redditmemes.loadRedditMemes(client)
-            randomFacts.loadRandomFacts(client)
-            wordoftheday.loadWordOfTheDay(client)
-            kdrama.loadKdrama(client)
+            schedule.scheduleJob('0 30 13 * * *', async () => {
+                try {
+                    log("WordOfTheDay: Scheduled job to run every day at 1:30 PM.")
+                    await wordOfTheDayService(client);
+                } catch (e) {
+                    error(e);
+                }
+            });
+
+            schedule.scheduleJob('0 */5 * * * *', async () => {
+                try {
+                    log("RedditMemes: Scheduled job to run every 5 minutes.")
+                    await redditMemesService(client);
+                    log("RandomFacts: Scheduled job to run every 5 minutes.")
+                    await randomFactsService(client);
+                    log("KdramaTracker: Scheduled job to run every 5 minutes.")
+                    await kdramaTrackerService(client);
+                } catch (e) {
+                    error(e);
+                }
+            });
+
+            schedule.scheduleJob('0 */15 * * * *', async () => {
+                try {
+                    log("UniqloTracker: Scheduled job to run 15 minutes.")
+                    await trackUniqloItems(client);
+                } catch (e) {
+                    error(e);
+                }
+            });
+            log("UniqloSale: Scheduled job to run 15 minutes.")
+            schedule.scheduleJob('0 */15 * * * *', async () => {
+                try {
+                    log("UniqloTracker: Scheduled job to run 15 minutes.")
+                    await femaleSaleItems(client);
+                    await maleSaleItems(client);
+                } catch (e) {
+                    error(e);
+                }
+            });
         }
-        log("UniqloTracker: Scheduled job to run every hour.")
-        schedule.scheduleJob('0 0 * * * *', async () => {
-            try {
-                log("Running UniqloSale")
-                await trackUniqloItems(client);
-            } catch (e) {
-                error(e);
-            }
-        });
-        log("UniqloSale: Scheduled job to run every hour.")
-        schedule.scheduleJob('0 0 * * * *', async () => {
-            try {
-                log("Running UniqloSale")
-                await femaleSaleItems(client);
-                await maleSaleItems(client);
-            } catch (e) {
-                error(e);
-            }
-        });
-        // femaleSaleItems(client);
-        // maleSaleItems(client);
+
         log('Ready!');
     },
 };

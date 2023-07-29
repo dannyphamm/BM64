@@ -1,8 +1,7 @@
 const { WebhookClient } = require('discord.js');
 const { error } = require('../utils/utils');
 
-const loadRedditMemes = async (client) => {
-    async function sendHook() {
+const redditMemesService = async (client) => {
         const fetch = await import('node-fetch');
 
         await fetch.default('https://meme-api.com/gimme')
@@ -32,26 +31,9 @@ const loadRedditMemes = async (client) => {
             .catch(e => {
                 error('Error fetching meme:', e);
             });
-    }
-
-    const now = new Date();
-    const nextMultipleOfTenMinutes = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours(), Math.ceil(now.getMinutes() / 10) * 10);
-    const timeUntilNextMultipleOfTenMinutes = nextMultipleOfTenMinutes - now;
-
-    // Schedule first call to sendHook
-    setTimeout(() => {
-        sendHook();
-
-        // Schedule subsequent calls to sendHook every ten minutes
-        setInterval(sendHook, 10 * 60 * 1000);
-    }, timeUntilNextMultipleOfTenMinutes);
 }
 
-module.exports = {
-    loadRedditMemes: function (client) {
-        loadRedditMemes(client)
-    }
-}
+module.exports = { redditMemesService }
 
 
 
