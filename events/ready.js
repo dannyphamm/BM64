@@ -15,40 +15,38 @@ module.exports = {
         if (config.mode !== 'DEV') {
             // API Deprecated
             //twitter.loadTwitter(client)
+            log("WordOfTheDay: Scheduled job to run every day at 1:30 PM.")
             schedule.scheduleJob('0 30 13 * * *', async () => {
                 try {
-                    log("WordOfTheDay: Scheduled job to run every day at 1:30 PM.")
+                    
                     await wordOfTheDayService(client);
                 } catch (e) {
                     error(e);
                 }
             });
-
+            log("Memes, Facts, KdramaTracker: Scheduled job to run every 5 minutes.")
             schedule.scheduleJob('0 */5 * * * *', async () => {
                 try {
-                    log("RedditMemes: Scheduled job to run every 5 minutes.")
+                    
                     await redditMemesService(client);
-                    log("RandomFacts: Scheduled job to run every 5 minutes.")
                     await randomFactsService(client);
-                    log("KdramaTracker: Scheduled job to run every 5 minutes.")
                     await kdramaTrackerService(client);
                 } catch (e) {
                     error(e);
                 }
             });
-
+            log("UniqloTracker: Scheduled job to run 15 minutes.")
             schedule.scheduleJob('0 */15 * * * *', async () => {
                 try {
-                    log("UniqloTracker: Scheduled job to run 15 minutes.")
+                 
                     await trackUniqloItems(client);
                 } catch (e) {
                     error(e);
                 }
             });
-            log("UniqloSale: Scheduled job to run 15 minutes.")
+            log("UniqloTracker: Scheduled job to run 15 minutes.")
             schedule.scheduleJob('0 */15 * * * *', async () => {
                 try {
-                    log("UniqloTracker: Scheduled job to run 15 minutes.")
                     await femaleSaleItems(client);
                     await maleSaleItems(client);
                 } catch (e) {
