@@ -74,8 +74,9 @@ async function fetchSaleItems(client, gender, discordId) {
         log(addedItems.length, removedItems.length, changedItems.length)
         if (addedItems.length === 0 && removedItems.length === 0 && changedItems.length === 0) return;
         //get the first image url from each item
-        
+
         const addedItemsImage = await imageAttachment(addedItems.map(item => item.images.main[0].url), "added-items");
+        //const newItemsImage = await imageAttachment(response.data.result.items.map(item => item.images.main[0].url), "new-items");
         const removedItemsImage = await imageAttachment(removedItems.map(item => item.images.main[0].url), "removed-items");
         const changedItemsImage = await imageAttachment(changedItems.map(item => item[1].images.main[0].url), "changed-items");
         // Log any differences found
@@ -99,15 +100,11 @@ async function fetchSaleItems(client, gender, discordId) {
             **Promo:** ${item[0].prices.promo.value}\t\t**New Promo:** ${item[1].prices.promo.value} **Diff:** ${parseInt(item[1].prices.promo.value) - parseInt(item[0].prices.promo.value)}`).join('\n\n') || 'None');
         //Update the database with the new state
         for (const item of addedItems) {
-
             await collection.updateOne({ id: item.productId }, { $set: item }, { upsert: true });
         }
         for (const item of removedItems) {
-
             await collection.deleteOne({ id: item.productId });
         }
-        // Update the database for changeditems
-
         changedItems.map(async item => {
             await collection.updateOne({ id: item[0].productId }, { $set: item[1] }, { upsert: true });
         })
@@ -123,6 +120,7 @@ async function fetchSaleItems(client, gender, discordId) {
         if (changedItems.length > 0) {
             await client.channels.cache.get(discordId).send({ embeds: [changedItemsEmbed], files: [changedItemsImage] });
         }
+        //await client.channels.cache.get(discordId).send({ embeds: [], files: [newItemsImage] });
     } catch (e) {
         error(e);
     }

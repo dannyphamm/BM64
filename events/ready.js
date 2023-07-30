@@ -54,7 +54,7 @@ module.exports = {
                 }
             });
         }
-        randomFactsService(client);
+        femaleSaleItems(client);
         log('Ready!');
     },
 };

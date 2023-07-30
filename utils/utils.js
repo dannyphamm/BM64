@@ -13,8 +13,8 @@ const error = (...message) => {
 async function imageAttachment(images, name) {
     if (images.length === 0) return null
     const gridSize = Math.ceil(Math.sqrt(images.length));
-    const gridWidth = gridSize * 200;
-    const gridHeight = gridSize * 200;
+    const gridWidth = gridSize * 400;
+    const gridHeight = gridSize * 400;
     
     const imageBuffers = await Promise.all(images.map(async (imageURL) => {
         const response = await axios.get(imageURL, { responseType: 'arraybuffer' });
@@ -26,9 +26,9 @@ async function imageAttachment(images, name) {
 
     for (let i = 0; i < imageBuffers.length; i++) {
         const img = await loadImage(Buffer.from(imageBuffers[i]));
-        const x = (i % gridSize) * 200;
-        const y = Math.floor(i / gridSize) * 200;
-        ctx.drawImage(img, x, y, 200, 200);
+        const x = (i % gridSize) * 400;
+        const y = Math.floor(i / gridSize) * 400;
+        ctx.drawImage(img, x, y, 400, 400);
     }
 
     const attachment = await new AttachmentBuilder(canvas.toBuffer('image/png'), { name: name + '.png' });
