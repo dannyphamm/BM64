@@ -2,7 +2,7 @@ const { SlashCommandBuilder } = require('@discordjs/builders');
 const { AttachmentBuilder, EmbedBuilder, ButtonBuilder, ActionRowBuilder } = require('discord.js');
 const { insertPrice, getPriceHistory, getUniqloItem } = require('../../utils/uniqloApi');
 const { createCanvas, loadImage } = require('@napi-rs/canvas');
-const { trackUniqloItems, femaleSaleItems,maleSaleItems } = require('../../services/uniqlo');
+const { trackUniqloItems, femaleSaleItems, maleSaleItems } = require('../../services/uniqlo');
 const Chart = require('chart.js/auto');
 const { imageAttachment } = require('../../utils/utils');
 
@@ -244,29 +244,29 @@ module.exports = {
                 .setThumbnail('attachment://image.png')
                 .setImage('attachment://pricehistory.png')
                 .setColor('#0099ff');
-                for (const price of prices) {
-                    const date = new Date(price.timestamp).toLocaleString();
+            for (const price of prices) {
+                const date = new Date(price.timestamp).toLocaleString();
+                historyEmbed.addFields(
+                    { name: 'Date', value: date, inline: true },
+                    { name: 'Base Price', value: `$${parseInt(price.basePrice).toFixed(2)}`, inline: true },
+                );
+                if (price.promoPrice !== null) {
                     historyEmbed.addFields(
-                        { name: 'Date', value: date, inline: true },
-                        { name: 'Base Price', value: `$${parseInt(price.basePrice).toFixed(2)}`, inline: true },
+                        { name: 'Promo Price', value: `$${parseInt(price.promoPrice).toFixed(2)}`, inline: true }
                     );
-                    if (price.promoPrice !== null) {
-                        historyEmbed.addFields(
-                            { name: 'Promo Price', value: `$${parseInt(price.promoPrice).toFixed(2)}`, inline: true }
-                        );
-                    } else {
-                        historyEmbed.addFields(
-                            { name: '\u200B', value: '\u200B', inline: true }
-                        );
-                    }
+                } else {
+                    historyEmbed.addFields(
+                        { name: '\u200B', value: '\u200B', inline: true }
+                    );
                 }
+            }
             return interaction.reply({ embeds: [historyEmbed], files: [attachment1, attachment] })
         } else if (subcommand === 'update') {
             // Handle the update subcommand
             const itemId = interaction.options.getString('itemid');
             const saleOnly = interaction.options.getBoolean('sale') || false;
             if (saleOnly) {
-await interaction.reply('Updating')
+                await interaction.reply('Updating')
                 await femaleSaleItems(interaction.client);
                 await maleSaleItems(interaction.client);
                 return interaction.followUp('Sale items updated.');
