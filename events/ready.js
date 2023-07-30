@@ -54,7 +54,7 @@ module.exports = {
                 }
             });
         }
-        femaleSaleItems(client);
+        //femaleSaleItems(client);
         log('Ready!');
     },
 };
