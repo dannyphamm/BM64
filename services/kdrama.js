@@ -79,7 +79,7 @@ const kdramaTrackerService = async (client) => {
                 .setLabel('Watch now')
                 .setURL(config.kdramaURL + newLink[i] + "/Episode-" + newEpisodes[i]);
             const row = new ActionRowBuilder().addComponents(button);
-            const channel = await client.channels.cache.find(c => c.name === '🍿movie-night');
+            const channel = await client.channels.cache.find(c => c.name === 'movie-night');
             if (!channel) return;
             const webhooks = await channel.fetchWebhooks();
             if (webhooks.size === 0) return;
