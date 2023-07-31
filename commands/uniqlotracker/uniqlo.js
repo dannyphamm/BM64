@@ -234,7 +234,7 @@ module.exports = {
             });
             chart.update()
             const attachment = new AttachmentBuilder(canvas.toBuffer('image/png'), { name: 'pricehistory.png' });
-            const attachment1 = imageAttachment(existingItem.imageURL, 'image.png')
+            const attachment1 = imageAttachment([existingItem.imageURL], 'image.png')
             const historyEmbed = new EmbedBuilder()
                 .setTitle(`Price history for Uniqlo item ${itemId}`)
                 .setURL(`https://www.uniqlo.com/au/en/products/${itemId}`)
