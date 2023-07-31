@@ -234,12 +234,12 @@ module.exports = {
             });
             chart.update();
             const attachment = new AttachmentBuilder(canvas.toBuffer('image/png'), { name: 'pricehistory.png' });
-            const attachment1 = imageAttachment([existingItem.imageURL], 'image.png')
+            const attachment1 = await imageAttachment([existingItem.imageURL], 'image1')
             const historyEmbed = new EmbedBuilder()
                 .setTitle(`Price history for Uniqlo item ${itemId}`)
                 .setURL(`https://www.uniqlo.com/au/en/products/${itemId}`)
                 .setDescription(`Price history for ${item.name}.`)
-                .setThumbnail('attachment://image.png')
+                .setThumbnail('attachment://image1.png')
                 .setImage('attachment://pricehistory.png')
                 .setColor('#0099ff');
             for (const price of prices) {
