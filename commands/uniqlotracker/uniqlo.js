@@ -232,7 +232,7 @@ module.exports = {
                 },
 
             });
-            chart.update();
+            chart.update()
             const attachment = new AttachmentBuilder(canvas.toBuffer('image/png'), { name: 'pricehistory.png' });
             const attachment1 = await imageAttachment([existingItem.imageURL], 'image1')
             const historyEmbed = new EmbedBuilder()
