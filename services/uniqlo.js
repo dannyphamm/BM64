@@ -15,14 +15,14 @@ async function trackUniqloItems(client) {
         }
         const latestPrice = existingItem.prices[existingItem.prices.length - 1];
         let { basePrice, promoPrice } = await getLatestPrices(itemId);
-        
+
         if (basePrice !== latestPrice.basePrice || promoPrice !== latestPrice.promoPrice) {
             // Save the new price to MongoDB
             const item = await getUniqloItem(itemId);
             await insertPrice(client, itemId, basePrice, promoPrice, item.name, existingItem.imageURL);
 
             // Send an alert to a Discord channel
-            
+
             const alertEmbed = new EmbedBuilder()
                 .setTitle(`Price change for Uniqlo item ${itemId}`)
                 .setURL(`https://www.uniqlo.com/au/en/products/${itemId}`)
@@ -73,31 +73,57 @@ async function fetchSaleItems(client, gender, discordId) {
         }, []);
         log(addedItems.length, removedItems.length, changedItems.length)
         if (addedItems.length === 0 && removedItems.length === 0 && changedItems.length === 0) return;
-        //get the first image url from each item
 
-        const addedItemsImage = await imageAttachment(addedItems.map(item => item.images.main[0].url), "added-items");
-        //const newItemsImage = await imageAttachment(response.data.result.items.map(item => item.images.main[0].url), "new-items");
-        const removedItemsImage = await imageAttachment(removedItems.map(item => item.images.main[0].url), "removed-items");
-        const changedItemsImage = await imageAttachment(changedItems.map(item => item[1].images.main[0].url), "changed-items");
-        // Log any differences found
-        const addedItemsEmbed = new EmbedBuilder()
-            .setColor('#0099ff')
-            .setImage(`attachment://added-items.png`)
-            .setTitle(`Added items`)
-            .setDescription(addedItems.map(item => `**[${item.name}](https://www.uniqlo.com/au/en/products/${item.productId})**\nBase: ${item.prices.base.value}\nPromo: ${item.prices.promo.value}`).join('\n\n') || 'None');
+        const addedItemsEmbeds = [];
+        const removedItemsEmbeds = [];
+        const changedItemsEmbeds = [];
+        const batchSize = 15;
+        for (let i = 0; i < addedItems.length; i += batchSize) {
+            const batch = addedItems.slice(i, i + batchSize);
+            const addedItemsImageUrls = batch.map(item => item.images.main[0].url);
+            const addedItemsImage = await imageAttachment(addedItemsImageUrls, "added-items");
+            const addedItemsEmbed = new EmbedBuilder()
+                .setColor('#0099ff')
+                .setTitle(`Added items (${i + 1}-${i + batch.length})`)
+                .setDescription(batch.map(item => `**[${item.name}](https://www.uniqlo.com/au/en/products/${item.productId})**\nBase: ${item.prices.base.value}\nPromo: ${item.prices.promo.value}`).join('\n\n'))
+                .setImage(`attachment://added-items.png`);
+            addedItemsEmbeds.push({addedItemsEmbed, addedItemsImage});
+        }
+        for (let i = 0; i < removedItems.length; i += batchSize) {
+            const batch = removedItems.slice(i, i + batchSize);
+            const removedItemsImageUrls = batch.map(item => item.images.main[0].url);
+            const removedItemsImage = await imageAttachment(removedItemsImageUrls, "removed-items");
+            const removedItemsEmbed = new EmbedBuilder()
+                .setColor('#0099ff')
+                .setTitle(`Removed items (${i + 1}-${i + batch.length})`)
+                .setDescription(batch.map(item => `**[${item.name}](https://www.uniqlo.com/au/en/products/${item.productId})**\nBase: ${item.prices.base.value}\nPromo: ${item.prices.promo.value}`).join('\n\n') || 'None')
+                .setImage(`attachment://removed-items.png`);
+            removedItemsEmbeds.push({removedItemsEmbed, removedItemsImage});
+        }
+        for (let i = 0; i < changedItems.length; i += batchSize) {
+            const batch = changedItems.slice(i, i + batchSize);
+            const changedItemsImageUrls = batch.map(item => item[1].images.main[0].url);
+            const changedItemsImage = await imageAttachment(changedItemsImageUrls, "changed-items");
+            const changedItemsEmbed = new EmbedBuilder()
+                .setColor('#0099ff')
+                .setTitle(`Changed items (${i + 1}-${i + batch.length})`)
+                .setDescription(batch.map(item => `**[${item[0].name}](https://www.uniqlo.com/au/en/products/${item[0].productId})**\n
+                     **Base:** ${item[0].prices.base.value}\t\t**New Base:** ${item[1].prices.base.value} \t\t **Diff:** ${parseInt(item[1].prices.base.value) - parseInt(item[0].prices.base.value)}\n
+                     **Promo:** ${item[0].prices.promo.value}\t\t**New Promo:** ${item[1].prices.promo.value} **Diff:** ${parseInt(item[1].prices.promo.value) - parseInt(item[0].prices.promo.value)}`).join('\n\n') || 'None')
+                .setImage(`attachment://changed-items.png`);
+            changedItemsEmbeds.push({changedItemsEmbed, changedItemsImage});
+        }
 
-        const removedItemsEmbed = new EmbedBuilder()
-            .setColor('#0099ff')
-            .setTitle(`Removed items`)
-            .setImage(`attachment://removed-items.png`)
-            .setDescription(removedItems.map(item => `**[${item.name}](https://www.uniqlo.com/au/en/products/${item.productId})**\nBase: ${item.prices.base.value}\nPromo: ${item.prices.promo.value}`).join('\n\n') || 'None');
-        const changedItemsEmbed = new EmbedBuilder()
-            .setColor('#0099ff')
-            .setTitle(`Changed items`)
-            .setImage(`attachment://changed-items.png`)
-            .setDescription(changedItems.map(item => `**[${item[0].name}](https://www.uniqlo.com/au/en/products/${item[0].productId})**\n
-            **Base:** ${item[0].prices.base.value}\t\t**New Base:** ${item[1].prices.base.value} \t\t **Diff:** ${parseInt(item[1].prices.base.value) - parseInt(item[0].prices.base.value)}\n
-            **Promo:** ${item[0].prices.promo.value}\t\t**New Promo:** ${item[1].prices.promo.value} **Diff:** ${parseInt(item[1].prices.promo.value) - parseInt(item[0].prices.promo.value)}`).join('\n\n') || 'None');
+        for (const data of addedItemsEmbeds) {
+            await client.channels.cache.get(discordId).send({ embeds: [data.addedItemsEmbed], files: [data.addedItemsImage] });
+        }
+        for (const data of removedItemsEmbeds) {
+            await client.channels.cache.get(discordId).send({ embeds: [data.removedItemsEmbed], files: [data.removedItemsImage] });
+        }
+        for (const data of changedItemsEmbeds) {
+            await client.channels.cache.get(discordId).send({ embeds: [data.changedItemsEmbed], files: [data.changedItemsImage] });
+        }
+
         //Update the database with the new state
         for (const item of addedItems) {
             await collection.updateOne({ id: item.productId }, { $set: item }, { upsert: true });
@@ -109,18 +135,6 @@ async function fetchSaleItems(client, gender, discordId) {
             await collection.updateOne({ id: item[0].productId }, { $set: item[1] }, { upsert: true });
         })
 
-        if (addedItems.length > 0) {
-            await client.channels.cache.get(discordId).send({ embeds: [addedItemsEmbed], files: [addedItemsImage] });
-        }
-
-        if (removedItems.length > 0) {
-            await client.channels.cache.get(discordId).send({ embeds: [removedItemsEmbed], files: [removedItemsImage] });
-        }
-
-        if (changedItems.length > 0) {
-            await client.channels.cache.get(discordId).send({ embeds: [changedItemsEmbed], files: [changedItemsImage] });
-        }
-        //await client.channels.cache.get(discordId).send({ embeds: [], files: [newItemsImage] });
     } catch (e) {
         error(e);
     }
