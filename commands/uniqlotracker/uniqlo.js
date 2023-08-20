@@ -280,6 +280,9 @@ module.exports = {
 
                 // Get the current price of the item
                 const item = await getUniqloItem(itemId);
+                if (item.length === 0) {
+                    return interaction.reply('This item no longer exists.');
+                }
                 const basePrice = item.prices.base.value;
                 const promoPrice = item.prices.promoPrice ? item.prices.promo.value : null;
 
