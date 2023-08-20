@@ -5,6 +5,9 @@ const config = require('../config');
 async function getUniqloItem(itemId) {
     log(`Fetching item ${itemId}`)
     const response = await axios.get(`${config.uniqloApiUrl}/products/${itemId}`);
+    if(response.data.status === 'nok') {
+        return []
+    }
     if(response.data.result.items.length === 0) {
         return []
     }
