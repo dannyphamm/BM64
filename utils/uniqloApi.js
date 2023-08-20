@@ -16,7 +16,7 @@ async function getUniqloItem(itemId) {
 // getlatestprice
 async function getLatestPrices(itemId) {
     const item = await getUniqloItem(itemId);
-    if(item === []) {
+    if(item.length === 0) {
         return {basePrice: null, promoPrice: null}
     }
     const basePrice = item.prices.base.value;
