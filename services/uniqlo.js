@@ -15,7 +15,7 @@ async function trackUniqloItems(client) {
         }
         const latestPrice = existingItem.prices[existingItem.prices.length - 1];
         let { basePrice, promoPrice } = await getLatestPrices(itemId);
-        if(basePrice === null && promoPrice === null) {
+        if (basePrice === null && promoPrice === null) {
             return
         }
         if (basePrice !== latestPrice.basePrice || promoPrice !== latestPrice.promoPrice) {
@@ -52,7 +52,7 @@ async function fetchSaleItems(client, gender, discordId) {
         // Fetch the current state of the sale items API
         const response = await axios.get(`${config.uniqloApiUrl}/products?path=${gender}&flagCodes=discount%2Cdiscount&limit=1000&offset=0`);
         // If response is not 200 then return
-        if (response.status !== 200) return (log("Error fetching sale items", response.status));
+        if (response.data.status !== "ok" || response.data.result.items.length === 0) return (log("Error fetching sale items", gender, `${config.uniqloApiUrl}/products?path=${gender}&flagCodes=discount%2Cdiscount&limit=1000&offset=0`));
         // Retrieve the previous state of the sale items from your database
         const collection = await client.mongodb.db.collection(`sale-items-${gender}`);
         const previousState = await collection.find().toArray();
@@ -89,7 +89,7 @@ async function fetchSaleItems(client, gender, discordId) {
                 .setTitle(`Added items (${i + 1}-${i + batch.length})`)
                 .setDescription(batch.map(item => `**[${item.name}](https://www.uniqlo.com/au/en/products/${item.productId})**\nBase: ${item.prices.base.value}\nPromo: ${item.prices.promo.value}`).join('\n\n'))
                 .setImage(`attachment://added-items.png`);
-            addedItemsEmbeds.push({addedItemsEmbed, addedItemsImage});
+            addedItemsEmbeds.push({ addedItemsEmbed, addedItemsImage });
         }
         for (let i = 0; i < removedItems.length; i += batchSize) {
             const batch = removedItems.slice(i, i + batchSize);
@@ -100,7 +100,7 @@ async function fetchSaleItems(client, gender, discordId) {
                 .setTitle(`Removed items (${i + 1}-${i + batch.length})`)
                 .setDescription(batch.map(item => `**[${item.name}](https://www.uniqlo.com/au/en/products/${item.productId})**\nBase: ${item.prices.base.value}\nPromo: ${item.prices.promo.value}`).join('\n\n') || 'None')
                 .setImage(`attachment://removed-items.png`);
-            removedItemsEmbeds.push({removedItemsEmbed, removedItemsImage});
+            removedItemsEmbeds.push({ removedItemsEmbed, removedItemsImage });
         }
         for (let i = 0; i < changedItems.length; i += batchSize) {
             const batch = changedItems.slice(i, i + batchSize);
@@ -113,7 +113,7 @@ async function fetchSaleItems(client, gender, discordId) {
                      **Base:** ${item[0].prices.base.value}\t\t**New Base:** ${item[1].prices.base.value} \t\t **Diff:** ${parseInt(item[1].prices.base.value) - parseInt(item[0].prices.base.value)}\n
                      **Promo:** ${item[0].prices.promo.value}\t\t**New Promo:** ${item[1].prices.promo.value} **Diff:** ${parseInt(item[1].prices.promo.value) - parseInt(item[0].prices.promo.value)}`).join('\n\n') || 'None')
                 .setImage(`attachment://changed-items.png`);
-            changedItemsEmbeds.push({changedItemsEmbed, changedItemsImage});
+            changedItemsEmbeds.push({ changedItemsEmbed, changedItemsImage });
         }
 
         for (const data of addedItemsEmbeds) {
@@ -138,7 +138,7 @@ async function fetchSaleItems(client, gender, discordId) {
         })
 
     } catch (e) {
-        error(e);
+        error(e, "FETCH SALE ITEMS", gender);
     }
 }
 

@@ -43,7 +43,7 @@ module.exports = {
                 }
                 await command.execute(interaction);
             } catch (e) {
-                error(e);
+                error(e, "COMMAND_ERROR");
                 await interaction.reply({ content: 'There was an error while executing this command!', ephemeral: true });
             }
         }

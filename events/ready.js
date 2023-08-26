@@ -21,7 +21,7 @@ module.exports = {
                     
                     await wordOfTheDayService(client);
                 } catch (e) {
-                    error(e);
+                    error(e, "TRY WORD OF THE DAY");
                 }
             });
             log("Memes, Facts, KdramaTracker: Scheduled job to run every 5 minutes.")
@@ -32,7 +32,7 @@ module.exports = {
                     await randomFactsService(client);
                     await kdramaTrackerService(client);
                 } catch (e) {
-                    error(e);
+                    error(e, "TRY MEMES, FACTS, KDRAMA");
                 }
             });
             log("UniqloTracker: Scheduled job to run 15 minutes.")
@@ -41,7 +41,7 @@ module.exports = {
                  
                     await trackUniqloItems(client);
                 } catch (e) {
-                    error(e);
+                    error(e, "TRY UNIQLO SINGLE ITEMS");
                 }
             });
             log("UniqloTracker: Scheduled job to run 15 minutes.")
@@ -50,7 +50,7 @@ module.exports = {
                     await femaleSaleItems(client);
                     await maleSaleItems(client);
                 } catch (e) {
-                    error(e);
+                    error(e, "TRY UNIQLO");
                 }
             });
         }

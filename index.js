@@ -6,7 +6,7 @@ const { token } = require('./config.json');
 const { YtDlpPlugin } = require("@distube/yt-dlp")
 const { DisTube } = require("distube");
 const { SpotifyPlugin } = require('@distube/spotify');
-const { log } = require("./utils/utils");
+const { log, error } = require("./utils/utils");
 const Genius = require("genius-lyrics");
 const GeniusClient = new Genius.Client();
 const MongoConnection = require('./utils/db');
@@ -75,7 +75,7 @@ const distube = new DisTube(client, {
 })
 distube.on('error', (channel, e) => {
     if (channel) channel.send(`An error encountered: ${e}`)
-    else log.error(e)
+    else error(e, "DISTUBE_ERROR")
 })
 distube.on("initQueue", queue => {
     queue.autoplay = false;
