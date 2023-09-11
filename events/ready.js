@@ -4,7 +4,7 @@ const config = require('../config.json');
 const { randomFactsService } = require('../services/randomfacts');
 const { redditMemesService } = require('../services/redditmemes');
 const { wordOfTheDayService } = require('../services/wordoftheday');
-const { kdramaTrackerService } = require('../services/kdrama');
+const { kdramaTrackerService, kdramaCompleterService } = require('../services/kdrama');
 const { trackUniqloItems, femaleSaleItems, maleSaleItems } = require('../services/uniqlo');
 
 module.exports = {
@@ -24,13 +24,23 @@ module.exports = {
                     error(e, "TRY WORD OF THE DAY");
                 }
             });
+
+            log("Kdrama Completer: Scheduled job to run every day at 33 Minutes.")
+            schedule.scheduleJob('0 33 * * * *', async () => {
+                try {
+                    
+                    await kdramaCompleterService(client);
+                } catch (e) {
+                    error(e, "TRY KDRAMACOMPLETER");
+                }
+            });
             log("Memes, Facts, KdramaTracker: Scheduled job to run every 5 minutes.")
             schedule.scheduleJob('0 */5 * * * *', async () => {
                 try {
                     
                     await redditMemesService(client);
                     await randomFactsService(client);
-                    await kdramaTrackerService(client);
+                   
                 } catch (e) {
                     error(e, "TRY MEMES, FACTS, KDRAMA");
                 }
