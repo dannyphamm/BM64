@@ -33,7 +33,7 @@ const kdramaTrackerService = async (client) => {
                 responseType: 'arraybuffer'
             }).then(response => { return response.data })
             log(`New title "${title}" found with episode ${newEpisodes[i]}.`);
-            kdramaCollection.insertOne({ title, episode: newEpisodes[i], banner: imageURL, link: config.kdramaURL + newLink[i] + "/Episode-" + newEpisodes[i], isCompleted: false });
+            kdramaCollection.insertOne({ title, episode: newEpisodes[i], banner: imageURL, link: newLink[i] + "/Episode-" + newEpisodes[i], isCompleted: false });
 
             const imageBuffer = Buffer.from(buffer);
             const attachment = new AttachmentBuilder(imageBuffer, { name: 'discordjs.jpg' });
@@ -61,7 +61,7 @@ const kdramaTrackerService = async (client) => {
         } else if (newEpisodes[i] > episodes[index]) {
 
             log(`New episode ${newEpisodes[i]} found for title "${title}".`);
-            kdramaCollection.updateOne({ _id: kdramas[index]._id }, { $set: { episode: newEpisodes[i], link: config.kdramaURL + newLink[i] + "/Episode-" + newEpisodes[i] } });
+            kdramaCollection.updateOne({ _id: kdramas[index]._id }, { $set: { episode: newEpisodes[i], link: newLink[i] + "/Episode-" + newEpisodes[i] } });
             const imageURL = newBanner[i]
             const buffer = await axios(config.kdramaURL + imageURL, {
                 responseType: 'arraybuffer'
