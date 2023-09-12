@@ -13,8 +13,7 @@ module.exports = {
     execute(client) {
 
         if (config.mode !== 'DEV') {
-            // API Deprecated
-            //twitter.loadTwitter(client)
+
             log("WordOfTheDay: Scheduled job to run every day at 1:30 PM.")
             schedule.scheduleJob('0 30 13 * * *', async () => {
                 try {
@@ -34,7 +33,7 @@ module.exports = {
                     error(e, "TRY KDRAMACOMPLETER");
                 }
             });
-            
+
             log("Memes, Facts, KdramaTracker: Scheduled job to run every 5 minutes.")
             schedule.scheduleJob('0 */5 * * * *', async () => {
                 try {
