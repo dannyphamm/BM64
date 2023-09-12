@@ -34,6 +34,7 @@ module.exports = {
                     error(e, "TRY KDRAMACOMPLETER");
                 }
             });
+            
             log("Memes, Facts, KdramaTracker: Scheduled job to run every 5 minutes.")
             schedule.scheduleJob('0 */5 * * * *', async () => {
                 try {
