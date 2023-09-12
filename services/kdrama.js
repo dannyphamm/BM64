@@ -122,7 +122,7 @@ const kdramaCompleterService = async (client) => {
             const attachment = new AttachmentBuilder(imageBuffer, { name: 'discordjs.jpg' });
             const embed = new EmbedBuilder()
                 .setTitle(`${title.title}`)
-                .setDescription(`This drama has been completed!`)
+                .setDescription(`This drama has completed!`)
                 .addFields(
                     { name: 'Total Episodes', value: `${title.episode}`, inline: true },
                 )
