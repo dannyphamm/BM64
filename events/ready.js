@@ -14,7 +14,7 @@ module.exports = {
 
         if (config.mode !== 'DEV') {
 
-            log("WordOfTheDay: Scheduled job to run every day at 1:30 PM.")
+            log("WordOfTheDay:  Scheduled job to run every day at 1:30 PM.")
             schedule.scheduleJob('0 30 13 * * *', async () => {
                 try {
                     
