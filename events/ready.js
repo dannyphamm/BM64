@@ -34,7 +34,7 @@ module.exports = {
                 }
             });
 
-            log("Memes, Facts, KdramaTracker: Scheduled job to run every 5 minutes.")
+            log("Memes, Facts, Kdrama Tracker: Scheduled job to run every 5 minutes.")
             schedule.scheduleJob('0 */5 * * * *', async () => {
                 try {
                     await kdramaTrackerService(client);
