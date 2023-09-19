@@ -65,8 +65,9 @@ module.exports = {
                 }
             });
         }
+        loadSpotify(client);
         log('Ready!');
-        loadSpotify(client)
+        
     },
 };
 
