@@ -18,6 +18,7 @@ const loadSpotify = async (client) => {
             function (data) {
                 console.log('The access token has been refreshed!');
                 spotifyApi.setAccessToken(data.body['access_token']);
+                spotifyApi.setRefreshToken(data.body['refresh_token']);
                 expiryDate = new Date()
                 expiryDate.setSeconds(expiryDate.getSeconds() + 3600)
             },
