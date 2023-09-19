@@ -6,6 +6,7 @@ const { redditMemesService } = require('../services/redditmemes');
 const { wordOfTheDayService } = require('../services/wordoftheday');
 const { kdramaTrackerService, kdramaCompleterService } = require('../services/kdrama');
 const { trackUniqloItems, femaleSaleItems, maleSaleItems } = require('../services/uniqlo');
+const { loadSpotify } = require('../services/spotifyStatus');
 
 module.exports = {
     name: 'ready',
@@ -65,6 +66,7 @@ module.exports = {
             });
         }
         log('Ready!');
+        loadSpotify(client)
     },
 };
 
