@@ -6,19 +6,20 @@ var spotifyApi = new SpotifyWebApi({
     clientSecret: config.spotifyClientSecret,
     accessToken: config.spotifyAccessToken,
 })
+spotifyApi.setRefreshToken(config.spotifyRefreshToken)
 const loadSpotify = async (client) => {
 
     const voiceChannelId = '1145310513232891955';
     // refresh token if expired
-    spotifyApi.setRefreshToken(config.spotifyRefreshToken)
+    
     if (new Date() >= expiryDate) {
-        spotifyApi.refreshAccessToken().then(
+        await spotifyApi.refreshAccessToken().then(
             function (data) {
                 console.log('The access token has been refreshed!');
                 spotifyApi.setAccessToken(data.body['access_token']);
                 console.log("access", data.body['access_token'])
                 expiryDate = new Date()
-                expiryDate.setSeconds(expiryDate.getSeconds() + 3500)
+                expiryDate.setSeconds(expiryDate.getSeconds() + 3300)
             },
             function (err) {
                 console.log('Could not refresh access token', err);
