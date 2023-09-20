@@ -26,7 +26,7 @@ module.exports = {
             });
 
             log("Kdrama Completer: Scheduled job to run every day at 33 Minutes.")
-            schedule.scheduleJob('0 33 * * * *', async () => {
+            schedule.scheduleJob('30 32 * * * *', async () => {
                 try {
                     
                     await kdramaCompleterService(client);

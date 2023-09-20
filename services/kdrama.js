@@ -113,33 +113,36 @@ const kdramaCompleterService = async (client) => {
     for (const title of uncompletedTitles) {
 
         if (foundTitles.length > 0) {
-            foundTitles.includes(title.title) && log(`Found title "${title.title}", marking Complete`)
-            await kdramaCollection.updateOne({ _id: title._id }, { $set: { isCompleted: true } });
-            const buffer = await axios(config.kdramaURL + title.banner, {
-                responseType: 'arraybuffer'
-            }).then(response => { return response.data })
-            const imageBuffer = Buffer.from(buffer);
-            const attachment = new AttachmentBuilder(imageBuffer, { name: 'discordjs.jpg' });
-            const embed = new EmbedBuilder()
-                .setTitle(`${title.title}`)
-                .setDescription(`This drama has completed!`)
-                .addFields(
-                    { name: 'Total Episodes', value: `${title.episode}`, inline: true },
-                )
-                .setColor(0x7289da)
-                .setThumbnail('attachment://discordjs.jpg')
-                .setTimestamp();
-            const channel = await client.channels.cache.find(c => c.name === 'movie-night');
-            if (!channel) return;
-            const webhooks = await channel.fetchWebhooks();
-            if (webhooks.size === 0) return;
-            const webhook = new WebhookClient({ id: webhooks.first().id, token: webhooks.first().token });
-            webhook.send({
-                embeds: [embed],
-                files: [attachment]
-            });
+            if (foundTitles.includes(title.title)) {
+
+                log(`Found title "${title.title}", marking Complete`)
+                await kdramaCollection.updateOne({ _id: title._id }, { $set: { isCompleted: true } });
+                const buffer = await axios(config.kdramaURL + title.banner, {
+                    responseType: 'arraybuffer'
+                }).then(response => { return response.data })
+                const imageBuffer = Buffer.from(buffer);
+                const attachment = new AttachmentBuilder(imageBuffer, { name: 'discordjs.jpg' });
+                const embed = new EmbedBuilder()
+                    .setTitle(`${title.title}`)
+                    .setDescription(`This drama has completed!`)
+                    .addFields(
+                        { name: 'Total Episodes', value: `${title.episode}`, inline: true },
+                    )
+                    .setColor(0x7289da)
+                    .setThumbnail('attachment://discordjs.jpg')
+                    .setTimestamp();
+                const channel = await client.channels.cache.find(c => c.name === 'movie-night');
+                if (!channel) return;
+                const webhooks = await channel.fetchWebhooks();
+                if (webhooks.size === 0) return;
+                const webhook = new WebhookClient({ id: webhooks.first().id, token: webhooks.first().token });
+                webhook.send({
+                    embeds: [embed],
+                    files: [attachment]
+                });
+            }
         }
     }
 }
-module.exports = { kdramaTrackerService, kdramaCompleterService}
+module.exports = { kdramaTrackerService, kdramaCompleterService }
 
