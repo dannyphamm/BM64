@@ -1,5 +1,6 @@
 const SpotifyWebApi = require('spotify-web-api-node');
 const config = require('../config');
+const { log, error } = require('./utils');
 var expiryDate = new Date();
 
 let spotifyApi;
@@ -24,14 +25,14 @@ async function init() {
 const refreshToken = async () => {
     await spotifyApi.refreshAccessToken().then(
         function (data) {
-            console.log('The access token has been refreshed!');
+            log('The access token has been refreshed!');
             spotifyApi.setAccessToken(data.body['access_token']);
-            console.log("access", data.body['access_token'])
+            log("access", data.body['access_token'])
             expiryDate = new Date()
             expiryDate.setSeconds(expiryDate.getSeconds() + 3300)
         },
         function (err) {
-            console.log('Could not refresh access token', err);
+            error('Could not refresh access token', err);
         }
     );
 }

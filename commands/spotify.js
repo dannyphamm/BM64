@@ -1,6 +1,7 @@
 const { SlashCommandBuilder } = require('@discordjs/builders');
 const SpotifyWebApi = require('spotify-web-api-node');
 const config = require('../config.json');
+const { log } = require('../utils/utils');
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('spotify')
@@ -23,8 +24,7 @@ module.exports = {
             state,
           );
           
-        console.log(authorizeURL);
-
+        log(authorizeURL);
 
         return interaction.reply(`
 			Sent		

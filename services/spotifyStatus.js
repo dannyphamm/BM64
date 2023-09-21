@@ -1,6 +1,7 @@
 const { spotify } = require('../utils/spotify,js');
-const { codeBlock, ActionRowBuilder, ButtonBuilder } = require('@discordjs/builders');
+const { ActionRowBuilder, ButtonBuilder } = require('@discordjs/builders');
 const { ButtonStyle } = require('discord.js');
+const { error,log } = require('../utils/utils');
 let message;
 
 const loadSpotify = async (client) => {
@@ -41,7 +42,7 @@ const loadSpotify = async (client) => {
                         artists: item.track.artists.map(artist => artist.name).join(', '),
                         album: item.track.album.name,
                     })));
-                    console.log(tracks)
+
                     const embed = {
                         color: 0x0099ff,
                         title: 'Recently Played',
@@ -70,7 +71,7 @@ const loadSpotify = async (client) => {
                 const progressMs = currentTrack.body.progress_ms;
                 const durationMs = currentTrack.body.item.duration_ms;
                 const remainingMs = durationMs - progressMs + 1000;
-                console.log(progressMs, durationMs, remainingMs);
+                log(progressMs, durationMs, remainingMs);
                 if (remainingMs > 0) {
                     // Wait for the remaining time before calling the loadSpotify function again
                     await new Promise(resolve => setTimeout(resolve, remainingMs));
@@ -89,8 +90,9 @@ const loadSpotify = async (client) => {
                 //await voiceChannel.setName('');
             }
         }
-    } catch (error) {
-        console.error(error);
+    } catch (e) {
+        error(e);
+        
     }
 };
 
