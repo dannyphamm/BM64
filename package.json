@@ -28,6 +28,7 @@
         "node-fetch": "^3.3.1",
         "node-schedule": "^2.1.1",
         "sharp": "^0.32.4",
+        "socket.io": "^4.7.2",
         "spotify-web-api-node": "^5.0.2"
     },
     "devDependencies": {
