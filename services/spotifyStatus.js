@@ -1,31 +1,14 @@
-const SpotifyWebApi = require('spotify-web-api-node');
-const config = require('../config.json');
-var expiryDate = new Date();
-var spotifyApi = new SpotifyWebApi({
-    clientId: config.spotifyClientID,
-    clientSecret: config.spotifyClientSecret,
-    accessToken: config.spotifyAccessToken,
-})
-spotifyApi.setRefreshToken(config.spotifyRefreshToken)
-const loadSpotify = async (client) => {
+const { spotify } = require('../utils/spotify,js');
+const { codeBlock, ActionRowBuilder, ButtonBuilder } = require('@discordjs/builders');
+const { ButtonStyle } = require('discord.js');
+let message;
 
+const loadSpotify = async (client) => {
+    const spotifyApi = await spotify();
     const voiceChannelId = '1145310513232891955';
     // refresh token if expired
-    
-    if (new Date() >= expiryDate) {
-        await spotifyApi.refreshAccessToken().then(
-            function (data) {
-                console.log('The access token has been refreshed!');
-                spotifyApi.setAccessToken(data.body['access_token']);
-                console.log("access", data.body['access_token'])
-                expiryDate = new Date()
-                expiryDate.setSeconds(expiryDate.getSeconds() + 3300)
-            },
-            function (err) {
-                console.log('Could not refresh access token', err);
-            }
-        );
-    }
+
+
 
     try {
         // Get the currently playing track from the Spotify API
@@ -33,13 +16,54 @@ const loadSpotify = async (client) => {
         if (currentTrack.body) {
             if (currentTrack.body.currently_playing_type === 'track') {
                 // Get the song details
-                const songName = currentTrack.body.item.name;
-                const artistNames = currentTrack.body.item.artists.map(artist => artist.name).join(', ');
-
                 // Set the voice channel status
                 const voiceChannel = await client.channels.fetch(voiceChannelId);
                 if (voiceChannel && voiceChannel.type === 2) {
-                    await voiceChannel.send(`${songName} - ${artistNames}`);
+                    //await voiceChannel.send(`${songName} - ${artistNames}`);
+                    const row = new ActionRowBuilder()
+                        .addComponents(
+                            new ButtonBuilder()
+                                .setCustomId('skip')
+                                .setLabel('Skip')
+                                .setStyle(ButtonStyle.Danger),
+                            new ButtonBuilder()
+                                .setCustomId('remove')
+                                .setLabel('Remove')
+                                .setStyle(ButtonStyle.Danger),
+                        );
+                    const data = await spotifyApi.getMyRecentlyPlayedTracks({ limit: 10 });
+                    const tracks = ([{
+                        name: currentTrack.body.item.name,
+                        artists: currentTrack.body.item.artists.map(artist => artist.name).join(', '),
+                        album: currentTrack.body.item.album.name,
+                    }]).concat(data.body.items.map(item => ({
+                        name: item.track.name,
+                        artists: item.track.artists.map(artist => artist.name).join(', '),
+                        album: item.track.album.name,
+                    })));
+                    console.log(tracks)
+                    const embed = {
+                        color: 0x0099ff,
+                        title: 'Recently Played',
+                        fields: tracks.map((track, id) => ({
+                            name: id+1 + ". " + track.name + " - " + track.artists,
+                            value: track.album,
+                        })),
+                        timestamp: new Date(),
+                    };
+                    if (!message) {
+                        // Create a new message if one doesn't already exist
+                        message = await voiceChannel.send({
+                            embeds: [embed],
+                            components: [row]
+                        });
+                    } else {
+                        // Edit the existing message with the new song details
+                        await message.edit({
+                            embeds: [embed],
+                            components: [row]
+                        });
+                    }
                 }
 
                 // Check if the song has finished

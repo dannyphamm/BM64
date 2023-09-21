@@ -7,6 +7,8 @@ const { wordOfTheDayService } = require('../services/wordoftheday');
 const { kdramaTrackerService, kdramaCompleterService } = require('../services/kdrama');
 const { trackUniqloItems, femaleSaleItems, maleSaleItems } = require('../services/uniqlo');
 const { loadSpotify } = require('../services/spotifyStatus');
+const { socketIO } = require('../utils/socket');
+const { spotify } = require('../utils/spotify,js');
 
 module.exports = {
     name: 'ready',
@@ -64,8 +66,19 @@ module.exports = {
                     error(e, "TRY UNIQLO");
                 }
             });
+           
         }
-        loadSpotify(client);
+        
+        loadSpotify(client)
+        socketIO().on('connection', (socket) => {
+            log('a user connected');
+            socket.on('disconnect', () => {
+                log('user disconnected');
+            });
+        });
+        
+        socketIO().listen(3000);
+        log("Socket.io listening on port 3000")
         log('Ready!');
         
     },
