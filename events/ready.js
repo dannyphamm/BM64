@@ -69,7 +69,11 @@ module.exports = {
 
         }
         socketIO().listen(3000);
-        loadSpotify(client)
+        const delay = async () => {
+            await new Promise(resolve => { setTimeout(resolve, 5000) });
+            loadSpotify(client)
+        }
+        
         socketIO().on('connection', (socket) => {
             log('a user connected');
             socket.on('disconnect', () => {
