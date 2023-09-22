@@ -1,7 +1,7 @@
 const { InteractionType } = require("discord-api-types/v10");
 const { log, error } = require('../utils/utils');
 const { socketIO } = require("../utils/socket");
-const { spotify } = require("../utils/spotify,js");
+const { spotify } = require("../utils/spotify.js");
 module.exports = {
     name: 'interactionCreate',
     async execute(interaction) {

@@ -8,7 +8,7 @@ const { kdramaTrackerService, kdramaCompleterService } = require('../services/kd
 const { trackUniqloItems, femaleSaleItems, maleSaleItems } = require('../services/uniqlo');
 const { loadSpotify } = require('../services/spotifyStatus');
 const { socketIO } = require('../utils/socket');
-const { spotify } = require('../utils/spotify,js');
+const { spotify } = require('../utils/spotify.js');
 
 module.exports = {
     name: 'ready',

@@ -1,4 +1,4 @@
-const { spotify } = require('../utils/spotify,js');
+const { spotify } = require('../utils/spotify.js');
 const { ActionRowBuilder, ButtonBuilder } = require('@discordjs/builders');
 const { ButtonStyle } = require('discord.js');
 const { error,log } = require('../utils/utils');
