@@ -68,13 +68,8 @@ module.exports = {
             });
 
         }
-
-        //loadSpotify(client)
-        const temp = async () => {
-            await new Promise(resolve => { timeoutId = setTimeout(resolve, 5000) });
-        await loadSpotify(client);
-        }
-        temp()
+        socketIO().listen(3000);
+        loadSpotify(client)
         socketIO().on('connection', (socket) => {
             log('a user connected');
             socket.on('disconnect', () => {
@@ -84,7 +79,7 @@ module.exports = {
                 loadSpotify(client);
             });
         });
-        socketIO().listen(3000);
+
         log("Socket.io listening on port 3000")
         log('Ready!');
 

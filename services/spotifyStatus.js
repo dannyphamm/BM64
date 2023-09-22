@@ -68,7 +68,6 @@ loadSpotify = async (client) => {
                         };
 
                         if (!message) {
-                            console.log("ere")
                             // Create a new message if one doesn't already exist
                             message = await voiceChannel.send({
                                 embeds: [embed],
@@ -97,7 +96,8 @@ loadSpotify = async (client) => {
                     await loadSpotify(client);
                 }
             } else if (currentTrack.body.currently_playing_type === 'ad') {
-                console.log("hit an ad")
+                log("hit an ad")
+
                 // Wait for 15 seconds before calling the loadSpotify function again
                 await new Promise(resolve => { timeoutId = setTimeout(resolve, 15000) });
                 await loadSpotify(client);

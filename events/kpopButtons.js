@@ -22,6 +22,7 @@ module.exports = {
                 await spotifyApi.removeTracksFromPlaylist(
                     playlist,
                     [{ uri: `spotify:track:${currentSong.body.item.id}` }])
+                socketIO().emit('skipMusic');
                 await interaction.reply({ content: 'Deleted!', ephemeral: true });
             }
         }
