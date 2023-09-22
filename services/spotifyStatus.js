@@ -1,8 +1,10 @@
 const { spotify } = require('../utils/spotify.js');
 const { ActionRowBuilder, ButtonBuilder } = require('@discordjs/builders');
 const { ButtonStyle } = require('discord.js');
-const { error,log } = require('../utils/utils');
+const { error, log } = require('../utils/utils');
+const { socketIO } = require('../utils/socket.js');
 let message;
+let timeoutId;
 
 const loadSpotify = async (client) => {
     const spotifyApi = await spotify();
@@ -33,23 +35,22 @@ const loadSpotify = async (client) => {
                                 .setStyle(ButtonStyle.Danger),
                         );
                     const data = await spotifyApi.getMyRecentlyPlayedTracks({ limit: 10 });
-                    const tracks = ([{
-                        name: currentTrack.body.item.name,
-                        artists: currentTrack.body.item.artists.map(artist => artist.name).join(', '),
-                        album: currentTrack.body.item.album.name,
-                    }]).concat(data.body.items.map(item => ({
+                    const tracks = data.body.items.map(item => ({
                         name: item.track.name,
                         artists: item.track.artists.map(artist => artist.name).join(', '),
                         album: item.track.album.name,
-                    })));
+                    }));
 
                     const embed = {
                         color: 0x0099ff,
                         title: 'Recently Played',
-                        fields: tracks.map((track, id) => ({
-                            name: id+1 + ". " + track.name + " - " + track.artists,
+                        fields: ([{
+                            name: "Current Song: " + track.name + " - " + track.artists,
                             value: track.album,
-                        })),
+                        }]).concat(tracks.map((track, id) => ({
+                            name: "-"+id - 1 + ". " + track.name + " - " + track.artists,
+                            value: track.album,
+                        }))),
                         timestamp: new Date(),
                     };
                     if (!message) {
@@ -74,13 +75,13 @@ const loadSpotify = async (client) => {
                 log(progressMs, durationMs, remainingMs);
                 if (remainingMs > 0) {
                     // Wait for the remaining time before calling the loadSpotify function again
-                    await new Promise(resolve => setTimeout(resolve, remainingMs));
+                    await new Promise(resolve => { timeoutId = setTimeout(resolve, remainingMs) });
                     // Call the loadSpotify function again
                     await loadSpotify(client);
                 }
             } else if (currentTrack.body.currently_playing_type === 'ad') {
                 // Wait for 15 seconds before calling the loadSpotify function again
-                await new Promise(resolve => setTimeout(resolve, 15000));
+                await new Promise(resolve => { timeoutId = setTimeout(resolve, 15000) });
                 await loadSpotify(client);
             }
         } else {
@@ -92,7 +93,7 @@ const loadSpotify = async (client) => {
         }
     } catch (e) {
         error(e);
-        
+
     }
 };
 

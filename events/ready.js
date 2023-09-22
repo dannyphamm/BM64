@@ -75,6 +75,9 @@ module.exports = {
             socket.on('disconnect', () => {
                 log('user disconnected');
             });
+            socket.on('skipMusic', async () => {
+                loadSpotify(client);
+            });
         });
         
         socketIO().listen(3000);
