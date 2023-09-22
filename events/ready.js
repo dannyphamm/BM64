@@ -8,7 +8,7 @@ const { kdramaTrackerService, kdramaCompleterService } = require('../services/kd
 const { trackUniqloItems, femaleSaleItems, maleSaleItems } = require('../services/uniqlo');
 const { loadSpotify } = require('../services/spotifyStatus');
 const { socketIO } = require('../utils/socket');
-const { spotify } = require('../utils/spotify.js');
+
 
 module.exports = {
     name: 'ready',
@@ -20,7 +20,7 @@ module.exports = {
             log("WordOfTheDay:  Scheduled job to run every day at 1:30 PM.")
             schedule.scheduleJob('0 30 13 * * *', async () => {
                 try {
-                    
+
                     await wordOfTheDayService(client);
                 } catch (e) {
                     error(e, "TRY WORD OF THE DAY");
@@ -30,7 +30,7 @@ module.exports = {
             log("Kdrama Completer: Scheduled job to run every day at 33 Minutes.")
             schedule.scheduleJob('30 32 * * * *', async () => {
                 try {
-                    
+
                     await kdramaCompleterService(client);
                 } catch (e) {
                     error(e, "TRY KDRAMACOMPLETER");
@@ -43,7 +43,7 @@ module.exports = {
                     await kdramaTrackerService(client);
                     await redditMemesService(client);
                     await randomFactsService(client);
-                   
+
                 } catch (e) {
                     error(e, "TRY MEMES, FACTS, KDRAMA");
                 }
@@ -51,7 +51,7 @@ module.exports = {
             log("UniqloTracker: Scheduled job to run 15 minutes.")
             schedule.scheduleJob('0 */15 * * * *', async () => {
                 try {
-                 
+
                     await trackUniqloItems(client);
                 } catch (e) {
                     error(e, "TRY UNIQLO SINGLE ITEMS");
@@ -66,10 +66,15 @@ module.exports = {
                     error(e, "TRY UNIQLO");
                 }
             });
-           
+
         }
-        
-        loadSpotify(client)
+
+        //loadSpotify(client)
+        const temp = async () => {
+            await new Promise(resolve => { timeoutId = setTimeout(resolve, 5000) });
+        await loadSpotify(client);
+        }
+        temp()
         socketIO().on('connection', (socket) => {
             log('a user connected');
             socket.on('disconnect', () => {
@@ -79,11 +84,10 @@ module.exports = {
                 loadSpotify(client);
             });
         });
-        
         socketIO().listen(3000);
         log("Socket.io listening on port 3000")
         log('Ready!');
-        
+
     },
 };
 
