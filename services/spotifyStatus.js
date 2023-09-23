@@ -40,12 +40,17 @@ loadSpotify = async (client) => {
                     const current = currentTrack.body.item;
                     await socketIO().timeout(5000).emit('getQueue', async (err, data) => {
                         const recent = await spotifyApi.getMyRecentlyPlayedTracks({ limit: 10 });
-
-                        let queue = data[0].map((track, id) => ({
-                            name: track.name,
-                            artists: track.artists,
-                            album: track.album
-                        }));
+                        let queue;
+                        if(!data) {
+                            queue = [[]];
+                        } else {
+                            queue = data[0].map((track, id) => ({
+                                name: track.name,
+                                artists: track.artists,
+                                album: track.album
+                            }));
+                        }
+                         
                         const tracks = recent.body.items.map(item => ({
                             name: item.track.name,
                             artists: item.track.artists.map(artist => artist.name).join(', '),
