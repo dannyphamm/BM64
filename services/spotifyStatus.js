@@ -41,8 +41,7 @@ loadSpotify = async (client) => {
                     await socketIO().timeout(5000).emit('getQueue', async (err, data) => {
                         const recent = await spotifyApi.getMyRecentlyPlayedTracks({ limit: 10 });
                         let queue;
-                        console.log(data)
-                        if(!data) {
+                        if(data.length === 0) {
                             queue = [[]];
                         } else {
                             queue = data[0].map((track, id) => ({
