@@ -42,7 +42,7 @@ loadSpotify = async (client) => {
                         const recent = await spotifyApi.getMyRecentlyPlayedTracks({ limit: 10 });
                         let queue;
                         if(data.length === 0) {
-                            queue = [[]];
+                            queue = [];
                         } else {
                             queue = data[0].map((track, id) => ({
                                 name: track.name,
@@ -56,6 +56,7 @@ loadSpotify = async (client) => {
                             artists: item.track.artists.map(artist => artist.name).join(', '),
                             album: item.track.album.name,
                         }));
+                       
                         const embed = {
                             color: 0x0099ff,
                             title: 'Recently Played',
