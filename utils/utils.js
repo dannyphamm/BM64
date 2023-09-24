@@ -2,11 +2,12 @@ const { createCanvas, loadImage } = require('@napi-rs/canvas');
 const axios = require('axios');
 const config = require('../config');
 const {AttachmentBuilder} = require('discord.js');
-let date = new Date().toLocaleString([], { dateStyle: 'long', timeStyle: 'long' });
 const log = (...message) => {
+    let date = new Date().toLocaleString([], { dateStyle: 'long', timeStyle: 'long' });
     return console.log(date, ...message)
 }
 const error = (...message) => {
+    let date = new Date().toLocaleString([], { dateStyle: 'long', timeStyle: 'long' });
     return console.error(date, ...message)
 }
 
