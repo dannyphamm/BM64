@@ -19,7 +19,7 @@ loadSpotify = async (client) => {
 
 
         if (currentTrack.body) {
-            if (currentTrack.body.currently_playing_type === 'track') {
+            if (currentTrack.body.currently_playing_type === 'track' && currentTrack.body.isPlaying) {
                 // Get the song details
                 // Set the voice channel status
                 const voiceChannel = await client.channels.fetch(voiceChannelId);
@@ -103,14 +103,8 @@ loadSpotify = async (client) => {
                     // Call the loadSpotify function again
                     await loadSpotify(client);
                 }
-            } else if (currentTrack.body.currently_playing_type === 'ad') {
-                log("hit an ad")
-                if (buttons) {
-                    buttons.components[0].setDisabled(true);
-                    buttons.components[1].setDisabled(true);
-                    buttons.components[0].setLabel('Ad');
-                    buttons.components[1].setLabel('Ad');
-                }
+            } else if (currentTrack.body.currently_playing_type === 'ad' || !currentTrack.body.isPlaying) {
+                log("hit an ad or is paused")
                 // Wait for 15 seconds before calling the loadSpotify function again
                 await new Promise(resolve => { setTimeout(resolve, 15000) });
                 await loadSpotify(client);
