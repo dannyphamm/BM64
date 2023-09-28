@@ -5,7 +5,7 @@ const { error, log } = require('../utils/utils');
 const { socketIO } = require('../utils/socket.js');
 let message;
 let buttons;
-
+let remainingMs;
 loadSpotify = async (client) => {
     const spotifyApi = await spotify();
     const voiceChannelId = '1145310513232891955';
@@ -16,7 +16,10 @@ loadSpotify = async (client) => {
     try {
         // Get the currently playing track from the Spotify API
         const currentTrack = await spotifyApi.getMyCurrentPlayingTrack();
-
+        if(remainingMs === 1000) {
+            log("skipping, looks like we are stuck")
+            await socketIO().emit('skipMusic');
+        }
 
         if (currentTrack.body) {
             if (currentTrack.body.currently_playing_type === 'track' && currentTrack.body.is_playing) {
@@ -95,7 +98,7 @@ loadSpotify = async (client) => {
                 // Check if the song has finished
                 const progressMs = currentTrack.body.progress_ms;
                 const durationMs = currentTrack.body.item.duration_ms;
-                const remainingMs = durationMs - progressMs + 1000;
+                remainingMs = durationMs - progressMs + 1000;
                 log(progressMs, durationMs, remainingMs);
                 if (remainingMs > 0) {
                     // Wait for the remaining time before calling the loadSpotify function again
