@@ -18,15 +18,15 @@ loadSpotify = async (client) => {
     try {
         // Get the currently playing track from the Spotify API
         const currentTrack = await spotifyApi.getMyCurrentPlayingTrack();
-
+        if(durationMs=== progressMs && remainingMs === 1000) {
+            log("skipping, looks like we are stuck")
+            await socketIO().emit('skipMusic');
+        }
 
         if (currentTrack.body) {
            
             if (currentTrack.body.currently_playing_type === 'track' && currentTrack.body.is_playing) {
-                // if(durationMs=== progressMs && remainingMs === 1000) {
-                //     log("skipping, looks like we are stuck")
-                //     await socketIO().emit('skipMusic');
-                // }
+
                 // Get the song details
                 // Set the voice channel status
                 const voiceChannel = await client.channels.fetch(voiceChannelId);
@@ -102,7 +102,7 @@ loadSpotify = async (client) => {
                 // Check if the song has finished
                 progressMs = currentTrack.body.progress_ms;
                 durationMs = currentTrack.body.item.duration_ms;
-                remainingMs = durationMs - progressMs + 1000;
+                remainingMs = durationMs - progressMs + 4000;
                 log(progressMs, durationMs, remainingMs);
                 if (remainingMs > 0) {
                     // Wait for the remaining time before calling the loadSpotify function again
