@@ -18,8 +18,14 @@ async function imageAttachment(images, name) {
     const gridHeight = gridSize * 400;
     
     const imageBuffers = await Promise.all(images.map(async (imageURL) => {
-        const response = await axios.get(imageURL, { responseType: 'arraybuffer' });
-        return response.data;
+        try {
+            const response = await axios.get(imageURL, { responseType: 'arraybuffer' });
+            return response.data;
+        } catch (e) {
+            error(e);
+            return; 
+        }
+        
     }));
 
     const canvas = createCanvas(gridWidth, gridHeight);

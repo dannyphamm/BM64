@@ -21,6 +21,13 @@ module.exports = {
                 )
         )
         .addSubcommand(subcommand =>
+            subcommand.setName('untrack').setDescription('Untrack a Uniqlo item by ID')
+                .addStringOption(option =>
+                    option.setName('itemid')
+                        .setDescription('The ID of the Uniqlo item to untrack')
+                        .setRequired(true)
+                ))
+        .addSubcommand(subcommand =>
             subcommand
                 .setName('pricehistory')
                 .setDescription('Get the price history of a Uniqlo item by ID')
@@ -134,7 +141,16 @@ module.exports = {
                     confirmMessage.edit({ content: 'Confirmation timed out.', components: [] });
                 }
             });
-
+        } else if (subcommand === 'untrack') {
+            const itemId = interaction.options.getString('itemid');
+            const uniqloCollection = interaction.client.mongodb.db.collection(config.mongodbDBUniqlo);
+            // check if itemId exists in the collection
+            const existingItem = await uniqloCollection.findOne({ itemId });
+            if(!existingItem) {
+                return interaction.reply('This item is not being tracked.')
+            }
+            await collection.updateOne({ itemId }, { $set: { tracking: false } });
+            return interaction.reply(`Uniqlo item ${itemId} has been removed from tracking.`)
         } else if (subcommand === 'pricehistory') {
             // Handle the pricehistory subcommand
             const itemId = interaction.options.getString('itemid');
