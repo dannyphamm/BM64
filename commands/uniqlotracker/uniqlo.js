@@ -149,7 +149,7 @@ module.exports = {
             if(!existingItem) {
                 return interaction.reply('This item is not being tracked.')
             }
-            await collection.updateOne({ itemId }, { $set: { tracking: false } });
+            await uniqloCollection.updateOne({ itemId }, { $set: { tracking: false } });
             return interaction.reply(`Uniqlo item ${itemId} has been removed from tracking.`)
         } else if (subcommand === 'pricehistory') {
             // Handle the pricehistory subcommand

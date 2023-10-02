@@ -8,7 +8,7 @@ async function trackUniqloItems(client) {
     const uniqloCollection = await client.mongodb.db.collection(config.mongodbDBUniqlo);
     const itemIds = await uniqloCollection.distinct('itemId');
     for (const itemId of itemIds) {
-        const existingItem = await uniqloCollection.findOne({ itemId });
+        const existingItem = await uniqloCollection.findOne({ itemId, tracking: true });
         if (!existingItem) {
             error(`Item ${itemId} not found in database.`);
             continue;
