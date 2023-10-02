@@ -24,7 +24,8 @@ const kdramaTrackerService = async (client) => {
     const newLink = $('.section.group.list .col.cover a').map((i, el) => $(el).attr('href')).get();
     const newBanner = $('.section.group.list .col.cover a img').map((i, el) => $(el).attr('src')).get();
     const newEpisodes = $('.section.group.list .col.info p:nth-child(3)').map((i, el) => parseInt($(el).text().trim().replace('Episode ', ''))).get();
-    // Check if there is a new title and update the JSON data accordingly
+    log("Checking for new kdramas", newTitles.length)
+    //Check if there is a new title and update the JSON data accordingly
     newTitles.forEach(async (title, i) => {
         const index = titles.indexOf(title);
         if (index === -1) {

@@ -2,11 +2,12 @@ const { WebhookClient } = require('discord.js');
 const { error } = require('../utils/utils');
 
 const redditMemesService = async (client) => {
-        const fetch = await import('node-fetch');
+    const fetch = await import('node-fetch');
 
-        await fetch.default('https://meme-api.com/gimme')
-            .then(response => response.json())
-            .then(async data => {
+    await fetch.default('https://meme-api.com/gimme')
+        .then(response => response.json())
+        .then(async data => {
+            if (data) {
                 const exampleEmbed = {
                     title: data.title,
                     url: data.url,
@@ -27,10 +28,14 @@ const redditMemesService = async (client) => {
                 webhook.send({
                     embeds: [exampleEmbed],
                 });
-            })
-            .catch(e => {
-                error('Error fetching meme:', e);
-            });
+            } else {
+                error('No meme data available')
+            }
+
+        })
+        .catch(e => {
+            error('Error fetching meme:', e);
+        });
 }
 
 module.exports = { redditMemesService }
