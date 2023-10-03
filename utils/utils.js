@@ -1,7 +1,7 @@
 const { createCanvas, loadImage } = require('@napi-rs/canvas');
 const axios = require('axios');
 const config = require('../config');
-const {AttachmentBuilder} = require('discord.js');
+const { AttachmentBuilder } = require('discord.js');
 const log = (...message) => {
     let date = new Date().toLocaleString([], { dateStyle: 'long', timeStyle: 'long' });
     return console.log(date, ...message)
@@ -16,18 +16,23 @@ async function imageAttachment(images, name) {
     const gridSize = Math.ceil(Math.sqrt(images.length));
     const gridWidth = gridSize * 400;
     const gridHeight = gridSize * 400;
-    
+
     const imageBuffers = await Promise.all(images.map(async (imageURL) => {
         try {
             const response = await axios.get(imageURL, { responseType: 'arraybuffer' });
             return response.data;
         } catch (e) {
-            error(e);
-            return; 
+            const notfound = createCanvas(400, 400);
+            const ctx = notfound.getContext('2d');
+            ctx.font = 'bold 24px Arial';
+            ctx.fillStyle = 'red';
+            ctx.textAlign = 'center';
+            ctx.fillText('Image not available', notfound.width / 2, notfound.height / 2);
+            // Convert the canvas to a buffer
+            return notfound.toBuffer('image/png');
         }
-        
     }));
-
+    //console.log(imageBuffers)
     const canvas = createCanvas(gridWidth, gridHeight);
     const ctx = canvas.getContext('2d');
 

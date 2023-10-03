@@ -84,7 +84,6 @@ module.exports = {
 
             log("Socket.io listening on port 3000")
         }
-        
         log('Ready!');
 
     },
