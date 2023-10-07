@@ -3,7 +3,7 @@ const { ActionRowBuilder, ButtonBuilder } = require('@discordjs/builders');
 const { ButtonStyle } = require('discord.js');
 const { error, log } = require('../utils/utils');
 const { socketIO } = require('../utils/socket.js');
-let message;
+
 let buttons;
 let remainingMs;
 let progressMs;
@@ -68,14 +68,14 @@ loadSpotify = async (client) => {
                         const updatedNextUpEmbed = {
                             color: 0x0099ff,
                             title: 'Next Up',
-                            fields: (queue.slice(0, 4).reverse().map((track, id) => ({
+                            fields: (queue.slice(0, 4).map((track, id) => ({
                                 name: "+" + 4 - id + ". " + track.name + " - " + track.artists,
                                 value: track.album,
                             })))
                         }
                         const updatedCurrentEmbed = {
                             color: 0x0099ff,
-                            title: 'Currently Played',
+                            title: 'Currently Playing',
                             fields: [{
                                 name: current.name + " - " + current.artists.map(artist => artist.name).join(', '),
                                 value: current.album.name,
@@ -91,7 +91,6 @@ loadSpotify = async (client) => {
                         }
 
                         if (!message) {
-                            console.log("message not found")
                             await voiceChannel.send({ embeds: [updatedNextUpEmbed, updatedCurrentEmbed, updatedPreviousEmbed], components: [buttons] })
                         } else {
                             await message.edit({ embeds: [updatedNextUpEmbed, updatedCurrentEmbed, updatedPreviousEmbed], components: [buttons] })
