@@ -84,6 +84,7 @@ module.exports = {
 
             log("Socket.io listening on port 3000")
         }
+        loadSpotify(client);
         log('Ready!');
 
     },

@@ -8,14 +8,14 @@ module.exports = {
             const newChannel = newState.channel;
 
             // Check if the user has joined an empty channel
-            if (newChannel && newChannel.members.size === 1 && newState.channelId !== oldState.channelId) {
+            if (newChannel && newChannel.members.size === 1 && newState.channelId !== oldState.channelId && newState.channelId !== '1145310513232891955') {
                 log(`Session Created in ${newChannel.name} (${newChannel.id})`)
                 const channelMessage = await newChannel.send('All messages sent in this text channel will automatically disappear after 15 minutes.');
                 channelMessage.channelId = newChannel.id; // save the channel ID on the message
             }
 
             // Check if the user has left an empty channel
-            if (oldChannel && oldChannel.members.size === 0) {
+            if (oldChannel && oldChannel.members.size === 0 && oldChannel.id !== '1145310513232891955') {
                 log(`Session complete in ${oldChannel.name} (${oldChannel.id}). Deleting message`)
                 const fetchedMessages = await oldChannel.messages.fetch();
                 const firstMessage = fetchedMessages.last();

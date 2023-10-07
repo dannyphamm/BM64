@@ -18,13 +18,12 @@ loadSpotify = async (client) => {
     try {
         // Get the currently playing track from the Spotify API
         const currentTrack = await spotifyApi.getMyCurrentPlayingTrack();
-        if(durationMs=== progressMs && remainingMs === 1000) {
+        if (durationMs === progressMs && remainingMs === 1000) {
             log("skipping, looks like we are stuck")
             await socketIO().emit('skipMusic');
         }
-
         if (currentTrack.body) {
-           
+
             if (currentTrack.body.currently_playing_type === 'track' && currentTrack.body.is_playing) {
 
                 // Get the song details
@@ -59,43 +58,44 @@ loadSpotify = async (client) => {
                                 album: track.album
                             }));
                         }
-
                         const tracks = recent.body.items.map(item => ({
                             name: item.track.name,
                             artists: item.track.artists.map(artist => artist.name).join(', '),
                             album: item.track.album.name,
                         }));
+                        const message = await voiceChannel.messages.fetch().then(messages => messages.find(msg => msg.author.id === client.user.id));
 
-                        const embed = {
+                        const updatedNextUpEmbed = {
                             color: 0x0099ff,
-                            title: 'Recently Played',
+                            title: 'Next Up',
                             fields: (queue.slice(0, 4).reverse().map((track, id) => ({
                                 name: "+" + 4 - id + ". " + track.name + " - " + track.artists,
                                 value: track.album,
-                            })).concat([{
-                                name: "Playing: " + current.name + " - " + current.artists.map(artist => artist.name).join(', '),
+                            })))
+                        }
+                        const updatedCurrentEmbed = {
+                            color: 0x0099ff,
+                            title: 'Currently Played',
+                            fields: [{
+                                name: current.name + " - " + current.artists.map(artist => artist.name).join(', '),
                                 value: current.album.name,
-                            }])).concat(tracks.map((track, id) => ({
+                            }]
+                        }
+                        const updatedPreviousEmbed = {
+                            color: 0x0099ff,
+                            title: 'Previously Played',
+                            fields: tracks.map((track, id) => ({
                                 name: "-" + id - 1 + ". " + track.name + " - " + track.artists,
                                 value: track.album,
-                            }))),
-                            timestamp: new Date(),
-                        };
-
-                        if (!message) {
-                            // Create a new message if one doesn't already exist
-                            message = await voiceChannel.send({
-                                embeds: [embed],
-                                components: [buttons]
-                            });
-                        } else {
-                            // Edit the existing message with the new song details
-                            await message.edit({
-                                embeds: [embed],
-                                components: [buttons]
-                            });
+                            }))
                         }
 
+                        if (!message) {
+                            console.log("message not found")
+                            await voiceChannel.send({ embeds: [updatedNextUpEmbed, updatedCurrentEmbed, updatedPreviousEmbed], components: [buttons] })
+                        } else {
+                            await message.edit({ embeds: [updatedNextUpEmbed, updatedCurrentEmbed, updatedPreviousEmbed], components: [buttons] })
+                        }
                     })
                 }
 
