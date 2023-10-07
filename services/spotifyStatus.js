@@ -68,8 +68,8 @@ loadSpotify = async (client) => {
                         const updatedNextUpEmbed = {
                             color: 0x0099ff,
                             title: 'Next Up',
-                            fields: (queue.reverse().slice(0, 4).map((track, id) => ({
-                                name: "+" + 4 - id + ". " + track.name + " - " + track.artists,
+                            fields: (queue.slice(0, 4).map((track, id) => ({
+                                name: "+" + id + ". " + track.name + " - " + track.artists,
                                 value: track.album,
                             })))
                         }
