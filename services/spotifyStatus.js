@@ -87,7 +87,8 @@ loadSpotify = async (client) => {
                             fields: tracks.map((track, id) => ({
                                 name: "-" + id - 1 + ". " + track.name + " - " + track.artists,
                                 value: track.album,
-                            }))
+                            })),
+                            timestamp: new Date().toISOString(),
                         }
 
                         if (!message) {
