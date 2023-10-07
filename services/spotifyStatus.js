@@ -69,7 +69,7 @@ loadSpotify = async (client) => {
                             color: 0x0099ff,
                             title: 'Next Up',
                             fields: (queue.slice(0, 4).map((track, id) => ({
-                                name: "+" + 1+ id + ". " + track.name + " - " + track.artists,
+                                name: (1+ Number(id)) + ". " + track.name + " - " + track.artists,
                                 value: track.album,
                             })))
                         }
