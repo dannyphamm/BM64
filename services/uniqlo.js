@@ -179,9 +179,9 @@ async function fetchSaleItems(client, gender, discordId) {
         }
 
         //Update the database with the new state
-        // for (const item of addedItems) {
-        //     await collection.updateOne({ id: item.productId }, { $set: item }, { upsert: true });
-        // }
+        for (const item of addedItems) {
+            await collection.updateOne({ id: item.productId }, { $set: item }, { upsert: true });
+        }
         for (const item of removedItems) {
             await collection.deleteOne({ id: item.productId });
         }
