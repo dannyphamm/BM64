@@ -66,23 +66,23 @@ module.exports = {
                     error(e, "TRY UNIQLO");
                 }
             });
-            // socketIO().listen(3000);
-            // const delay = async () => {
-            //     await new Promise(resolve => { setTimeout(resolve, 5000) });
-            //     loadSpotify(client)
-            // }
-            // delay()
-            // socketIO().on('connection', (socket) => {
-            //     log('a user connected');
-            //     socket.on('disconnect', () => {
-            //         log('user disconnected');
-            //     });
-            //     socket.on('skipMusic', async () => {
-            //         loadSpotify(client);
-            //     });
-            // });
+            socketIO().listen(3000);
+            const delay = async () => {
+                await new Promise(resolve => { setTimeout(resolve, 5000) });
+                loadSpotify(client)
+            }
+            delay()
+            socketIO().on('connection', (socket) => {
+                log('a user connected');
+                socket.on('disconnect', () => {
+                    log('user disconnected');
+                });
+                socket.on('skipMusic', async () => {
+                    loadSpotify(client);
+                });
+            });
 
-            // log("Socket.io listening on port 3000")
+            log("Socket.io listening on port 3000")
         }
         log('Ready!');
 
