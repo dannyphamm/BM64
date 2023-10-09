@@ -98,7 +98,7 @@ async function fetchSaleItems(client, gender, discordId) {
         const addedItemsEmbeds = [];
         const removedItemsEmbeds = [];
         const changedItemsEmbeds = [];
-        const batchSize = 4;
+        const batchSize = 10;
         for (let i = 0; i < addedItems.length; i += batchSize) {
             const batch = addedItems.slice(i, i + batchSize);
             const addedItemsImageUrls = batch.map(item => item.images.main[0].url);
