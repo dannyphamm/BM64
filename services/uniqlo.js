@@ -3,8 +3,6 @@ const { getUniqloItem, getLatestPrices, insertPrice } = require('../utils/uniqlo
 const config = require('../config');
 const axios = require('axios');
 const { log, error, imageAttachment } = require('../utils/utils');
-const { add } = require('libsodium-wrappers');
-
 async function trackUniqloItems(client) {
     const uniqloCollection = await client.mongodb.db.collection(config.mongodbDBUniqlo);
     const itemIds = await uniqloCollection.distinct('itemId');
@@ -51,26 +49,24 @@ async function trackUniqloItems(client) {
 async function fetchSaleItems(client, gender, discordId) {
     try {
         // Fetch the current state of the sale items API
-        const response = await axios.get(`${config.uniqloApiUrl}/products?path=${gender}&flagCodes=discount%2Cdiscount&limit=1000&offset=0`,
-        {
-            timeout: 20000,
-        });
+        const response = await fetch(`${config.uniqloApiUrl}/products?path=${gender}&flagCodes=discount&limit=1000&offset=0`);
+
         // If response is not 200 then return
-        if (response.data.status !== "ok" || response.data.result.items.length === 0) return (log("Error fetching sale items", gender, `${config.uniqloApiUrl}/products?path=${gender}&flagCodes=discount%2Cdiscount&limit=1000&offset=0`));
+        if (response.status !== "ok" || response.result.items.length === 0) return (log("Error fetching sale items", gender, `${config.uniqloApiUrl}/products?path=${gender}&flagCodes=discount&limit=1000&offset=0`));
         // Retrieve the previous state of the sale items from your database
         const collection = await client.mongodb.db.collection(`sale-items-${gender}`);
         const previousState = await collection.find().toArray();
         if (previousState.length === 0) {
-            log("Inserting data into database", response.data.result.items.length)
-            for (const item of response.data.result.items) {
+            log("Inserting data into database", response.result.items.length)
+            for (const item of response.result.items) {
                 await collection.updateOne({ id: item.productId }, { $set: item }, { upsert: true });
             }
             return;
         }
         // Compare the two states to find any differences
-        let addedItems = response.data.result.items.filter(item => !previousState.find(i => i.productId === item.productId))
-        let removedItems = previousState.filter(item => !response.data.result.items.find(i => i.productId === item.productId));
-        let changedItems = response.data.result.items.reduce((acc, item) => {
+        let addedItems = response.result.items.filter(item => !previousState.find(i => i.productId === item.productId))
+        let removedItems = previousState.filter(item => !response.result.items.find(i => i.productId === item.productId));
+        let changedItems = response.result.items.reduce((acc, item) => {
             const previousItem = previousState.find(i => i.productId === item.productId);
             if (previousItem && (previousItem.prices.base.value !== item.prices.base.value || previousItem.prices.promo.value !== item.prices.promo.value)) {
                 acc.push([previousItem, item]);
