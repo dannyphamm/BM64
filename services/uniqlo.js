@@ -78,21 +78,33 @@ async function fetchSaleItems(client, gender, discordId) {
 
         addedItems = await Promise.all(addedItems.map(async item => {
             const product = await getUniqloItem(item.productId)
-            const available = product.l2s.filter(item => item.prices.promo !== null && item.stock.quantity !== 0);
+            if(product.length === 0) {
+                available = []
+            } else {
+                available = product.l2s.filter(item => item.prices.promo !== null && item.stock.quantity !== 0);
+            }
             return { ...item, l2s: available };
         }));
         removedItems = await Promise.all(removedItems.map(async item => {
             const product = await getUniqloItem(item.productId)
-            const available = product.l2s.filter(item => item.prices.promo !== null && item.stock.quantity !== 0);
+            if(product.length === 0) {
+                available = []
+            } else {
+                available = product.l2s.filter(item => item.prices.promo !== null && item.stock.quantity !== 0);
+            }
             return { ...item, l2s: available };
         }));
         changedItems = await Promise.all(changedItems.map(async item => {
             const product = await getUniqloItem(item[1].productId)
-            const available = product.l2s.filter(item => item.prices.promo !== null && item.stock.quantity !== 0);
+            let available;
+            if(product.length === 0) {
+                available = []
+            } else {
+                available = product.l2s.filter(item => item.prices.promo !== null && item.stock.quantity !== 0);
+            }
+            
             return [{ ...item[0], l2s: available }, { ...item[1], l2s: available }];
         }));
-
-
 
         const addedItemsEmbeds = [];
         const removedItemsEmbeds = [];
@@ -168,15 +180,15 @@ async function fetchSaleItems(client, gender, discordId) {
         }
 
         //Update the database with the new state
-        for (const item of addedItems) {
-            await collection.updateOne({ id: item.productId }, { $set: item }, { upsert: true });
-        }
-        for (const item of removedItems) {
-            await collection.deleteOne({ id: item.productId });
-        }
-        changedItems.map(async item => {
-            await collection.updateOne({ id: item[0].productId }, { $set: item[1] }, { upsert: true });
-        })
+        // for (const item of addedItems) {
+        //     await collection.updateOne({ id: item.productId }, { $set: item }, { upsert: true });
+        // }
+        // for (const item of removedItems) {
+        //     await collection.deleteOne({ id: item.productId });
+        // }
+        // changedItems.map(async item => {
+        //     await collection.updateOne({ id: item[0].productId }, { $set: item[1] }, { upsert: true });
+        // })
 
     } catch (e) {
         error(e, "FETCH SALE ITEMS", gender);

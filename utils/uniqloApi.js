@@ -7,6 +7,7 @@ async function getUniqloItem(itemId) {
     const url = await fetch(`${config.uniqloApiUrl}/products/${itemId}`);
     const response = await url.json();
     if(response.status === 'nok') {
+        console.log("NOK", itemId)
         return []
     }
     if(response.result.items.length === 0) {
