@@ -152,7 +152,7 @@ async function fetchSaleItems(client, gender, discordId) {
             .setColor('#0099ff')
             .setTitle(`Changed items (${i + 1}-${i + batch.length})`)
             .setDescription(batch.map(item => {
-                const colorSizes = item[0].l2s.reduce((acc, l2) => {
+                const colorSizes = item[1].l2s.reduce((acc, l2) => {
                   if (!acc[l2.color.name]) {
                     acc[l2.color.name] = [];
                   }

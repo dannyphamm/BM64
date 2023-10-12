@@ -11,6 +11,7 @@ async function getUniqloItem(itemId) {
         return []
     }
     if(response.result.items.length === 0) {
+        console.log("0", itemId)
         return []
     }
     return response.result.items[0];
