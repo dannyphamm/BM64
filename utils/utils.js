@@ -19,8 +19,8 @@ async function imageAttachment(images, name) {
 
     const imageBuffers = await Promise.all(images.map(async (imageURL) => {
         try {
-            const response = await axios.get(imageURL, { responseType: 'arraybuffer' });
-            return response.data;
+            const response = await fetch(imageURL, { responseType: 'arraybuffer' });
+            return response;
         } catch (e) {
             const notfound = createCanvas(400, 400);
             const ctx = notfound.getContext('2d');

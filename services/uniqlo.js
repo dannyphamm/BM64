@@ -1,7 +1,6 @@
 const { EmbedBuilder, AttachmentBuilder } = require('discord.js');
 const { getUniqloItem, getLatestPrices, insertPrice } = require('../utils/uniqloApi');
 const config = require('../config');
-const axios = require('axios');
 
 const { log, error, imageAttachment } = require('../utils/utils');
 async function trackUniqloItems(client) {

@@ -1,17 +1,18 @@
-const axios = require('axios');
+
 const { log } = require('./utils');
 const config = require('../config');
 
 async function getUniqloItem(itemId) {
     log(`Fetching item ${itemId}`)
-    const response = await axios.get(`${config.uniqloApiUrl}/products/${itemId}`);
-    if(response.data.status === 'nok') {
+    const url = await fetch(`${config.uniqloApiUrl}/products/${itemId}`);
+    const response = await url.json();
+    if(response.status === 'nok') {
         return []
     }
-    if(response.data.result.items.length === 0) {
+    if(response.result.items.length === 0) {
         return []
     }
-    return response.data.result.items[0];
+    return response.result.items[0];
 }
 // getlatestprice
 async function getLatestPrices(itemId) {
