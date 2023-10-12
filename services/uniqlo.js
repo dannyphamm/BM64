@@ -50,8 +50,8 @@ async function trackUniqloItems(client) {
 async function fetchSaleItems(client, gender, discordId) {
     try {
         // Fetch the current state of the sale items API
-        const response = await fetch(`${config.uniqloApiUrl}/products?path=${gender}&flagCodes=discount&limit=1000&offset=0`);
-        
+        const url = await fetch(`${config.uniqloApiUrl}/products?path=${gender}&flagCodes=discount&limit=1000&offset=0`);
+        const response = await url.json();
         // If response is not 200 then return
         if (response.status !== "ok" || response.result.items.length === 0) return (log("Error fetching sale items", gender, `${config.uniqloApiUrl}/products?path=${gender}&flagCodes=discount&limit=1000&offset=0`));
         // Retrieve the previous state of the sale items from your database
