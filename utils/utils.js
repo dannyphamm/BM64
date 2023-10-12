@@ -20,7 +20,7 @@ async function imageAttachment(images, name) {
     const imageBuffers = await Promise.all(images.map(async (imageURL) => {
         try {
             const response = await fetch(imageURL, { responseType: 'arraybuffer' });
-            return response;
+            return response.arrayBuffer();
         } catch (e) {
             const notfound = createCanvas(400, 400);
             const ctx = notfound.getContext('2d');
