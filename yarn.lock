@@ -302,13 +302,6 @@
   "resolved" "https://registry.npmjs.org/@bcoe/v8-coverage/-/v8-coverage-0.2.3.tgz"
   "version" "0.2.3"
 
-"@dannyp29/spotify-web-api-node@^5.0.2":
-  "integrity" "sha512-GC/8PCAWi7a8SfV78uGwrf1ArmdRsJybuZcuGDBm2ODGxlJfHcui5fRDvdkh3/pLqT+g0wiUeMz+jOLHKrhQtA=="
-  "resolved" "https://registry.npmjs.org/@dannyp29/spotify-web-api-node/-/spotify-web-api-node-5.0.4.tgz"
-  "version" "5.0.4"
-  dependencies:
-    "superagent" "^6.1.0"
-
 "@discordjs/builders@^1.6.3", "@discordjs/builders@^1.6.5":
   "integrity" "sha512-SdweyCs/+mHj+PNhGLLle7RrRFX9ZAhzynHahMCLqp5Zeq7np7XC6/mgzHc79QoVlQ1zZtOkTTiJpOZu5V8Ufg=="
   "resolved" "https://registry.npmjs.org/@discordjs/builders/-/builders-1.6.5.tgz"
@@ -3723,7 +3716,7 @@
   dependencies:
     "whatwg-url" "^5.0.0"
 
-"node-fetch@^3.3.1":
+"node-fetch@^3.3.2":
   "integrity" "sha512-dRB78srN/l6gqWulah9SrxeYnxeddIG30+GOqK/9OlLVyLg3HPnr6SqOWTWOXKRwC2eGYCkZ59NNuSgvSrpgOA=="
   "resolved" "https://registry.npmjs.org/node-fetch/-/node-fetch-3.3.2.tgz"
   "version" "3.3.2"
