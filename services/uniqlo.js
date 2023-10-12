@@ -2,7 +2,7 @@ const { EmbedBuilder, AttachmentBuilder } = require('discord.js');
 const { getUniqloItem, getLatestPrices, insertPrice } = require('../utils/uniqloApi');
 const config = require('../config');
 const axios = require('axios');
-const fetch = require('node-fetch');
+
 const { log, error, imageAttachment } = require('../utils/utils');
 async function trackUniqloItems(client) {
     const uniqloCollection = await client.mongodb.db.collection(config.mongodbDBUniqlo);
@@ -51,7 +51,7 @@ async function fetchSaleItems(client, gender, discordId) {
     try {
         // Fetch the current state of the sale items API
         const response = await fetch(`${config.uniqloApiUrl}/products?path=${gender}&flagCodes=discount&limit=1000&offset=0`);
-
+        
         // If response is not 200 then return
         if (response.status !== "ok" || response.result.items.length === 0) return (log("Error fetching sale items", gender, `${config.uniqloApiUrl}/products?path=${gender}&flagCodes=discount&limit=1000&offset=0`));
         // Retrieve the previous state of the sale items from your database
