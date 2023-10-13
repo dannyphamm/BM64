@@ -68,7 +68,7 @@ async function fetchSaleItems(client, gender, discordId) {
         let removedItems = previousState.filter(item => !response.result.items.find(i => i.productId === item.productId));
         let changedItems = response.result.items.reduce((acc, item) => {
             const previousItem = previousState.find(i => i.productId === item.productId);
-            if (previousItem && (previousItem.prices.base.value !== item.prices.base.value || previousItem.prices.promo.value !== item.prices.promo.value)) {
+            if (previousItem && (previousItem.prices.base?.value !== item.prices.base?.value || previousItem.prices.promo?.value !== item.prices.promo?.value || (previousItem.prices.promo?.value !== null && item.prices.promo?.value === null))) {
                 acc.push([previousItem, item]);
             }
             return acc;
@@ -118,6 +118,7 @@ async function fetchSaleItems(client, gender, discordId) {
                 color: 0x0099ff,
                 title: `Added items (${i + 1}-${i + batch.length})`,
                 description: batch.map(item => {
+                    log("Added ITEM", item.name)
                     const colorSizes = item.l2s.reduce((acc, l2) => {
                       if (!acc[l2.color.name]) {
                         acc[l2.color.name] = [];
@@ -139,7 +140,10 @@ async function fetchSaleItems(client, gender, discordId) {
             const removedItemsEmbed = new EmbedBuilder()
                 .setColor('#0099ff')
                 .setTitle(`Removed items (${i + 1}-${i + batch.length})`)
-                .setDescription(batch.map(item => `**[${item.name}](https://www.uniqlo.com/au/en/products/${item.productId})**\nBase: ${item.prices.base.value}\nPromo: ${item.prices.promo.value}`).join('\n\n') || 'None')
+                .setDescription(batch.map(item => {
+                    log("Removed ITEM", item.name)
+                    return `**[${item.name}](https://www.uniqlo.com/au/en/products/${item.productId})**\nBase: ${item.prices.base.value}\nPromo: ${item.prices.promo.value}`
+                }).join('\n\n') || 'None')
                 .setImage(`attachment://removed-items.png`)
 
             removedItemsEmbeds.push({ removedItemsEmbed, removedItemsImage });
@@ -152,6 +156,7 @@ async function fetchSaleItems(client, gender, discordId) {
             .setColor('#0099ff')
             .setTitle(`Changed items (${i + 1}-${i + batch.length})`)
             .setDescription(batch.map(item => {
+                log("Changed ITEM", item[1].name)
                 const colorSizes = item[1].l2s.reduce((acc, l2) => {
                   if (!acc[l2.color.name]) {
                     acc[l2.color.name] = [];
@@ -161,8 +166,8 @@ async function fetchSaleItems(client, gender, discordId) {
                 }, {});
                 const colorSizeLines = Object.entries(colorSizes).map(([color, sizes]) => `${color}: ${sizes.join(', ')}`).join('\n');
                 return `**[${item[0].name}](https://www.uniqlo.com/au/en/products/${item[0].productId})**\n
-                  **Base:** ${item[0].prices.base.value}\t\t**New Base:** ${item[1].prices.base.value} \t\t **Diff:** ${parseInt(item[1].prices.base.value) - parseInt(item[0].prices.base.value)}\n
-                  **Promo:** ${item[0].prices.promo.value}\t\t**New Promo:** ${item[1].prices.promo.value} **Diff:** ${parseInt(item[1].prices.promo.value) - parseInt(item[0].prices.promo.value)}\n
+                  **Base:** ${item[0].prices.base?.value}\t\t**New Base:** ${item[1].prices.base?.value} \t\t **Diff:** ${parseInt(item[1].prices.base?.value) - parseInt(item[0].prices.base?.value)}\n
+                  **Promo:** ${item[0].prices.promo?.value}\t\t**New Promo:** ${item[1].prices.promo?.value} **Diff:** ${parseInt(item[1].prices.promo?.value) - parseInt(item[0].prices.promo?.value)}\n
                   ${colorSizeLines}`;
               }).join('\n\n') || 'None')
               .setImage(`attachment://changed-items.png`)

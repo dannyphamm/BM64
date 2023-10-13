@@ -2,9 +2,7 @@ const { WebhookClient } = require('discord.js');
 const { error } = require('../utils/utils');
 
 const redditMemesService = async (client) => {
-    const fetch = await import('node-fetch');
-
-    await fetch.default('https://meme-api.com/gimme')
+    await fetch('https://meme-api.com/gimme')
         .then(response => {
             if(response.status !== 200) return
             return response.json()

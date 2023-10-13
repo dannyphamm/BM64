@@ -58,9 +58,7 @@ function createExamples(example) {
     return array
 }
 const wordOfTheDayService = async (client) => {
-    const fetch = await import('node-fetch');
-
-    await fetch.default(`https://api.wordnik.com/v4/words.json/wordOfTheDay?api_key=${config.wordofDayKey}`)
+    await fetch(`https://api.wordnik.com/v4/words.json/wordOfTheDay?api_key=${config.wordofDayKey}`)
         .then(response => response.json())
         .then(async data => {
             const word = {
