@@ -2,7 +2,7 @@ const { EmbedBuilder, AttachmentBuilder } = require('discord.js');
 const { getUniqloItem, getLatestPrices, insertPrice } = require('../utils/uniqloApi');
 const config = require('../config');
 
-const { log, error, imageAttachment } = require('../utils/utils');
+const { log, error, imageAttachment, pricePrecision} = require('../utils/utils');
 async function trackUniqloItems(client) {
     const uniqloCollection = await client.mongodb.db.collection(config.mongodbDBUniqlo);
     const itemIds = await uniqloCollection.distinct('itemId');
@@ -123,11 +123,11 @@ async function fetchSaleItems(client, gender, discordId) {
                       if (!acc[l2.color.name]) {
                         acc[l2.color.name] = [];
                       }
-                      acc[l2.color.name].push(`${l2.size.name} (${l2.stock.quantity})`);
+                      acc[l2.color.name].push(`${l2.size.name} (${l2.stock.quantity}) (${pricePrecision(l2.prices.promo.value)})`);
                       return acc;
                     }, {});
                     const colorSizeLines = Object.entries(colorSizes).map(([color, sizes]) => `${color}: ${sizes.join(', ')}`).join('\n');
-                    return `**[${item.name}](https://www.uniqlo.com/au/en/products/${item.productId})**\nBase: ${item.prices.base.value}\nPromo: ${item.prices.promo.value}\n${colorSizeLines}`;
+                    return `**[${item.name}](https://www.uniqlo.com/au/en/products/${item.productId})**\nBase: ${pricePrecision(item.prices.base.value)}\nPromo: ${pricePrecision(item.prices.promo?.value)}\n${colorSizeLines}`;
                   }).join('\n\n') || 'None',
                 image: { url: `attachment://added-items.png` }
             }
@@ -141,8 +141,8 @@ async function fetchSaleItems(client, gender, discordId) {
                 .setColor('#0099ff')
                 .setTitle(`Removed items (${i + 1}-${i + batch.length})`)
                 .setDescription(batch.map(item => {
-                    log("Removed ITEM", item.name)
-                    return `**[${item.name}](https://www.uniqlo.com/au/en/products/${item.productId})**\nBase: ${item.prices.base.value}\nPromo: ${item.prices.promo.value}`
+                    log("Removed ITEM", item.name, item.productId)
+                    return `**[${item.name}](https://www.uniqlo.com/au/en/products/${item.productId})**\nBase: ${pricePrecision(item.prices.base.value)}\nPromo: ${pricePrecision(item.prices.promo?.value)}`
                 }).join('\n\n') || 'None')
                 .setImage(`attachment://removed-items.png`)
 
@@ -161,13 +161,13 @@ async function fetchSaleItems(client, gender, discordId) {
                   if (!acc[l2.color.name]) {
                     acc[l2.color.name] = [];
                   }
-                  acc[l2.color.name].push(`${l2.size.name} (${l2.stock.quantity})`);
+                  acc[l2.color.name].push(`${l2.size.name} (${l2.stock.quantity}) (${pricePrecision(l2.prices.promo.value)})`);
                   return acc;
                 }, {});
                 const colorSizeLines = Object.entries(colorSizes).map(([color, sizes]) => `${color}: ${sizes.join(', ')}`).join('\n');
                 return `**[${item[0].name}](https://www.uniqlo.com/au/en/products/${item[0].productId})**\n
-                  **Base:** ${item[0].prices.base?.value}\t\t**New Base:** ${item[1].prices.base?.value} \t\t **Diff:** ${parseInt(item[1].prices.base?.value) - parseInt(item[0].prices.base?.value)}\n
-                  **Promo:** ${item[0].prices.promo?.value}\t\t**New Promo:** ${item[1].prices.promo?.value} **Diff:** ${parseInt(item[1].prices.promo?.value) - parseInt(item[0].prices.promo?.value)}\n
+                  **Base:** ${pricePrecision(item[0].prices.base?.value)}\t\t**New Base:** ${pricePrecision(item[1].prices.base?.value)} \t\t **Diff:** ${pricePrecision(parseInt(item[1].prices.base?.value) - parseInt(item[0].prices.base?.value))}\n
+                  **Promo:** ${pricePrecision(item[0].prices.promo?.value)}\t\t**New Promo:** ${pricePrecision(item[1].prices.promo?.value)} **Diff:** ${pricePrecision(parseInt(item[1].prices.promo?.value) - parseInt(item[0].prices.promo?.value))}\n
                   ${colorSizeLines}`;
               }).join('\n\n') || 'None')
               .setImage(`attachment://changed-items.png`)

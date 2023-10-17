@@ -16,11 +16,11 @@ async function imageAttachment(images, name) {
     const gridSize = Math.ceil(Math.sqrt(images.length));
     const gridWidth = gridSize * 400;
     const gridHeight = gridSize * 400;
-
     const imageBuffers = await Promise.all(images.map(async (imageURL) => {
         try {
-            const response = await fetch(imageURL);
-            return await response.arrayBuffer();;
+            const response = await fetch(imageURL).then(response=>
+                response.arrayBuffer());
+            return response;
         } catch (e) {
             const notfound = createCanvas(400, 400);
             const ctx = notfound.getContext('2d');
@@ -46,4 +46,7 @@ async function imageAttachment(images, name) {
     return attachment
 }
 
-module.exports = { log, error, imageAttachment }
+const pricePrecision = (price) => {
+    return `$${parseFloat(price).toFixed(2)}`
+}
+module.exports = { log, error, imageAttachment, pricePrecision }
