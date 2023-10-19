@@ -62,7 +62,7 @@ module.exports = {
             log("Spotify Restart browser every 5AM")
             schedule.scheduleJob('0 0 5 * * *', async () => {
                 try {
-
+                    log("Refreshing Page")
                     await socketIO().emit('refreshPage');
                 } catch (e) {
                     error(e, "Refresh Spotify");
@@ -72,7 +72,7 @@ module.exports = {
             log("Spotify Restart browser every 5AM")
             schedule.scheduleJob('30 0 5 * * *', async () => {
                 try {
-
+                    log("Playing Music")
                     await socketIO().emit('playMusic');
                 } catch (e) {
                     error(e, "Spotify play music");

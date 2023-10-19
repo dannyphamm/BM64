@@ -82,7 +82,7 @@ async function fetchSaleItems(client, gender, discordId) {
             } else {
                 available = product.l2s.filter(item => item.prices.promo !== null && item.stock.quantity !== 0);
             }
-            return { ...item, l2s: available };
+            return { ...item, l2s: available, images: product.images };
         }));
         removedItems = await Promise.all(removedItems.map(async item => {
             const product = await getUniqloItem(item.productId)
@@ -91,7 +91,7 @@ async function fetchSaleItems(client, gender, discordId) {
             } else {
                 available = product.l2s.filter(item => item.prices.promo !== null && item.stock.quantity !== 0);
             }
-            return { ...item, l2s: available };
+            return { ...item, l2s: available, images: product.images };
         }));
         changedItems = await Promise.all(changedItems.map(async item => {
             const product = await getUniqloItem(item[1].productId)
@@ -102,7 +102,7 @@ async function fetchSaleItems(client, gender, discordId) {
                 available = product.l2s.filter(item => item.prices.promo !== null && item.stock.quantity !== 0);
             }
             
-            return [{ ...item[0], l2s: available }, { ...item[1], l2s: available }];
+            return [{ ...item[0], l2s: available, images: product.images }, { ...item[1], l2s: available, images: product.images }];
         }));
 
         const addedItemsEmbeds = [];
