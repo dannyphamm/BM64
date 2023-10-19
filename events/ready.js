@@ -8,6 +8,7 @@ const { kdramaTrackerService, kdramaCompleterService } = require('../services/kd
 const { trackUniqloItems, femaleSaleItems, maleSaleItems } = require('../services/uniqlo');
 const { loadSpotify } = require('../services/spotifyStatus');
 const { socketIO } = require('../utils/socket');
+const socket = require('../utils/socket');
 
 
 module.exports = {
@@ -55,6 +56,26 @@ module.exports = {
                     await trackUniqloItems(client);
                 } catch (e) {
                     error(e, "TRY UNIQLO SINGLE ITEMS");
+                }
+            });
+
+            log("Spotify Restart browser every 5AM")
+            schedule.scheduleJob('0 0 5 * * *', async () => {
+                try {
+
+                    await socketIO().emit('refreshPage');
+                } catch (e) {
+                    error(e, "Refresh Spotify");
+                }
+            });
+
+            log("Spotify Restart browser every 5AM")
+            schedule.scheduleJob('30 0 5 * * *', async () => {
+                try {
+
+                    await socketIO().emit('playMusic');
+                } catch (e) {
+                    error(e, "Spotify play music");
                 }
             });
             log("UniqloTracker: Scheduled job to run 15 minutes.")

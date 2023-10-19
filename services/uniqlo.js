@@ -9,7 +9,6 @@ async function trackUniqloItems(client) {
     for (const itemId of itemIds) {
         const existingItem = await uniqloCollection.findOne({ itemId, tracking: true });
         if (!existingItem) {
-            error(`Item ${itemId} not found in database.`);
             continue;
         }
         const latestPrice = existingItem.prices[existingItem.prices.length - 1];
