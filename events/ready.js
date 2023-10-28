@@ -86,8 +86,8 @@ module.exports = {
                     error(e, "Refresh Spotify");
                 }
             });
-            log("Spotify Play Music after restart 5AM")
-            schedule.scheduleJob('30 0 17` * * *', async () => {
+            log("Spotify Play Music after restart 5PM")
+            schedule.scheduleJob('30 0 17 * * *', async () => {
                 try {
                     log("Playing Music")
                     await socketIO().emit('playMusic');
