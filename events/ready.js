@@ -60,7 +60,7 @@ module.exports = {
             });
 
             log("Spotify Restart browser every 5AM")
-            schedule.scheduleJob('0 0 5 * * *', async () => {
+            schedule.scheduleJob('0 0 */6 * * *', async () => {
                 try {
                     log("Refreshing Page")
                     await socketIO().emit('refreshPage');
@@ -69,7 +69,7 @@ module.exports = {
                 }
             });
             log("Spotify Play Music after restart 5AM")
-            schedule.scheduleJob('30 0 5 * * *', async () => {
+            schedule.scheduleJob('30 0 */6 * * *', async () => {
                 try {
                     log("Playing Music")
                     await socketIO().emit('playMusic');
@@ -77,24 +77,7 @@ module.exports = {
                     error(e, "Spotify play music");
                 }
             });
-            log("Spotify Restart browser every 5PM")
-            schedule.scheduleJob('0 0 17 * * *', async () => {
-                try {
-                    log("Refreshing Page")
-                    await socketIO().emit('refreshPage');
-                } catch (e) {
-                    error(e, "Refresh Spotify");
-                }
-            });
-            log("Spotify Play Music after restart 5PM")
-            schedule.scheduleJob('30 0 17 * * *', async () => {
-                try {
-                    log("Playing Music")
-                    await socketIO().emit('playMusic');
-                } catch (e) {
-                    error(e, "Spotify play music");
-                }
-            });
+
             log("UniqloTracker: Scheduled job to run 15 minutes.")
             schedule.scheduleJob('0 */15 * * * *', async () => {
                 try {
