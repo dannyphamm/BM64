@@ -14,11 +14,13 @@ async function trackUniqloItems(client) {
         const latestPrice = existingItem.prices[existingItem.prices.length - 1];
         let { basePrice, promoPrice } = await getLatestPrices(itemId);
         if (basePrice === null && promoPrice === null) {
+            uniqloCollection.updateOne({ itemId }, { $set: { tracking: false } });
             return
         }
         if (basePrice !== latestPrice.basePrice || promoPrice !== latestPrice.promoPrice) {
             // Save the new price to MongoDB
             const item = await getUniqloItem(itemId);
+            
             await insertPrice(client, itemId, basePrice, promoPrice, item.name, existingItem.imageURL);
 
             // Send an alert to a Discord channel
