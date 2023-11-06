@@ -26,6 +26,11 @@ module.exports = {
                 socketIO().emit('skipMusic');
                 await interaction.reply({ content: 'Deleted!', ephemeral: true });
             }
+
+            if (interaction.customId === 'play') {
+                socketIO().emit('playMusic');
+                await interaction.reply({ content: 'Reset Triggered', ephemeral: true });
+            }
         }
 
     },

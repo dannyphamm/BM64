@@ -43,6 +43,11 @@ loadSpotify = async (client) => {
                                 .setLabel('Remove')
                                 .setDisabled(false)
                                 .setStyle(ButtonStyle.Danger),
+                            new ButtonBuilder()
+                                .setCustomId('reset')
+                                .setLabel('Broken?')
+                                .setDisabled(false)
+                                .setStyle(ButtonStyle.Danger)
                         );
 
                     const current = currentTrack.body.item;
