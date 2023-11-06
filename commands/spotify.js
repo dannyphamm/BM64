@@ -30,7 +30,7 @@ module.exports = {
         // return interaction.reply(`
 		// 	Sent		
 		// 	`);
-        await socketIO.emit('playMusic')
+        await socketIO().emit('playMusic')
         return interaction.reply(`Sent`);
     },
 };
