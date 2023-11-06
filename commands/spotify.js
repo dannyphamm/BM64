@@ -2,6 +2,7 @@ const { SlashCommandBuilder } = require('@discordjs/builders');
 const SpotifyWebApi = require('spotify-web-api-node');
 const config = require('../config.json');
 const { log } = require('../utils/utils');
+const { socketIO } = require('../utils/socket.js');
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('spotify')
@@ -29,7 +30,7 @@ module.exports = {
         // return interaction.reply(`
 		// 	Sent		
 		// 	`);
-        await socket.emit('playMusic')
+        await socketIO.emit('playMusic')
         return interaction.reply(`Sent`);
     },
 };
