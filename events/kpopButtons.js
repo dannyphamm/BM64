@@ -27,7 +27,7 @@ module.exports = {
                 await interaction.reply({ content: 'Deleted!', ephemeral: true });
             }
 
-            if (interaction.customId === 'play') {
+            if (interaction.customId === 'reset') {
                 socketIO().emit('playMusic');
                 await interaction.reply({ content: 'Reset Triggered', ephemeral: true });
             }
