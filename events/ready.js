@@ -101,6 +101,7 @@ module.exports = {
                 socket.on('skipMusic', async () => {
                     loadSpotify(client);
                 });
+                
             });
 
             log("Socket.io listening on port 3000")
