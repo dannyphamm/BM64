@@ -113,7 +113,7 @@ async function fetchSaleItems(client, gender, discordId) {
         const batchSize = 4;
         for (let i = 0; i < addedItems.length; i += batchSize) {
             const batch = addedItems.slice(i, i + batchSize);
-            const addedItemsImageUrls = batch.map(item => item.images.main[0].url);
+            const addedItemsImageUrls = batch.map(item => item.images && item.images.main ? item.images.main[0].url : null);
             const addedItemsImage = await imageAttachment(addedItemsImageUrls, "added-items");
             const addedItemsEmbed = {
                 color: 0x0099ff,
@@ -136,7 +136,7 @@ async function fetchSaleItems(client, gender, discordId) {
         }
         for (let i = 0; i < removedItems.length; i += batchSize) {
             const batch = removedItems.slice(i, i + batchSize);
-            const removedItemsImageUrls = batch.map(item => item.images.main[0].url);
+            const removedItemsImageUrls = batch.map(item => item.images && item.images.main ? item.images.main[0].url : null);
             const removedItemsImage = await imageAttachment(removedItemsImageUrls, "removed-items");
             const removedItemsEmbed = new EmbedBuilder()
                 .setColor('#0099ff')
@@ -151,7 +151,7 @@ async function fetchSaleItems(client, gender, discordId) {
         }
         for (let i = 0; i < changedItems.length; i += batchSize) {
             const batch = changedItems.slice(i, i + batchSize);
-            const changedItemsImageUrls = batch.map(item => item[1].images.main[0].url);
+            const changedItemsImageUrls = batch.map(item => item[1].images && item[1].images.main ? item[1].images.main[0].url : null);
             const changedItemsImage = await imageAttachment(changedItemsImageUrls, "changed-items");
             const changedItemsEmbed = new EmbedBuilder()
             .setColor('#0099ff')
