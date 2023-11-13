@@ -2,6 +2,7 @@ const { InteractionType } = require("discord-api-types/v10");
 const { log, error } = require('../utils/utils');
 const { socketIO } = require("../utils/socket");
 const { spotify } = require("../utils/spotify.js");
+const config = require('../config.json');
 module.exports = {
     name: 'interactionCreate',
     async execute(interaction) {
@@ -23,6 +24,8 @@ module.exports = {
                 await spotifyApi.removeTracksFromPlaylist(
                     playlist,
                     [{ uri: `spotify:track:${currentSong.body.item.id}` }])
+                const misamo = interaction.client.mongodb.db.collection(config.mongodbDBMiSaMo);
+                await misamo.deleteOne({ uri: `spotify:track:${currentSong.body.item.id}` });
                 socketIO().emit('skipMusic');
                 await interaction.reply({ content: 'Deleted!', ephemeral: true });
             }

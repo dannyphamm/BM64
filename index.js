@@ -12,7 +12,7 @@ const GeniusClient = new Genius.Client();
 const MongoConnection = require('./utils/db');
 // Create a new client instance
 const myIntents = new IntentsBitField();
-myIntents.add(IntentsBitField.Flags.Guilds, IntentsBitField.Flags.GuildMessages, IntentsBitField.Flags.GuildVoiceStates);
+myIntents.add(IntentsBitField.Flags.Guilds, IntentsBitField.Flags.GuildMessages, IntentsBitField.Flags.GuildVoiceStates, IntentsBitField.Flags.MessageContent);
 const client = new Client(
     {
         intents: myIntents
@@ -24,7 +24,6 @@ const connectToDB = async () => {
 }
 connectToDB()
 client.commands = new Collection();
-
 const eventPath = path.resolve(__dirname, 'events');
 
 fs.readdir(eventPath, (err, files) => {
@@ -97,6 +96,7 @@ distube.on("playSong", (queue, song) => queue.textChannel.send(
 
 client.genius = GeniusClient;
 client.distube = distube;
+
 
 // Login to Discord with your client's token
 client.login(token);
