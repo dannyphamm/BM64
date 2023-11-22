@@ -42,7 +42,7 @@ module.exports = {
                     } else if (message.content.includes('/playlist/')||message.content.includes('/album/')) {
                         // Get the tracks in the playlist
 
-                      const data = await message.content.includes('/playlist/') ? spotifyApi.getPlaylistTracks(spotifyId) : spotifyApi.getAlbumTracks(spotifyId);
+                      const data = message.content.includes('/playlist/') ? await spotifyApi.getPlaylistTracks(spotifyId) : await spotifyApi.getAlbumTracks(spotifyId);
 
                         const newData = message.content.includes('/playlist/') ?data.body.items.map(song => ({
                             uri: song.track.uri,
