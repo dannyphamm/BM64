@@ -43,6 +43,8 @@ module.exports = {
                         // Get the tracks in the playlist
 
                       const data = await message.content.includes('/playlist/') ? spotifyApi.getPlaylistTracks(spotifyId) : spotifyApi.getAlbumTracks(spotifyId);
+
+console.log(data.body)
                         const newData = data.body.items.map(song => ({
                             uri: song.track.uri,
                             name: song.track.name,
