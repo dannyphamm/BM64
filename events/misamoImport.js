@@ -48,10 +48,10 @@ module.exports = {
                             uri: song.track.uri,
                             name: song.track.name,
                             artists: song.track.artists.map(artist => artist.name).join(', ')
-                        })): data.items.map(song => ({
-                            uri: song.track.uri,
-                            name: song.track.name,
-                            artists: song.track.artists.map(artist => artist.name).join(', ')
+                        })): data.body.items.map(song => ({
+                            uri: song.uri,
+                            name: song.name,
+                            artists: song.artists.map(artist => artist.name).join(', ')
                         }));
 
                         const existingUris = currentTrackUris.map(song => song.uri);
