@@ -44,8 +44,11 @@ module.exports = {
 
                       const data = await message.content.includes('/playlist/') ? spotifyApi.getPlaylistTracks(spotifyId) : spotifyApi.getAlbumTracks(spotifyId);
 
-console.log(data.body)
-                        const newData = data.body.items.map(song => ({
+                        const newData = message.content.includes('/playlist/') ?data.body.items.map(song => ({
+                            uri: song.track.uri,
+                            name: song.track.name,
+                            artists: song.track.artists.map(artist => artist.name).join(', ')
+                        })): data.items.map(song => ({
                             uri: song.track.uri,
                             name: song.track.name,
                             artists: song.track.artists.map(artist => artist.name).join(', ')
