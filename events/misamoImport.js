@@ -7,7 +7,7 @@ module.exports = {
         let misamo = message.client.mongodb.db.collection(config.mongodbDBMiSaMo)
         if (message.type === 0 && message.channelId === config.spotifyChannel) {
             try {
-                const spotifyUrlPattern = /https?:\/\/(?:open|play)\.spotify\.com\/(?:track|playlist)\/(\w+)/;
+                const spotifyUrlPattern = /https?:\/\/(?:open|play)\.spotify\.com\/(?:track|playlist|album)\/(\w+)/;
                 const match = message.content.match(spotifyUrlPattern);
                 if (match) {
 
@@ -39,9 +39,9 @@ module.exports = {
                             await message.reactions.removeAll();
                             message.react('❌')
                         }
-                    } else if (message.content.includes('/playlist/')) {
+                    } else if (message.content.includes('/playlist/')||message.content.includes('/album/')) {
                         // Get the tracks in the playlist
-                        const data = await spotifyApi.getPlaylistTracks(spotifyId);
+                        const data = await spotifyApi.getPlaylistTracks(spotifyId) || ;spotifyApi.getAlbumTracks(spotifyId)
                         const newData = data.body.items.map(song => ({
                             uri: song.track.uri,
                             name: song.track.name,
