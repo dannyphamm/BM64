@@ -36,6 +36,28 @@ const refreshToken = async () => {
         }
     );
 }
+
+const getAllPlaylistSongs = async (id) => {
+    var data = await spotifyApi.getPlaylistTracks(id);
+    var numBatches = Math.floor(data.body.total / 100) + 1;
+    var promises = [];
+    for (let batchNum = 0; batchNum < numBatches; batchNum++) {
+        var promise = getSongs(id, batchNum * 100);
+        promises.push(promise);
+    }
+    var rawSongData = await Promise.all(promises);
+    var songs = [];
+    for (let i = 0; i < rawSongData.length; i++) {
+        songs = songs.concat(rawSongData[i].body.items);
+    }
+    return songs;
+}
+
+const getSongs = async (id, offset) => {
+    var songs = await spotifyApi.getPlaylistTracks(id, { offset: offset });
+    return songs;
+}
 module.exports = {
     spotify: init,
+    getAllPlaylistSongs
 };

@@ -18,7 +18,7 @@ async function imageAttachment(images, name) {
     const gridHeight = gridSize * 400;
     const imageBuffers = await Promise.all(images.map(async (imageURL) => {
         try {
-            const response = await fetch(imageURL).then(response=>
+            const response = await fetch(imageURL).then(response =>
                 response.arrayBuffer());
             return response;
         } catch (e) {
@@ -49,4 +49,6 @@ async function imageAttachment(images, name) {
 const pricePrecision = (price) => {
     return `$${parseFloat(price).toFixed(2)}`
 }
+
+
 module.exports = { log, error, imageAttachment, pricePrecision }

@@ -8,7 +8,8 @@ const { kdramaTrackerService, kdramaCompleterService } = require('../services/kd
 const { trackUniqloItems, femaleSaleItems, maleSaleItems } = require('../services/uniqlo');
 const { loadSpotify } = require('../services/spotifyStatus');
 const { socketIO } = require('../utils/socket');
-const socket = require('../utils/socket');
+const {spotify,getAllPlaylistSongs} = require('../utils/spotify');
+
 
 
 module.exports = {
@@ -107,7 +108,6 @@ module.exports = {
             log("Socket.io listening on port 3000")
         }
         log('Ready!');
-
     },
 };
 

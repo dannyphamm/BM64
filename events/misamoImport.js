@@ -1,5 +1,5 @@
 const config = require('../config.json');
-const { spotify } = require('../utils/spotify.js');
+const { spotify, getAllPlaylistSongs } = require('../utils/spotify.js');
 const { error, log } = require('../utils/utils');
 module.exports = {
     name: 'messageCreate',
@@ -33,22 +33,23 @@ module.exports = {
                                 artists: song.body.artists.map(artist => artist.name).join(', ')
                             });
                             await message.reactions.removeAll();
-                        await message.react('✅');
+                            await message.react('✅');
                         } else {
                             //Duplicate emoji
                             await message.reactions.removeAll();
                             message.react('❌')
                         }
-                    } else if (message.content.includes('/playlist/')||message.content.includes('/album/')) {
-                        // Get the tracks in the playlist
+                    } else if (message.content.includes('/playlist/') || message.content.includes('/album/')) {
 
-                      const data = message.content.includes('/playlist/') ? await spotifyApi.getPlaylistTracks(spotifyId) : await spotifyApi.getAlbumTracks(spotifyId);
-
-                        const newData = message.content.includes('/playlist/') ?data.body.items.map(song => ({
+                        // Get the tracks in the playlist or album
+                        const data = message.content.includes('/playlist/') ? await getAllPlaylistSongs(spotifyId) : await spotifyApi.getAlbumTracks(spotifyId);
+                        
+                        // Extract the track URIs and names
+                        const newData = message.content.includes('/playlist/') ? data.map(song => ({
                             uri: song.track.uri,
                             name: song.track.name,
                             artists: song.track.artists.map(artist => artist.name).join(', ')
-                        })): data.body.items.map(song => ({
+                        })) : data.body.items.map(song => ({
                             uri: song.uri,
                             name: song.name,
                             artists: song.artists.map(artist => artist.name).join(', ')
