@@ -88,6 +88,14 @@ module.exports = {
                     error(e, "TRY UNIQLO");
                 }
             });
+            log("Health check for spotify. 30 seconds")
+            schedule.scheduleJob('*/30 * * * * *', async () => {
+                try {
+                    await socketIO().emit('playMusic');
+                } catch (e) {
+                    error(e, "TRY spotify health");
+                }
+            });
             socketIO().listen(3000);
             const delay = async () => {
                 await new Promise(resolve => { setTimeout(resolve, 5000) });

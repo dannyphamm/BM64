@@ -56,6 +56,10 @@ module.exports = {
                         }));
 
                         const existingUris = currentTrackUris.map(song => song.uri);
+                        console.dir(existingUris, {'maxArrayLength': null})
+                        
+
+                        console.dir(newData.map(object => object.uri), {'maxArrayLength': null})
                         // Filter the songs in the playlist
                         const newSongs = newData.filter(song => !existingUris.includes(song.uri));
                         const newSongDocuments = newSongs.map(song => ({
