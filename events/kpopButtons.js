@@ -27,7 +27,10 @@ module.exports = {
                 const misamo = interaction.client.mongodb.db.collection(config.mongodbDBMiSaMo);
                 await misamo.deleteOne({ uri: `spotify:track:${currentSong.body.item.id}` });
                 socketIO().emit('skipMusic');
-                await new Promise(r => setTimeout(r, 3000));
+                // delay and add loadSpotify
+                
+                loadSpotify(interaction.client)
+
                 await interaction.reply({ content: 'Deleted!', ephemeral: true });
             }
 
