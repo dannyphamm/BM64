@@ -32,7 +32,7 @@ module.exports = {
 
             if (interaction.customId === 'reset') {
                 socketIO().emit('playMusic');
-                loadSpotify(interation.client)
+                loadSpotify(interaction.client)
                 await interaction.reply({ content: 'Reset Triggered', ephemeral: true });
             }
         }
