@@ -6,7 +6,7 @@ const config = require('../config.json');
 module.exports = {
     name: 'interactionCreate',
     async execute(interaction) {
-
+        const {client} = interaction;
         // v14 interaction.type == InteractionType.ApplicationCommandAutocomplete
         if (interaction.type == InteractionType.MessageComponent) {
             if (!interaction.isButton()) return
@@ -24,19 +24,19 @@ module.exports = {
                 await spotifyApi.removeTracksFromPlaylist(
                     playlist,
                     [{ uri: `spotify:track:${currentSong.body.item.id}` }])
-                const misamo = interaction.client.mongodb.db.collection(config.mongodbDBMiSaMo);
+                const misamo = client.mongodb.db.collection(config.mongodbDBMiSaMo);
                 await misamo.deleteOne({ uri: `spotify:track:${currentSong.body.item.id}` });
                 socketIO().emit('skipMusic');
                 // delay and add loadSpotify
                 
-                loadSpotify(interaction.client)
+                loadSpotify(client)
 
                 await interaction.reply({ content: 'Deleted!', ephemeral: true });
             }
 
             if (interaction.customId === 'reset') {
                 socketIO().emit('playMusic');
-                loadSpotify(interaction.client)
+                loadSpotify(client)
                 await interaction.reply({ content: 'Reset Triggered', ephemeral: true });
             }
         }
