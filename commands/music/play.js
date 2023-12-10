@@ -9,7 +9,8 @@ module.exports = {
 
 		),
 	async execute(interaction) {
-		interaction.client.distube.play(interaction.member.voice.channel,
+		const { client } = interaction;
+		client.distube.play(interaction.member.voice.channel,
 		 	interaction.options.getString("name")
 			, {
 				textChannel: interaction.channel,
