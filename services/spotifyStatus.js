@@ -8,11 +8,15 @@ let buttons;
 let remainingMs;
 let progressMs;
 let durationMs;
-loadSpotify = async (client) => {
+let timeoutId;
+loadSpotify = async (client, clear) => {
     const spotifyApi = await spotify();
     const voiceChannelId = '1145310513232891955';
     // refresh token if expired
 
+    if (clear) {
+        clearTimeout(timeoutId);
+    }
 
 
     try {
@@ -23,7 +27,6 @@ loadSpotify = async (client) => {
             await socketIO().emit('skipMusic');
         }
         if (currentTrack.body) {
-
             if (currentTrack.body.currently_playing_type === 'track' && currentTrack.body.is_playing) {
 
                 // Get the song details
@@ -74,7 +77,7 @@ loadSpotify = async (client) => {
                             color: 0x0099ff,
                             title: 'Next Up',
                             fields: (queue.slice(0, 4).map((track, id) => ({
-                                name: (1+ Number(id)) + ". " + track.name + " - " + track.artists,
+                                name: (1 + Number(id)) + ". " + track.name + " - " + track.artists,
                                 value: track.album,
                             })))
                         }
@@ -111,15 +114,29 @@ loadSpotify = async (client) => {
                 log(progressMs, durationMs, remainingMs);
                 if (remainingMs > 0) {
                     // Wait for the remaining time before calling the loadSpotify function again
-                    await new Promise(resolve => { setTimeout(resolve, remainingMs) });
+                    await new Promise(resolve => { timeoutId = setTimeout(resolve, remainingMs) });
                     // Call the loadSpotify function again
-                    await loadSpotify(client);
+                    await loadSpotify(client, true);
                 }
             } else if (currentTrack.body.currently_playing_type === 'ad' || !currentTrack.body.is_playing) {
                 log("hit an ad or is paused")
                 // Wait for 15 seconds before calling the loadSpotify function again
-                await new Promise(resolve => { setTimeout(resolve, 15000) });
-                await loadSpotify(client);
+                // await new Promise(resolve => { setTimeout(resolve, 15000) });
+
+                // await loadSpotify(client, true);
+
+                await socketIO().timeout(3000).emit('getPlayLength', async (err, data) => {
+                    progressMs = data[0].progress_ms;
+                    durationMs = data[0].duration_ms;
+                    remainingMs = durationMs - progressMs + 4000;
+                    log(progressMs, durationMs, remainingMs);
+                    if (remainingMs > 0) {
+                        // Wait for the remaining time before calling the loadSpotify function again
+                        await new Promise(resolve => { setTimeout(resolve, remainingMs) });
+                        // Call the loadSpotify function again
+                        await loadSpotify(client, true);
+                    }
+                });
             }
         } else {
             // No track is currently playing, clear the voice channel status

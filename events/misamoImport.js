@@ -4,7 +4,8 @@ const { error, log } = require('../utils/utils');
 module.exports = {
     name: 'messageCreate',
     async execute(message) {
-        let misamo = message.client.mongodb.db.collection(config.mongodbDBMiSaMo)
+        const { client } = message;
+        let misamo = client.mongodb.db.collection(config.mongodbDBMiSaMo)
         if (message.type === 0 && message.channelId === config.spotifyChannel) {
             try {
                 const spotifyUrlPattern = /https?:\/\/(?:open|play)\.spotify\.com\/(?:track|playlist|album)\/(\w+)/;

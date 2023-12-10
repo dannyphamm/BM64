@@ -8,7 +8,8 @@ module.exports = {
                 .setDescription('The name of the song to find.')
                 .setRequired(false)),
     async execute(interaction) {
-        const queue = interaction.client.distube.getQueue(interaction.guild.id);
+        const { client } = interaction;
+        const queue = client.distube.getQueue(interaction.guild.id);
         try {
             let currentSong = "";
             if (interaction.options.getString('song')) {
@@ -19,7 +20,7 @@ module.exports = {
                 }
                 currentSong = queue.songs[0].name
             }
-            const searches = await interaction.client.genius.songs.search(currentSong);
+            const searches = await client.genius.songs.search(currentSong);
             const initial = {
                 title: "Searching for " + searches[0].fullTitle,
                 color: 0x7289da

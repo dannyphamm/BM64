@@ -3,6 +3,7 @@ const {log, error} = require('../utils/utils')
 module.exports = {
     name: 'interactionCreate',
     async execute(interaction) {
+        const {client} = interaction;
         log(`${interaction.user.tag} in #${interaction.channel.name} triggered an interaction.`);
         // v14 interaction.type == InteractionType.ApplicationCommandAutocomplete
         if (interaction.type == InteractionType.ApplicationCommandAutocomplete) {
@@ -10,7 +11,7 @@ module.exports = {
                 const focusedOption = interaction.options.getFocused(true);
                 let choices;
                 if (focusedOption.name === 'module') {
-                    choices = interaction.client.commands.map(s => {
+                    choices = client.commands.map(s => {
                         if (s.data.name !== "toggle") {
                             return s.data.name
                         }
@@ -34,7 +35,7 @@ module.exports = {
         }
         // v14 interaction.type == InteractionType.ApplicationCommand
         if (interaction.type == InteractionType.ApplicationCommand) {
-            const command = interaction.client.commands.get(interaction.commandName);
+            const command = client.commands.get(interaction.commandName);
             const disabled = false;
             if (!command) return;
             try {

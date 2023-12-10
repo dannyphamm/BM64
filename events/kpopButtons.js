@@ -29,14 +29,14 @@ module.exports = {
                 socketIO().emit('skipMusic');
                 // delay and add loadSpotify
                 
-                loadSpotify(client)
+                loadSpotify(client,true)
 
                 await interaction.reply({ content: 'Deleted!', ephemeral: true });
             }
 
             if (interaction.customId === 'reset') {
                 socketIO().emit('playMusic');
-                loadSpotify(client)
+                loadSpotify(client,true)
                 await interaction.reply({ content: 'Reset Triggered', ephemeral: true });
             }
         }

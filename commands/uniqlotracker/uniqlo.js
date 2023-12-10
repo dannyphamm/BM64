@@ -55,11 +55,12 @@ module.exports = {
         ),
 
     async execute(interaction) {
+        const { client } = interaction;
         const config = require('../../config');
         const subcommand = interaction.options.getSubcommand();
         if (subcommand === 'track') {
             // Handle the track subcommand
-            const uniqloCollection = interaction.client.mongodb.db.collection(config.mongodbDBUniqlo);
+            const uniqloCollection = client.mongodb.db.collection(config.mongodbDBUniqlo);
             const itemId = interaction.options.getString('itemid');
             const existingItem = await uniqloCollection.findOne({ itemId })
             if (existingItem) {
@@ -129,7 +130,7 @@ module.exports = {
             const collector = confirmMessage.createMessageComponentCollector({ filter, time: 15000 });
             collector.on('collect', async i => {
                 if (i.customId === 'confirm') {
-                    await insertPrice(interaction.client, item.productId, basePrice, promoPrice, item.name, item.images.main[0].url);
+                    await insertPrice(client, item.productId, basePrice, promoPrice, item.name, item.images.main[0].url);
 
                     i.update({ content: `Uniqlo item ${itemId} has been added to tracking.`, components: [] });
                 } else {
@@ -143,7 +144,7 @@ module.exports = {
             });
         } else if (subcommand === 'untrack') {
             const itemId = interaction.options.getString('itemid');
-            const uniqloCollection = interaction.client.mongodb.db.collection(config.mongodbDBUniqlo);
+            const uniqloCollection = client.mongodb.db.collection(config.mongodbDBUniqlo);
             // check if itemId exists in the collection
             const existingItem = await uniqloCollection.findOne({ itemId });
             if(!existingItem) {
@@ -154,7 +155,7 @@ module.exports = {
         } else if (subcommand === 'pricehistory') {
             // Handle the pricehistory subcommand
             const itemId = interaction.options.getString('itemid');
-            const uniqloCollection = interaction.client.mongodb.db.collection(config.mongodbDBUniqlo);
+            const uniqloCollection = client.mongodb.db.collection(config.mongodbDBUniqlo);
             const existingItem = await uniqloCollection.findOne({ itemId });
             if (!existingItem) {
                 return interaction.reply(`Item ${itemId} not found in database.`);
@@ -281,13 +282,13 @@ module.exports = {
             const saleOnly = interaction.options.getBoolean('sale') || false;
             if (saleOnly) {
                 await interaction.reply('Updating')
-                await femaleSaleItems(interaction.client);
-                await maleSaleItems(interaction.client);
+                await femaleSaleItems();
+                await maleSaleItems();
                 return interaction.followUp('Sale items updated.');
             }
             if (itemId) {
 
-                const uniqloCollection = interaction.client.mongodb.db.collection(config.mongodbDBUniqlo);
+                const uniqloCollection = client.mongodb.db.collection(config.mongodbDBUniqlo);
                 const itemId = interaction.options.getString('itemid');
                 const existingItem = await uniqloCollection.findOne({ itemId });
                 if (!existingItem) {
@@ -322,14 +323,14 @@ module.exports = {
                             { name: 'New Promo Price', value: `$${parseInt(promoPrice).toFixed(2)}`, inline: true },
                         );
                     }
-                    const channel = interaction.client.channels.cache.get(config.discordChannelId);
+                    const channel = client.channels.cache.get(config.discordChannelId);
                     await channel.send({ embeds: [alertEmbed] });
 
                     // Update the base price and promo price
                     existingItem.prices[existingItem.prices.length - 1].basePrice = basePrice;
                     existingItem.prices[existingItem.prices.length - 1].promoPrice = promoPrice;
                     // Save the new price to MongoDB
-                    await insertPrice(interaction.client, itemId, basePrice, promoPrice, item.name, item.images.main[0].url);
+                    await insertPrice(client, itemId, basePrice, promoPrice, item.name, item.images.main[0].url);
 
                     return interaction.reply('The price has changed. The new price has been saved to the database and an alert has been sent to the Discord channel.');
                 } else {
@@ -337,12 +338,12 @@ module.exports = {
                 }
             } else {
                 // Update all tracked items
-                await trackUniqloItems(interaction.client);
+                await trackUniqloItems(client);
                 return interaction.reply('All tracked Uniqlo items have been updated.');
             }
         } else if (subcommand === 'list') {
             // Handle the list subcommand
-            const uniqloCollection = interaction.client.mongodb.db.collection(config.mongodbDBUniqlo);
+            const uniqloCollection = client.mongodb.db.collection(config.mongodbDBUniqlo);
             const items = await uniqloCollection.find().toArray();
             const embed = new EmbedBuilder()
                 .setTitle('Tracked Uniqlo Items')
