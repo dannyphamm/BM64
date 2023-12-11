@@ -127,15 +127,20 @@ loadSpotify = async (client, clear) => {
                 // await loadSpotify(client, true);
 
                 await socketIO().timeout(3000).emit('getPlayLength', async (err, data) => {
-                    progressMs = data[0].progress_ms;
-                    durationMs = data[0].duration_ms;
+                    progressMs = data[0]?.progress_ms;
+                    durationMs = data[0]?.duration_ms;
                     remainingMs = durationMs - progressMs + 4000;
+                    if(data.length === 0 ) {
+                        log("play length not found, retrying in 3 seconds")
+                        await new Promise(resolve => { setTimeout(resolve, 3000) });
+                        return loadSpotify(client, true);
+                    }
                     log(progressMs, durationMs, remainingMs);
                     if (remainingMs > 0) {
                         // Wait for the remaining time before calling the loadSpotify function again
                         await new Promise(resolve => { setTimeout(resolve, remainingMs) });
                         // Call the loadSpotify function again
-                        await loadSpotify(client, true);
+                         return loadSpotify(client, true);
                     }
                 });
             }
