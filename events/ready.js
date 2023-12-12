@@ -98,7 +98,7 @@ module.exports = {
                 }
             });
             
-            socketIO().listen(3000);
+            socketIO({ rememberTransport: false, transports: ['WebSocket', 'Flash Socket', 'AJAX long-polling'] }).listen(3000);
             const delay = async () => {
                 await new Promise(resolve => { setTimeout(resolve, 5000) });
                 loadSpotify(client, true)
