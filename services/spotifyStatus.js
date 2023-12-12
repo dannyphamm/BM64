@@ -142,7 +142,7 @@ loadSpotify = async (client, clear) => {
                         color: 0x0099ff,
                         title: 'Currently Playing',
                         fields: [{
-                            name: current.name + " - " + current.artists.map(artist => artist.name).join(', '),
+                            name: data.name + " - " + data.artist,
                             value: "Ad is currently running",
                         }]
                     }
