@@ -127,6 +127,7 @@ loadSpotify = async (client, clear) => {
                 // await loadSpotify(client, true);
 
                 await socketIO().timeout(3000).emit('getPlayLength', null, async (data) => {
+                    log(data);
                     progressMs = data.progress_ms;
                     durationMs = data.duration_ms;
                     remainingMs = durationMs - progressMs + 4000;
