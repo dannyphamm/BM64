@@ -142,7 +142,7 @@ loadSpotify = async (client, clear) => {
                         title: 'Currently Playing',
                         fields: [{
                             name: current.name + " - " + current.artists.map(artist => artist.name).join(', '),
-                            value: current.album.name,
+                            value: "Ad is currently running",
                         }]
                     }
                     if (message) {
