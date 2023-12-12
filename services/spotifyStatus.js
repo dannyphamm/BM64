@@ -135,7 +135,7 @@ loadSpotify = async (client, clear) => {
                     progressMs = data?.progress_ms;
                     durationMs = data?.duration_ms;
                     remainingMs = durationMs - progressMs + 4000;
-                    if (data.length === 0) {
+                    if (!data) {
                         log("play length not found, retrying in 3 seconds")
                         await new Promise(resolve => { setTimeout(resolve, 3000) });
                         return loadSpotify(client, true);
