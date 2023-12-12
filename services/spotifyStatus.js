@@ -55,7 +55,7 @@ loadSpotify = async (client, clear) => {
                         );
 
                     const current = currentTrack.body.item;
-                    await socketIO().timeout(5000).emit('getQueue', null, async (data) => {
+                    await socketIO().emit('getQueue', null, async (data) => {
                         const recent = await spotifyApi.getMyRecentlyPlayedTracks({ limit: 10 });
                         let queue;
                         if (data.songs === 0) {
@@ -126,7 +126,7 @@ loadSpotify = async (client, clear) => {
 
                 // await loadSpotify(client, true);
 
-                await socketIO().timeout(3000).emit('getPlayLength', null, async (data) => {
+                await socketIO().emit('getPlayLength', null, async (data) => {
                     log(data);
                     progressMs = data.progress_ms;
                     durationMs = data.duration_ms;
