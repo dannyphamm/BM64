@@ -55,13 +55,13 @@ loadSpotify = async (client, clear) => {
                         );
 
                     const current = currentTrack.body.item;
-                    await socketIO().timeout(5000).emit('getQueue', async (err, data) => {
+                    await socketIO().timeout(5000).emit('getQueue', null, async (data) => {
                         const recent = await spotifyApi.getMyRecentlyPlayedTracks({ limit: 10 });
                         let queue;
-                        if (data.length === 0) {
+                        if (data.songs === 0) {
                             queue = [];
                         } else {
-                            queue = data[0].map((track, id) => ({
+                            queue = data.songs.map((track, id) => ({
                                 name: track.name,
                                 artists: track.artists,
                                 album: track.album
@@ -126,21 +126,33 @@ loadSpotify = async (client, clear) => {
 
                 // await loadSpotify(client, true);
 
-                await socketIO().timeout(3000).emit('getPlayLength', async (err, data) => {
-                    progressMs = data[0]?.progress_ms;
-                    durationMs = data[0]?.duration_ms;
+                await socketIO().timeout(3000).emit('getPlayLength', null, async (data) => {
+                    progressMs = data.progress_ms;
+                    durationMs = data.duration_ms;
                     remainingMs = durationMs - progressMs + 4000;
-                    if(data.length === 0 ) {
+                    if (data.length === 0) {
                         log("play length not found, retrying in 3 seconds")
                         await new Promise(resolve => { setTimeout(resolve, 3000) });
                         return loadSpotify(client, true);
                     }
                     log(progressMs, durationMs, remainingMs);
+                    const message = await voiceChannel.messages.fetch().then(messages => messages.find(msg => msg.author.id === client.user.id));
+                    const updatedCurrentEmbed = {
+                        color: 0x0099ff,
+                        title: 'Currently Playing',
+                        fields: [{
+                            name: current.name + " - " + current.artists.map(artist => artist.name).join(', '),
+                            value: current.album.name,
+                        }]
+                    }
+                    if (message) {
+                        await message.edit({ embeds: [updatedCurrentEmbed] })
+                    }
                     if (remainingMs > 0) {
                         // Wait for the remaining time before calling the loadSpotify function again
                         await new Promise(resolve => { setTimeout(resolve, remainingMs) });
                         // Call the loadSpotify function again
-                         return loadSpotify(client, true);
+                        return loadSpotify(client, true);
                     }
                 });
             }
