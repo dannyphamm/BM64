@@ -132,8 +132,8 @@ loadSpotify = async (client, clear) => {
 
                 await socketIO().emit('getPlayLength', null, async (data) => {
                     log(data);
-                    progressMs = data.progress_ms;
-                    durationMs = data.duration_ms;
+                    progressMs = data?.progress_ms;
+                    durationMs = data?.duration_ms;
                     remainingMs = durationMs - progressMs + 4000;
                     if (data.length === 0) {
                         log("play length not found, retrying in 3 seconds")
@@ -146,7 +146,7 @@ loadSpotify = async (client, clear) => {
                         color: 0x0099ff,
                         title: 'Currently Playing',
                         fields: [{
-                            name: data.name + " - " + data.artist,
+                            name: data?.name + " - " + data?.artist,
                             value: "Ad is currently running",
                         }]
                     }
