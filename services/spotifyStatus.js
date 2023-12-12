@@ -28,11 +28,11 @@ loadSpotify = async (client, clear) => {
             await socketIO().emit('skipMusic');
         }
         if (currentTrack.body) {
+            const voiceChannel = await client.channels.fetch(voiceChannelId);
             if (currentTrack.body.currently_playing_type === 'track' && currentTrack.body.is_playing) {
 
                 // Get the song details
                 // Set the voice channel status
-                const voiceChannel = await client.channels.fetch(voiceChannelId);
                 if (voiceChannel && voiceChannel.type === 2) {
                     //await voiceChannel.send(`${songName} - ${artistNames}`);
                     buttons = new ActionRowBuilder()
