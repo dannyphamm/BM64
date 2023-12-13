@@ -64,7 +64,7 @@ module.exports = {
             schedule.scheduleJob('0 0 */6 * * *', async () => {
                 try {
                     log("Refreshing Page")
-                    await socketIO().then((socket)=> {
+                    await socketIO().then((socket) => {
                         socket.emit('refreshPage');
                     })
                 } catch (e) {
@@ -75,10 +75,13 @@ module.exports = {
             schedule.scheduleJob('30 0 */6 * * *', async () => {
                 try {
                     log("Playing Music")
-                    await socketIO().then((socket)=> {
-                        socket.emit('playMusic');
+                    await socketIO().then(async (socket) => {
+                        const play = await socket.timeout(10000).emitWithAck('playMusic');
+                        console.log(play)
+                        if (play) {
+                            loadSpotify(client, true)
+                        }
                     })
-                    loadSpotify(client, true);
                 } catch (e) {
                     error(e, "Spotify play music");
                 }
@@ -96,14 +99,13 @@ module.exports = {
             log("Health check for spotify. 30 seconds")
             schedule.scheduleJob('*/30 * * * * *', async () => {
                 try {
-                    await socketIO().then((socket)=> {
-                        socket.emit('playMusic');
+                    await socketIO().then(async (socket) => {
+                        await socket.timeout(10000).emitWithAck('playMusic');
                     })
                 } catch (e) {
                     error(e, "TRY spotify health");
                 }
             });
-
             socketIO();
 
             const delay = async () => {
@@ -111,9 +113,10 @@ module.exports = {
                 loadSpotify(client, true)
             }
             delay()
-            log("Socket.io listening on port 3000")
         }
-       
+
+
+        log("Socket.io listening on port 3000")
         log('Ready!');
     },
 };

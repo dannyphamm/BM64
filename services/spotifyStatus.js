@@ -17,6 +17,7 @@ loadSpotify = async (client, clear) => {
 
     if (clear) {
         clearTimeout(timeoutId);
+        await new Promise(resolve => { setTimeout(resolve, 1500) });
     }
     buttons = new ActionRowBuilder()
     .addComponents(

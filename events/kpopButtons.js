@@ -14,7 +14,7 @@ module.exports = {
             if (interaction.customId === 'skip') {
                 await socketIO().then((socket) => {
                     const play = socket.timeout(10000).emitWithAck('skipMusic');
-                    if (skip) {
+                    if (play) {
                         loadSpotify(client, true)
                     }
 
@@ -47,8 +47,9 @@ module.exports = {
             }
 
             if (interaction.customId === 'reset') {
-                await socketIO().then((socket) => {
-                    const play = socket.timeout(10000).emitWithAck('playMusic');
+                await socketIO().then(async(socket) => {
+                    const play = await socket.timeout(10000).emitWithAck('playMusic');
+                    console.log(play)
                     if (play) {
                         loadSpotify(client, true)
                     }
