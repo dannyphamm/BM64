@@ -106,7 +106,6 @@ module.exports = {
 
             socketIO();
 
-        
             const delay = async () => {
                 await new Promise(resolve => { setTimeout(resolve, 5000) });
                 loadSpotify(client, true)
