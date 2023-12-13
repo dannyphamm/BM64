@@ -18,14 +18,31 @@ loadSpotify = async (client, clear) => {
     if (clear) {
         clearTimeout(timeoutId);
     }
-
+    buttons = new ActionRowBuilder()
+    .addComponents(
+        new ButtonBuilder()
+            .setCustomId('skip')
+            .setLabel('Skip')
+            .setDisabled(false)
+            .setStyle(ButtonStyle.Danger),
+        new ButtonBuilder()
+            .setCustomId('remove')
+            .setLabel('Remove')
+            .setDisabled(false)
+            .setStyle(ButtonStyle.Danger),
+        new ButtonBuilder()
+            .setCustomId('reset')
+            .setLabel('Broken?')
+            .setDisabled(false)
+            .setStyle(ButtonStyle.Danger)
+    );
 
     try {
         // Get the currently playing track from the Spotify API
         const currentTrack = await spotifyApi.getMyCurrentPlayingTrack();
         if (durationMs === progressMs && remainingMs === 1000) {
             log("skipping, looks like we are stuck")
-            await socketIO().then((socket)=> {
+            await socketIO().then((socket) => {
                 socket.emit('skipMusic');
             })
         }
@@ -36,27 +53,10 @@ loadSpotify = async (client, clear) => {
                 // Set the voice channel status
                 if (voiceChannel && voiceChannel.type === 2) {
                     //await voiceChannel.send(`${songName} - ${artistNames}`);
-                    buttons = new ActionRowBuilder()
-                        .addComponents(
-                            new ButtonBuilder()
-                                .setCustomId('skip')
-                                .setLabel('Skip')
-                                .setDisabled(false)
-                                .setStyle(ButtonStyle.Danger),
-                            new ButtonBuilder()
-                                .setCustomId('remove')
-                                .setLabel('Remove')
-                                .setDisabled(false)
-                                .setStyle(ButtonStyle.Danger),
-                            new ButtonBuilder()
-                                .setCustomId('reset')
-                                .setLabel('Broken?')
-                                .setDisabled(false)
-                                .setStyle(ButtonStyle.Danger)
-                        );
+                    
 
                     const current = currentTrack.body.item;
-                    const response = await socketIO().then((socket)=> {
+                    const response = await socketIO().then((socket) => {
                         return socket.timeout(10000).emitWithAck('getQueue');
                     })
                     const data = response;
@@ -126,9 +126,49 @@ loadSpotify = async (client, clear) => {
                     loadSpotify(client, true);
                 }
             } else if (currentTrack.body.currently_playing_type === 'ad' || !currentTrack.body.is_playing) {
+                const response1 = await socketIO().then((socket) => {
+                    return socket.timeout(10000).emitWithAck('getQueue');
+                })
+                const next = response1;
+                let queue;
+                if (!next) {
+                    return
+                }
+                if (next[0].songs === 0) {
+                    queue = [];
+                } else {
+                    queue = next[0].songs.map((track, id) => ({
+                        name: track.name,
+                        artists: track.artists,
+                        album: track.album
+                    }));
+                }
+                const updatedNextUpEmbed = {
+                    color: 0x0099ff,
+                    title: 'Next Up',
+                    fields: (queue.slice(0, 4).map((track, id) => ({
+                        name: (1 + Number(id)) + ". " + track.name + " - " + track.artists,
+                        value: track.album,
+                    })))
+                }
+                const recent = await spotifyApi.getMyRecentlyPlayedTracks({ limit: 10 });
+                const tracks = recent.body.items.map(item => ({
+                    name: item.track.name,
+                    artists: item.track.artists.map(artist => artist.name).join(', '),
+                    album: item.track.album.name,
+                }));
+                const updatedPreviousEmbed = {
+                    color: 0x0099ff,
+                    title: 'Previously Played',
+                    fields: tracks.map((track, id) => ({
+                        name: "-" + id - 1 + ". " + track.name + " - " + track.artists,
+                        value: track.album,
+                    })),
+                    timestamp: new Date().toISOString(),
+                }
                 log("hit an ad or is paused")
                 // Wait for 15 seconds before calling the loadSpotify function again
-                const response = await socketIO().then((socket)=> {
+                const response = await socketIO().then((socket) => {
                     return socket.timeout(10000).emitWithAck('getPlayLength');
                 })
                 const data = response[0];
@@ -150,8 +190,10 @@ loadSpotify = async (client, clear) => {
                         value: "Ad is currently running",
                     }]
                 }
-                if (message) {
-                    await message.edit({ embeds: [updatedCurrentEmbed] })
+                if (!message) {
+                    await voiceChannel.send({ embeds: [updatedNextUpEmbed, updatedCurrentEmbed, updatedPreviousEmbed], components: [buttons] })
+                } else {
+                    await message.edit({ embeds: [updatedNextUpEmbed, updatedCurrentEmbed, updatedPreviousEmbed], components: [buttons] })
                 }
                 if (remainingMs > 0) {
                     // Wait for the remaining time before calling the loadSpotify function again
