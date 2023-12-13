@@ -98,12 +98,7 @@ module.exports = {
                 }
             });
 
-            socketIO().listen(3000);
-            const delay = async () => {
-                await new Promise(resolve => { setTimeout(resolve, 5000) });
-                await loadSpotify(client, true)
-            }
-            delay()
+
 
             socketIO().on('connection', (socket) => {
                 log('a user connected');
@@ -115,7 +110,11 @@ module.exports = {
                 });
 
             });
-
+            const delay = async () => {
+                await new Promise(resolve => { setTimeout(resolve, 5000) });
+                await loadSpotify(client, true)
+            }
+            delay()
             log("Socket.io listening on port 3000")
 
         }
