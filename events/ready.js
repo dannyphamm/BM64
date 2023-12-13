@@ -97,11 +97,11 @@ module.exports = {
                     error(e, "TRY spotify health");
                 }
             });
-            
+
             socketIO().listen(3000);
             const delay = async () => {
                 await new Promise(resolve => { setTimeout(resolve, 5000) });
-                loadSpotify(client, true)
+                await loadSpotify(client, true)
             }
             delay()
 
@@ -111,7 +111,7 @@ module.exports = {
                     log('user disconnected');
                 });
                 socket.on('skipMusic', async () => {
-                    loadSpotify(client, true);
+                    await loadSpotify(client, true);
                 });
 
             });
@@ -119,6 +119,7 @@ module.exports = {
             log("Socket.io listening on port 3000")
 
         }
+
 
         log('Ready!');
     },

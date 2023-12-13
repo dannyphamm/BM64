@@ -1,10 +1,12 @@
 const {Server} = require('socket.io');
-
+const { log } = require('./utils');
 let io;
 
 function connect() {
   if (!io) {
-     io = new Server({});
+    log("connecting to socket.io")
+     io = new Server().listen(3000);
+
     
   }
   return io;
