@@ -59,7 +59,6 @@ loadSpotify = async (client, clear) => {
                     const data = response[0];
                     const recent = await spotifyApi.getMyRecentlyPlayedTracks({ limit: 10 });
                     let queue;
-                    log(data)
                     if (!data) {
                         return
                     }
@@ -131,8 +130,7 @@ loadSpotify = async (client, clear) => {
                 // await loadSpotify(client, true);
                 const response = await socketIO().timeout(10000).emitWithAck('getPlayLength');
                 const data = response[0];
-                console.log(data)
-                console.log(!response)
+
                 if (!response) {
                     log("play length not found, retrying in 3 seconds")
                     await new Promise(resolve => { setTimeout(resolve, 3000) });
@@ -143,7 +141,6 @@ loadSpotify = async (client, clear) => {
                 remainingMs = durationMs - progressMs + 4000;
                 log(progressMs, durationMs, remainingMs);
                 const message = await voiceChannel.messages.fetch().then(messages => messages.find(msg => msg.author.id === client.user.id));
-                console.log(message)
                 const updatedCurrentEmbed = {
                     color: 0x0099ff,
                     title: 'Currently Playing',
