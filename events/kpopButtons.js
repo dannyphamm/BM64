@@ -12,10 +12,14 @@ module.exports = {
             if (!interaction.isButton()) return
             log(`${interaction.user.tag} in #${interaction.channel.name} triggered an interaction.`);
             if (interaction.customId === 'skip') {
-                await socketIO().then((socket)=> {
-                    socket.emit('skipMusic');
+                await socketIO().then((socket) => {
+                    const play = socket.timeout(10000).emitWithAck('skipMusic');
+                    if (skip) {
+                        loadSpotify(client, true)
+                    }
+
                 })
-                await loadSpotify(client, true)
+
                 return interaction.reply({ content: 'Skipped!', ephemeral: true });
             }
 
@@ -29,21 +33,27 @@ module.exports = {
                     [{ uri: `spotify:track:${currentSong.body.item.id}` }])
                 const misamo = client.mongodb.db.collection(config.mongodbDBMiSaMo);
                 await misamo.deleteOne({ uri: `spotify:track:${currentSong.body.item.id}` });
-                await socketIO().then((socket)=> {
-                    socket.emit('skipMusic');
+                await socketIO().then((socket) => {
+                    const play = socket.timeout(10000).emitWithAck('skipMusic');
+                    if (play) {
+                        loadSpotify(client, true)
+                    }
                 })
                 // delay and add loadSpotify
 
-                await loadSpotify(client, true)
+
 
                 return interaction.reply({ content: 'Deleted!', ephemeral: true });
             }
 
             if (interaction.customId === 'reset') {
-                await socketIO().then((socket)=> {
-                    socket.emit('playMusic');
+                await socketIO().then((socket) => {
+                    const play = socket.timeout(10000).emitWithAck('playMusic');
+                    if (play) {
+                        loadSpotify(client, true)
+                    }
                 })
-                await loadSpotify(client, true)
+
                 return interaction.reply({ content: 'Reset Triggered', ephemeral: true });
             }
         }
