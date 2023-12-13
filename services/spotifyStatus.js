@@ -133,7 +133,9 @@ loadSpotify = async (client, clear) => {
                 const next = response1;
                 let queue;
                 if (!next) {
-                    return
+                    log("queue not found, retrying in 3 seconds")
+                    await new Promise(resolve => { setTimeout(resolve, 3000) });
+                    return loadSpotify(client, true);
                 }
                 if (next[0].songs === 0) {
                     queue = [];

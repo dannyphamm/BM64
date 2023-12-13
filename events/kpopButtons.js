@@ -12,6 +12,7 @@ module.exports = {
             if (!interaction.isButton()) return
             log(`${interaction.user.tag} in #${interaction.channel.name} triggered an interaction.`);
             if (interaction.customId === 'skip') {
+                await interaction.reply('Running...');
                 await socketIO().then((socket) => {
                     const play = socket.timeout(10000).emitWithAck('skipMusic');
                     if (play) {
@@ -20,10 +21,11 @@ module.exports = {
 
                 })
 
-                return interaction.reply({ content: 'Skipped!', ephemeral: true });
+                await interaction.editReply({ content: 'Skipped!', ephemeral: true });
             }
 
             if (interaction.customId === 'remove') {
+                await interaction.reply('Running...');
                 const spotifyApi = await spotify();
                 const currentSong = await spotifyApi.getMyCurrentPlayingTrack();
                 if (currentSong.body.currently_playing_type !== 'track') return await interaction.reply({ content: 'Cannot remove. An ad is playing!', ephemeral: true });
@@ -43,10 +45,11 @@ module.exports = {
 
 
 
-                return interaction.reply({ content: 'Deleted!', ephemeral: true });
+                await interaction.editReply({ content: 'Deleted!', ephemeral: true });
             }
 
             if (interaction.customId === 'reset') {
+                await interaction.reply('Running...');
                 await socketIO().then(async(socket) => {
                     const play = await socket.timeout(10000).emitWithAck('playMusic');
                     console.log(play)
@@ -55,7 +58,7 @@ module.exports = {
                     }
                 })
 
-                return interaction.reply({ content: 'Reset Triggered', ephemeral: true });
+                await interaction.editReply({ content: 'Reset Triggered', ephemeral: true });
             }
         }
 

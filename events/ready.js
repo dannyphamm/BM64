@@ -100,7 +100,7 @@ module.exports = {
             schedule.scheduleJob('*/30 * * * * *', async () => {
                 try {
                     await socketIO().then(async (socket) => {
-                        await socket.timeout(10000).emitWithAck('playMusic');
+                        const result = await socket.timeout(10000).emitWithAck('playMusic');
                     })
                 } catch (e) {
                     error(e, "TRY spotify health");
