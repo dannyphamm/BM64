@@ -78,7 +78,7 @@ module.exports = {
                     await socketIO().then((socket)=> {
                         socket.emit('playMusic');
                     })
-                    await loadSpotify(client, true);
+                    loadSpotify(client, true);
                 } catch (e) {
                     error(e, "Spotify play music");
                 }
@@ -109,7 +109,7 @@ module.exports = {
         
             const delay = async () => {
                 await new Promise(resolve => { setTimeout(resolve, 5000) });
-                await loadSpotify(client, true)
+                loadSpotify(client, true)
             }
             delay()
             log("Socket.io listening on port 3000")

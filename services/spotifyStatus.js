@@ -123,14 +123,11 @@ loadSpotify = async (client, clear) => {
                     // Wait for the remaining time before calling the loadSpotify function again
                     await new Promise(resolve => { timeoutId = setTimeout(resolve, remainingMs) });
                     // Call the loadSpotify function again
-                    await loadSpotify(client, true);
+                    loadSpotify(client, true);
                 }
             } else if (currentTrack.body.currently_playing_type === 'ad' || !currentTrack.body.is_playing) {
                 log("hit an ad or is paused")
                 // Wait for 15 seconds before calling the loadSpotify function again
-                // await new Promise(resolve => { setTimeout(resolve, 15000) });
-
-                // await loadSpotify(client, true);
                 const response = await socketIO().then((socket)=> {
                     return socket.timeout(10000).emitWithAck('getPlayLength');
                 })

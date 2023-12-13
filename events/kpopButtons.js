@@ -43,7 +43,7 @@ module.exports = {
                 await socketIO().then((socket)=> {
                     socket.emit('playMusic');
                 })
-                await loadSpotify(client, true)
+                loadSpotify(client, true)
                 await interaction.reply({ content: 'Reset Triggered', ephemeral: true });
             }
         }
