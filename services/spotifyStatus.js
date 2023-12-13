@@ -60,11 +60,15 @@ loadSpotify = async (client, clear) => {
                     const response = await socketIO().then((socket) => {
                         return socket.timeout(10000).emitWithAck('getQueue');
                     })
+                    
                     const data = response;
+                    log(data, "Queue")
                     const recent = await spotifyApi.getMyRecentlyPlayedTracks({ limit: 10 });
                     let queue;
                     if (!data) {
-                        return
+                        log("queue not found, retrying in 3 seconds")
+                        await new Promise(resolve => { setTimeout(resolve, 3000) });
+                        return loadSpotify(client, true);
                     }
                     if (data[0].songs === 0) {
                         queue = [];
@@ -131,6 +135,7 @@ loadSpotify = async (client, clear) => {
                     return socket.timeout(10000).emitWithAck('getQueue');
                 })
                 const next = response1;
+                log(next, "AD queue")
                 let queue;
                 if (!next) {
                     log("queue not found, retrying in 3 seconds")
@@ -183,7 +188,7 @@ loadSpotify = async (client, clear) => {
                 progressMs = data?.progress_ms;
                 durationMs = data?.duration_ms;
                 remainingMs = durationMs - progressMs + 4000;
-                log(progressMs, durationMs, remainingMs);
+                log(data, "AD current")
                 const message = await voiceChannel.messages.fetch().then(messages => messages.find(msg => msg.author.id === client.user.id));
                 const updatedCurrentEmbed = {
                     color: 0x0099ff,
