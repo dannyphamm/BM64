@@ -28,7 +28,7 @@ loadSpotify = async (client, clear) => {
             await socketIO().emit('skipMusic');
         }
         if (currentTrack.body) {
-
+            console.log("currentTrack", currentTrack.body)
             if (currentTrack.body.currently_playing_type === 'track' && currentTrack.body.is_playing) {
 
                 // Get the song details
@@ -55,17 +55,20 @@ loadSpotify = async (client, clear) => {
                         );
 
                     const current = currentTrack.body.item;
-                    const response = await socketIO().timeout(10000).emitWithAck('getQueue');
+                    const response = await socketIO().then((socket)=> {
+                        return socket.timeout(10000).emitWithAck('getQueue');
+                    })
                     const data = response;
+                    console.log("data", data)
                     const recent = await spotifyApi.getMyRecentlyPlayedTracks({ limit: 10 });
                     let queue;
                     if (!data) {
                         return
                     }
-                    if (data.songs === 0) {
+                    if (data[0].songs === 0) {
                         queue = [];
                     } else {
-                        queue = data.songs.map((track, id) => ({
+                        queue = data[0].songs.map((track, id) => ({
                             name: track.name,
                             artists: track.artists,
                             album: track.album
@@ -128,9 +131,11 @@ loadSpotify = async (client, clear) => {
                 // await new Promise(resolve => { setTimeout(resolve, 15000) });
 
                 // await loadSpotify(client, true);
-                const response = await socketIO().timeout(10000).emitWithAck('getPlayLength');
+                const response = await socketIO().then((socket)=> {
+                    return socket.timeout(10000).emitWithAck('getPlayLength');
+                })
                 const data = response[0];
-
+                console.log(data)
                 if (!response) {
                     log("play length not found, retrying in 3 seconds")
                     await new Promise(resolve => { setTimeout(resolve, 3000) });

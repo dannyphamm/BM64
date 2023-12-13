@@ -98,28 +98,17 @@ module.exports = {
                 }
             });
 
+            
 
-
-            socketIO().on('connection', (socket) => {
-                log('a user connected');
-                socket.on('disconnect', () => {
-                    log('user disconnected');
-                });
-                socket.on('skipMusic', async () => {
-                    await loadSpotify(client, true);
-                });
-
-            });
+        
             const delay = async () => {
                 await new Promise(resolve => { setTimeout(resolve, 5000) });
                 await loadSpotify(client, true)
             }
             delay()
             log("Socket.io listening on port 3000")
-
         }
-
-
+        socketIO();
         log('Ready!');
     },
 };

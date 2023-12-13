@@ -1,13 +1,18 @@
-const {Server} = require('socket.io');
+const { Server } = require('socket.io');
 const { log } = require('./utils');
 let io;
 
-function connect() {
+async function connect() {
   if (!io) {
     log("connecting to socket.io")
-     io = new Server().listen(3000);
+    io = await new Server().listen(3000);
+    io.on('connection', async (socket) => {
+      log('a user connected');
+      socket.on('disconnect', () => {
+        log('user disconnected');
+      });
+    });
 
-    
   }
   return io;
 }
