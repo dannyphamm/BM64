@@ -1,0 +1,67 @@
+Arguments: 
+  C:\Program Files\nodejs\node.exe C:\Users\Danny Pham\AppData\Roaming\npm\node_modules\yarn\bin\yarn.js add spotify-web-api-node
+
+PATH: 
+  D:\Program Files\Git\mingw64\bin;D:\Program Files\Git\usr\bin;C:\Users\Danny Pham\bin;C:\Program Files\Eclipse Adoptium\jdk-18.0.2.101-hotspot\bin;C:\Program Files\Eclipse Adoptium\jre-8.0.372.7-hotspot\bin;C:\Program Files\Eclipse Adoptium\jre-17.0.7.7-hotspot\bin;E:\Oculus\Support\oculus-runtime;C:\Program Files\Common Files\Oracle\Java\javapath;C:\Program Files (x86)\Common Files\Oracle\Java\javapath;C:\Program Files (x86)\AdoptOpenJDK\jre-8.0.282.8-hotspot\bin;C:\Program Files\AdoptOpenJDK\jdk-11.0.9.11-hotspot\bin;C:\Program Files (x86)\Common Files\Intel\Shared Libraries\redist\intel64\compiler;C:\Windows\system32;C:\Windows;C:\Windows\System32\Wbem;C:\Windows\System32\WindowsPowerShell\v1.0;C:\Windows\System32\OpenSSH;D:\Users\Danny Pham\Downloads\ffmpeg-20191004-e6625ca-win64-static\bin;D:\Users\Danny Pham\Downloads\jdk-13.0.1\bin;D:\Users\Danny Pham\Downloads\gradle-6.0.1\bin;C:\WINDOWS\system32;C:\WINDOWS;C:\WINDOWS\System32\Wbem;C:\WINDOWS\System32\WindowsPowerShell\v1.0;C:\WINDOWS\System32\OpenSSH;D:\Users\Danny Pham\Downloads\terraform.exe;C:\ProgramData\chocolatey\bin;C:\Program Files (x86)\NVIDIA Corporation\PhysX\Common;C:\Program Files\nodejs;C:\WINDOWS\system32;C:\WINDOWS;C:\WINDOWS\System32\Wbem;C:\WINDOWS\System32\WindowsPowerShell\v1.0;C:\WINDOWS\System32\OpenSSH;C:\Program Files\Docker\Docker\resources\bin;D:\Program Files\Git\cmd;C:\Program Files\Amazon\AWSCLIV2;C:\Program Files\PuTTY;D:\Users\Danny Pham\Downloads\apache-maven-3.9.4-bin\apache-maven-3.9.4;C:\Users\Danny Pham\AppData\Local\Programs\Python\Python310\Scripts;C:\Users\Danny Pham\AppData\Local\Programs\Python\Python310;C:\Users\Danny Pham\AppData\Local\pnpm;C:\Users\Danny Pham\.windows-build-tools\python27;C:\Users\Danny Pham\AppData\Local\Programs\Python\Python37\Scripts;C:\Users\Danny Pham\AppData\Local\Programs\Python\Python37;C:\Users\Danny Pham\AppData\Local\Microsoft\WindowsApps;C:\Users\Danny Pham\AppData\Local\GitHubDesktop\bin;D:\Users\Danny Pham\Downloads\apache-maven-3.6.3\bin;C:\Users\Danny Pham\AppData\Local\Programs\Microsoft VS Code\bin;C:\media-autobuild_suite-master\local64\bin-video;C:\Users\Danny Pham\AppData\Roaming\npm;C:\Users\Danny Pham\AppData\Local\spicetify;C:\Users\Danny Pham\AppData\Local\Microsoft\WindowsApps
+
+Yarn version: 
+  1.22.10
+
+Node version: 
+  19.1.0
+
+Platform: 
+  win32 x64
+
+Trace: 
+  Error: ENOENT: no such file or directory, copyfile 'C:\Users\Danny Pham\AppData\Local\Yarn\Cache\v6\npm-p-locate-5.0.0-83c8315c6785005e3bd021839411c9e110e6d834-integrity\node_modules\p-locate\index.js' -> 'D:\GitHub\BM64\node_modules\eslint\node_modules\p-locate\index.js'
+
+npm manifest: 
+  {
+      "name": "bm64",
+      "version": "1.0.0",
+      "description": "",
+      "main": "index.js",
+      "scripts": {
+          "test": "jest",
+          "lint-md": "remark .",
+          "lint": "eslint . --fix"
+      },
+      "author": "",
+      "license": "ISC",
+      "dependencies": {
+          "@discordjs/builders": "^1.6.3",
+          "@discordjs/opus": "^0.9.0",
+          "@discordjs/voice": "^0.15.0",
+          "@distube/spotify": "^1.5.1",
+          "@distube/yt-dlp": "^1.1.3",
+          "@napi-rs/canvas": "^0.1.41",
+          "axios": "^1.4.0",
+          "chart.js": "^4.3.1",
+          "cheerio": "^1.0.0-rc.12",
+          "deep-object-diff": "^1.1.9",
+          "distube": "^4.0.5",
+          "genius-lyrics": "^4.4.3",
+          "libsodium-wrappers": "^0.7.11",
+          "mongodb": "^5.7.0",
+          "node-fetch": "^3.3.1",
+          "node-schedule": "^2.1.1",
+          "sharp": "^0.32.4"
+      },
+      "devDependencies": {
+          "@discordjs/rest": "^1.7.1",
+          "discord-api-types": "^0.35.0",
+          "discord.js": "^14.11.0",
+          "eslint": "^8.45.0",
+          "eslint-config-google": "^0.14.0",
+          "jest": "^29.6.2",
+          "remark-cli": "^11.0.0",
+          "remark-preset-lint-recommended": "^6.1.3"
+      }
+  }
+
+yarn manifest: 
+  No manifest
+
+Lockfile: 
+  No lockfile

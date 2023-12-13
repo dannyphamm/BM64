@@ -1,4 +1,4 @@
-const log = require('../utils/utils')
+const { log, error } = require('../utils/utils')
 const config = require('../config.json')
 module.exports = {
     name: 'voiceStateUpdate',
@@ -15,7 +15,7 @@ module.exports = {
                         SendMessages: true
                     }).then(() => {
                         log(`Added permissions for ${member.user.tag} in ${textChannel.name} (${textChannel.id})`)
-                    }).catch(console.error);
+                    }).catch(error);
                 }
             }
 
@@ -25,7 +25,7 @@ module.exports = {
                     textChannel.permissionOverwrites.delete(member, {
                     }).then(() => {
                         log(`Removed permissions for ${member.user.tag} in ${textChannel.name} (${textChannel.id})`);
-                    }).catch(console.error);
+                    }).catch(error);
                 }
             }
         }

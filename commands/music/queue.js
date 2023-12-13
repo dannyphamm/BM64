@@ -4,7 +4,8 @@ module.exports = {
         .setName('queue')
         .setDescription('Queue info'),
     async execute(interaction) {
-        const queue = interaction.client.distube.getQueue(interaction.guild.id);
+        const { client } = interaction;
+        const queue = client.distube.getQueue(interaction.guild.id);
 
         const q = queue.songs
             .map((song, i) => {

@@ -14,7 +14,8 @@ module.exports = {
                     { name: 'Queue', value: '2' },
                 )),
     async execute(interaction) {
-        const queue = interaction.client.distube.getQueue(interaction.guild.id)
+        const { client } = interaction;
+        const queue = client.distube.getQueue(interaction.guild.id)
         if (!queue) return interaction.reply(`There is nothing in the queue right now!`)
         try {
             const choice = parseInt(interaction.options.get('type').value)

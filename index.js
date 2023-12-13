@@ -1,26 +1,29 @@
 // Require the necessary discord.js classes
 const fs = require('node:fs');
 const path = require('node:path');
-const { Client, Collection, IntentsBitField  } = require('discord.js');
+const { Client, Collection, IntentsBitField } = require('discord.js');
 const { token } = require('./config.json');
 const { YtDlpPlugin } = require("@distube/yt-dlp")
 const { DisTube } = require("distube");
 const { SpotifyPlugin } = require('@distube/spotify');
-const log  = require("./utils/utils");
+const { log, error } = require("./utils/utils");
 const Genius = require("genius-lyrics");
 const GeniusClient = new Genius.Client();
 const MongoConnection = require('./utils/db');
 // Create a new client instance
 const myIntents = new IntentsBitField();
-myIntents.add(IntentsBitField.Flags.Guilds, IntentsBitField.Flags.GuildMessages, IntentsBitField.Flags.GuildVoiceStates);
+myIntents.add(IntentsBitField.Flags.Guilds, IntentsBitField.Flags.GuildMessages, IntentsBitField.Flags.GuildVoiceStates, IntentsBitField.Flags.MessageContent);
 const client = new Client(
     {
         intents: myIntents
     });
 
-
+const connectToDB = async () => {
+    await MongoConnection.connect();
+    client.mongodb = MongoConnection;
+}
+connectToDB()
 client.commands = new Collection();
-
 const eventPath = path.resolve(__dirname, 'events');
 
 fs.readdir(eventPath, (err, files) => {
@@ -28,7 +31,7 @@ fs.readdir(eventPath, (err, files) => {
     files.filter(file => file.endsWith('.js')).forEach(file => {
         const filePath = path.join(eventPath, file);
         const event = require(filePath);
-            log(`Loaded Event: ${event.name}`)
+        log(`Loaded Event: ${event.name}`)
         if (event.once) {
             client.once(event.name, (...args) => event.execute(...args));
         } else {
@@ -71,7 +74,7 @@ const distube = new DisTube(client, {
 })
 distube.on('error', (channel, e) => {
     if (channel) channel.send(`An error encountered: ${e}`)
-    else console.error(e)
+    else error(e, "DISTUBE_ERROR")
 })
 distube.on("initQueue", queue => {
     queue.autoplay = false;
@@ -93,10 +96,7 @@ distube.on("playSong", (queue, song) => queue.textChannel.send(
 
 client.genius = GeniusClient;
 client.distube = distube;
-const connectToDB = async() => {
-    await MongoConnection.connect();
-    client.mongodb = MongoConnection;
-}
-connectToDB()
+
+
 // Login to Discord with your client's token
 client.login(token);
