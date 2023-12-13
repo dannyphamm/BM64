@@ -12,7 +12,9 @@ module.exports = {
             if (!interaction.isButton()) return
             log(`${interaction.user.tag} in #${interaction.channel.name} triggered an interaction.`);
             if (interaction.customId === 'skip') {
-                socketIO().emit('skipMusic');
+                await socketIO().then((socket)=> {
+                    socket.emit('skipMusic');
+                })
                 loadSpotify(client, true)
                 await interaction.reply({ content: 'Skipped!', ephemeral: true });
             }
@@ -27,7 +29,9 @@ module.exports = {
                     [{ uri: `spotify:track:${currentSong.body.item.id}` }])
                 const misamo = client.mongodb.db.collection(config.mongodbDBMiSaMo);
                 await misamo.deleteOne({ uri: `spotify:track:${currentSong.body.item.id}` });
-                socketIO().emit('skipMusic');
+                await socketIO().then((socket)=> {
+                    socket.emit('skipMusic');
+                })
                 // delay and add loadSpotify
 
                 loadSpotify(client, true)
@@ -36,8 +40,10 @@ module.exports = {
             }
 
             if (interaction.customId === 'reset') {
-                socketIO().emit('playMusic');
-                loadSpotify(client, true)
+                await socketIO().then((socket)=> {
+                    socket.emit('playMusic');
+                })
+                await loadSpotify(client, true)
                 await interaction.reply({ content: 'Reset Triggered', ephemeral: true });
             }
         }

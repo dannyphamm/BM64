@@ -64,7 +64,9 @@ module.exports = {
             schedule.scheduleJob('0 0 */6 * * *', async () => {
                 try {
                     log("Refreshing Page")
-                    await socketIO().emit('refreshPage');
+                    await socketIO().then((socket)=> {
+                        socket.emit('refreshPage');
+                    })
                 } catch (e) {
                     error(e, "Refresh Spotify");
                 }
@@ -73,7 +75,9 @@ module.exports = {
             schedule.scheduleJob('30 0 */6 * * *', async () => {
                 try {
                     log("Playing Music")
-                    await socketIO().emit('playMusic');
+                    await socketIO().then((socket)=> {
+                        socket.emit('playMusic');
+                    })
                     await loadSpotify(client, true);
                 } catch (e) {
                     error(e, "Spotify play music");
@@ -92,13 +96,15 @@ module.exports = {
             log("Health check for spotify. 30 seconds")
             schedule.scheduleJob('*/30 * * * * *', async () => {
                 try {
-                    await socketIO().emit('playMusic');
+                    await socketIO().then((socket)=> {
+                        socket.emit('playMusic');
+                    })
                 } catch (e) {
                     error(e, "TRY spotify health");
                 }
             });
 
-            
+            socketIO();
 
         
             const delay = async () => {
@@ -108,7 +114,7 @@ module.exports = {
             delay()
             log("Socket.io listening on port 3000")
         }
-        socketIO();
+       
         log('Ready!');
     },
 };
