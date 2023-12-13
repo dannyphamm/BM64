@@ -15,8 +15,8 @@ module.exports = {
                 await socketIO().then((socket)=> {
                     socket.emit('skipMusic');
                 })
-                loadSpotify(client, true)
-                await interaction.reply({ content: 'Skipped!', ephemeral: true });
+                await loadSpotify(client, true)
+                return interaction.reply({ content: 'Skipped!', ephemeral: true });
             }
 
             if (interaction.customId === 'remove') {
@@ -34,17 +34,17 @@ module.exports = {
                 })
                 // delay and add loadSpotify
 
-                loadSpotify(client, true)
+                await loadSpotify(client, true)
 
-                await interaction.reply({ content: 'Deleted!', ephemeral: true });
+                return interaction.reply({ content: 'Deleted!', ephemeral: true });
             }
 
             if (interaction.customId === 'reset') {
                 await socketIO().then((socket)=> {
                     socket.emit('playMusic');
                 })
-                loadSpotify(client, true)
-                await interaction.reply({ content: 'Reset Triggered', ephemeral: true });
+                await loadSpotify(client, true)
+                return interaction.reply({ content: 'Reset Triggered', ephemeral: true });
             }
         }
 
