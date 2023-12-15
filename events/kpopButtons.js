@@ -12,7 +12,7 @@ module.exports = {
             if (!interaction.isButton()) return
             log(`${interaction.user.tag} in #${interaction.channel.name} triggered an interaction.`);
             if (interaction.customId === 'skip') {
-                await interaction.reply('Running...');
+                await interaction.reply({content:'Running...', ephemeral: true });
                 await socketIO().then((socket) => {
                     const play = socket.timeout(10000).emitWithAck('skipMusic');
                     if (play) {
@@ -25,7 +25,7 @@ module.exports = {
             }
 
             if (interaction.customId === 'remove') {
-                await interaction.reply('Running...');
+                await interaction.reply({content:'Running...', ephemeral: true });
                 const spotifyApi = await spotify();
                 const currentSong = await spotifyApi.getMyCurrentPlayingTrack();
                 if (currentSong.body.currently_playing_type !== 'track') return await interaction.reply({ content: 'Cannot remove. An ad is playing!', ephemeral: true });
@@ -49,7 +49,7 @@ module.exports = {
             }
 
             if (interaction.customId === 'reset') {
-                await interaction.reply('Running...');
+                await interaction.reply({content:'Running...', ephemeral: true });
                 await socketIO().then(async(socket) => {
                     const play = await socket.timeout(10000).emitWithAck('playMusic');
                     console.log(play)
