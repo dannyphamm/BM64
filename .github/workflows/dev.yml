@@ -17,6 +17,7 @@ jobs:
         with:
           node-version: '20.x'
       - run: npm install
+      - run: echo '{}' > config.json
       - run: node ./deploy-commands-actions.js
         env:
           BM64_BETA_CLIENTID: ${{ secrets.BM64_CLIENTID }}
