@@ -3,7 +3,7 @@ const { ActionRowBuilder, ButtonBuilder } = require('@discordjs/builders');
 const { ButtonStyle } = require('discord.js');
 const { error, log } = require('../utils/utils');
 const { socketIO } = require('../utils/socket.js');
-
+const config = require('../config');
 let buttons;
 let remainingMs;
 let progressMs;
@@ -11,7 +11,7 @@ let durationMs;
 let timeoutId;
 loadSpotify = async (client, clear) => {
     const spotifyApi = await spotify();
-    const voiceChannelId = '1145310513232891955';
+    const voiceChannelId = config.misamoVoiceChannel;
     const voiceChannel = await client.channels.fetch(voiceChannelId);
     // refresh token if expired
 
