@@ -96,8 +96,8 @@ module.exports = {
                     error(e, "TRY UNIQLO");
                 }
             });
-            log("Health check for spotify. 30 seconds")
-            schedule.scheduleJob('*/30 * * * * *', async () => {
+            log("Health check for spotify. 1 minute")
+            schedule.scheduleJob('0 * * * * *', async () => {
                 try {
                     await socketIO().then(async (socket) => {
                         const result = await socket.timeout(10000).emitWithAck('playMusic');
