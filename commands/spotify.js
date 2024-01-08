@@ -3,7 +3,7 @@ const SpotifyWebApi = require('spotify-web-api-node');
 const config = require('../config.json');
 const { log } = require('../utils/utils');
 const { socketIO } = require('../utils/socket.js');
-const { spotify, addAllTracksToPlaylist, getAllPlaylistSongs } = require('../utils/spotify.js');
+const { spotify, addAllTracksToPlaylist, getAllPlaylistSongs, removeAllTracksFromPlaylist } = require('../utils/spotify.js');
 const { loadSpotify } = require('../services/spotifyStatus.js');
 module.exports = {
     data: new SlashCommandBuilder()
