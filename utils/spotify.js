@@ -60,18 +60,18 @@ const getSongs = async (id, offset) => {
 
 const addAllTracksToPlaylist = async (playlistId, trackUris) => {
     const numBatches = Math.ceil(trackUris.length / 100);
+    const promises = [];
 
     for (let batchNum = 0; batchNum < numBatches; batchNum++) {
         const start = batchNum * 100;
         const end = Math.min(start + 100, trackUris.length);
         const batch = trackUris.slice(start, end);
-        await addTracks(playlistId, batch);
-        if (batchNum < numBatches - 1) {
-            await delay(15000); // Delay of 15 second
-        }
+        const promise = addTracks(playlistId, batch);
+        promises.push(promise);
     }
+
+    await Promise.all(promises);
 }
-const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 const addTracks = async (playlistId, trackUris) => {
     log(`Adding ${trackUris.length} tracks to playlist ${playlistId}`);
@@ -80,16 +80,17 @@ const addTracks = async (playlistId, trackUris) => {
 
 const removeAllTracksFromPlaylist = async (playlistId, trackUris) => {
     const numBatches = Math.ceil(trackUris.length / 100);
+    const promises = [];
 
     for (let batchNum = 0; batchNum < numBatches; batchNum++) {
         const start = batchNum * 100;
         const end = Math.min(start + 100, trackUris.length);
         const batch = trackUris.slice(start, end);
-        await removeTracks(playlistId, batch);
-        if (batchNum < numBatches - 1) {
-            await delay(15000); // Delay of 15 second
-        }
+        const promise = removeTracks(playlistId, batch);
+        promises.push(promise);
     }
+
+    await Promise.all(promises);
 }
 
 const removeTracks = async (playlistId, trackUris) => {
