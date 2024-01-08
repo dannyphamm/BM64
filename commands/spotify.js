@@ -17,7 +17,7 @@ module.exports = {
         const subcommand = interaction.options.getSubcommand();
         
         if (subcommand === 'sync') {
-            const spotifyApi = await spotify();
+            await spotify();
             //load spotify
             // const songs = await getAllPlaylistSongs(config.spotifyPrivatePlaylist);
             // import to mongodb in spotify collection

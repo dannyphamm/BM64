@@ -25,9 +25,9 @@ async function init() {
 const refreshToken = async () => {
     await spotifyApi.refreshAccessToken().then(
         function (data) {
-            log('The access token has been refreshed!');
+            log('Private: The access token has been refreshed!');
             spotifyApi.setAccessToken(data.body['access_token']);
-            log("access", data.body['access_token'])
+            log("Private access:", data.body['access_token'])
             expiryDate = new Date()
             expiryDate.setSeconds(expiryDate.getSeconds() + 3300)
         },
