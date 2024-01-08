@@ -74,10 +74,33 @@ const addAllTracksToPlaylist = async (playlistId, trackUris) => {
 }
 
 const addTracks = async (playlistId, trackUris) => {
+    log(`Adding ${trackUris.length} tracks to playlist ${playlistId}`);
     await spotifyApi.addTracksToPlaylist(playlistId, trackUris);
 }
+
+const removeAllTracksFromPlaylist = async (playlistId, trackUris) => {
+    const numBatches = Math.ceil(trackUris.length / 100);
+    const promises = [];
+
+    for (let batchNum = 0; batchNum < numBatches; batchNum++) {
+        const start = batchNum * 100;
+        const end = Math.min(start + 100, trackUris.length);
+        const batch = trackUris.slice(start, end);
+        const promise = removeTracks(playlistId, batch);
+        promises.push(promise);
+    }
+
+    await Promise.all(promises);
+}
+
+const removeTracks = async (playlistId, trackUris) => {
+    const tracks = trackUris.map(uri => ({ uri }));
+    await spotifyApi.removeTracksFromPlaylist(playlistId, tracks);
+}
+
 module.exports = {
     spotify: init,
     getAllPlaylistSongs,
-    addAllTracksToPlaylist
+    addAllTracksToPlaylist,
+    removeAllTracksFromPlaylist
 };
