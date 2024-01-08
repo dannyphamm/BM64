@@ -67,12 +67,10 @@ const addAllTracksToPlaylist = async (playlistId, trackUris) => {
         const batch = trackUris.slice(start, end);
         await addTracks(playlistId, batch);
     }
-
 }
 
 const addTracks = async (playlistId, trackUris) => {
     log(`Adding ${trackUris.length} tracks to playlist ${playlistId}`);
-    log(trackUris)
     await spotifyApi.addTracksToPlaylist(playlistId, trackUris).then(function(data) {
         log('Added tracks to playlist!');
       }, function(err) {

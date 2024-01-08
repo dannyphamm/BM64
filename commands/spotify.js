@@ -28,9 +28,10 @@ module.exports = {
             const songs = await spotifyCollection.find({}).toArray();
             const songUris = songs.map(song => song.uri);
             // import songs into spotifyCollection
+            await interaction.deferReply({ ephemeral: true })
             await addAllTracksToPlaylist(config.spotifyPlaylist, songUris);
             //console.log song uri
-            return interaction.reply('Spotify Synced!');
+            await  interaction.editReply('Spotify Synced!',{ ephemeral: true });
         }
         else if(subcommand === 'purge') {
             await spotify();
@@ -38,7 +39,7 @@ module.exports = {
             const songs = await spotifyCollection.find({}).toArray();
             const songUris = songs.map(song => song.uri);
             await removeAllTracksFromPlaylist(config.spotifyPlaylist, songUris);
-            return interaction.reply('Spotify Purged!');
+            await  interaction.reply('Spotify Purged!');
         }
         // const { client } = interaction;
         // //load spotify
