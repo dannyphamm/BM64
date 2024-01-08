@@ -20,5 +20,5 @@ jobs:
       - run: echo '{}' > config.json
       - run: node ./deploy-commands-actions.js
         env:
-          BM64_BETA_CLIENTID: ${{ secrets.BM64_CLIENTID }}
-          BM64_BETA_TOKEN: ${{ secrets.BM64_TOKEN }}
+          BM64_BETA_CLIENTID: ${{ secrets.BM64_BETA_CLIENTID }}
+          BM64_BETA_TOKEN: ${{ secrets.BM64_BETA_TOKEN }}
