@@ -7,9 +7,28 @@ const { spotify, getAllPlaylistSongs } = require('../utils/spotify.js');
 const { loadSpotify } = require('../services/spotifyStatus.js');
 module.exports = {
     data: new SlashCommandBuilder()
-        .setName('spotify')
-        .setDescription('Spotify Grant'),
+        .setName('spotify').addSubcommand(subcommand =>
+            subcommand.setName('sync')
+                .setDescription('Syncs the mongodb to the spotify playlist')
+        )
+        .setDescription('Spotify related commands'),
     async execute(interaction) {
+        const { client } = interaction;
+        const subcommand = interaction.options.getSubcommand();
+        const spotifyApi = await spotify();
+        if (subcommand === 'sync') {
+          
+            //load spotify
+            // const songs = await getAllPlaylistSongs(config.spotifyPrivatePlaylist);
+            // import to mongodb in spotify collection
+            const spotifyCollection = client.mongodb.db.collection(config.mongodbDBMiSaMo);
+            const songs = await spotifyCollection.find({}).toArray();
+            const songUris = songs.map(song => song.uri);
+            // import songs into spotifyCollection
+            await spotifyApi.addTracksToPlaylist(config.spotifyPlaylist, songUris);
+            //console.log song uri
+            await interaction.reply('Spotify Synced!');
+        }
         // const { client } = interaction;
         // //load spotify
         // const spotifyApi = await spotify();
