@@ -60,14 +60,12 @@ const getSongs = async (id, offset) => {
 
 const addAllTracksToPlaylist = async (playlistId, trackUris) => {
     const numBatches = Math.ceil(trackUris.length / 100);
-    const promises = [];
 
     for (let batchNum = 0; batchNum < numBatches; batchNum++) {
         const start = batchNum * 100;
         const end = Math.min(start + 100, trackUris.length);
         const batch = trackUris.slice(start, end);
-        const promise = addTracks(playlistId, batch);
-        promises.push(promise);
+        await addTracks(playlistId, batch);
     }
 
     await Promise.all(promises);
@@ -80,14 +78,12 @@ const addTracks = async (playlistId, trackUris) => {
 
 const removeAllTracksFromPlaylist = async (playlistId, trackUris) => {
     const numBatches = Math.ceil(trackUris.length / 100);
-    const promises = [];
 
     for (let batchNum = 0; batchNum < numBatches; batchNum++) {
         const start = batchNum * 100;
         const end = Math.min(start + 100, trackUris.length);
         const batch = trackUris.slice(start, end);
-        const promise = removeTracks(playlistId, batch);
-        promises.push(promise);
+        await removeTracks(playlistId, batch);
     }
 
     await Promise.all(promises);
