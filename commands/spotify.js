@@ -23,11 +23,13 @@ module.exports = {
             // import to mongodb in spotify collection
             const spotifyCollection = client.mongodb.db.collection(config.mongodbDBMiSaMo);
             const songs = await spotifyCollection.find({}).toArray();
+            log(songs.length);
             const songUris = songs.map(song => song.uri);
+            log(songs)
             // import songs into spotifyCollection
             await spotifyApi.addTracksToPlaylist(config.spotifyPlaylist, songUris);
             //console.log song uri
-            await interaction.reply('Spotify Synced!');
+            return interaction.reply('Spotify Synced!');
         }
         // const { client } = interaction;
         // //load spotify
