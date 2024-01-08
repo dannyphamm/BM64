@@ -76,7 +76,7 @@ const addTracks = async (playlistId, trackUris) => {
     await spotifyApi.addTracksToPlaylist(playlistId, trackUris).then(function(data) {
         log('Added tracks to playlist!');
       }, function(err) {
-        log('Something went wrong!', err.stringify());
+        log('Something went wrong!', JSON.stringify(err));
       });
 }
 
@@ -97,7 +97,7 @@ const removeTracks = async (playlistId, trackUris) => {
     await spotifyApi.removeTracksFromPlaylist(playlistId, tracks).then(function(data) {
         log('Removed tracks to playlist!');
       }, function(err) {
-        log('Something went wrong!', err.stringify());
+        log('Something went wrong!', JSON.stringify(err));
       });
 }
 
