@@ -59,6 +59,11 @@ loadSpotify = async (client, clear) => {
                     const current = currentTrack.body.item;
                     const response = await socketIO().then((socket) => {
                         return socket.timeout(10000).emitWithAck('getQueue');
+                    }).catch(async(e) => {
+                        log("Socket failure, retrying in 3 seconds")
+                        error(e);
+                        await new Promise(resolve => { setTimeout(resolve, 3000) });
+                        return loadSpotify(client, true);
                     })
                     
                     const data = response;
@@ -133,6 +138,11 @@ loadSpotify = async (client, clear) => {
             } else if (currentTrack.body.currently_playing_type === 'ad' || !currentTrack.body.is_playing) {
                 const response1 = await socketIO().then((socket) => {
                     return socket.timeout(10000).emitWithAck('getQueue');
+                }).catch(async(e) => {
+                    log("Socket failure, retrying in 3 seconds")
+                    error(e);
+                    await new Promise(resolve => { setTimeout(resolve, 3000) });
+                    return loadSpotify(client, true);
                 })
                 const next = response1;
                 log(next, "AD queue")
