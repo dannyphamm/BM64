@@ -18,7 +18,7 @@ module.exports = {
                 if (result) {
                     await message.react('✅').catch((e) => error(e));
                     // get queue
-                    await loadSpotify(client, false);
+                    await loadSpotify(client, true);
                 } else {
                     await message.react('❌').catch((e) => error(e));
                 }
