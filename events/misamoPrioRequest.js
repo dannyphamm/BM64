@@ -19,16 +19,16 @@ module.exports = {
 
             // Process the queue if it's not already being processed
             if (queue.length === 1) {
-                processQueue(client);
+                processQueue();
             }
         }
     }
 };
 
-async function processQueue(client) {
+async function processQueue() {
     while (queue.length > 0) {
         const { song, message } = queue[0];
-
+        const { client } = message;
         // React with a loading emoji
         const loadingReaction = await message.react('🔄').catch((e) => error(e));
 
@@ -36,10 +36,12 @@ async function processQueue(client) {
         await socketIO().then(async (socket) => {
             const result = await socket.timeout(10000).emitWithAck('addSongToQueue', song);
             if (result) {
+                await loadingReaction.remove().catch((e) => error(e));
                 await message.react('✅').catch((e) => error(e));
                 // get queue
                 await loadSpotify(client, true);
             } else {
+                await loadingReaction.remove().catch((e) => error(e));
                 await message.react('❌').catch((e) => error(e));
             }
 
