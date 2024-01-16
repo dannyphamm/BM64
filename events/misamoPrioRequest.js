@@ -19,13 +19,13 @@ module.exports = {
 
             // Process the queue if it's not already being processed
             if (queue.length === 1) {
-                processQueue();
+                processQueue(client);
             }
         }
     }
 };
 
-async function processQueue() {
+async function processQueue(client) {
     while (queue.length > 0) {
         const { song, message } = queue[0];
 
