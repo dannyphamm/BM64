@@ -12,6 +12,9 @@ module.exports = {
         if (message.channel.id === config.misamoVoiceChannel) {
             const song = message.content;
 
+            // React with a loading emoji
+            const loadingReaction = await message.react('🔄').catch((e) => error(e));
+
             // Emit the addSongToQueue event
             await socketIO().then(async (socket) => {
                 const result = await socket.timeout(10000).emitWithAck('addSongToQueue', song);
@@ -22,7 +25,9 @@ module.exports = {
                 } else {
                     await message.react('❌').catch((e) => error(e));
                 }
-                
+
+                // Remove the loading emoji
+                await loadingReaction.remove().catch((e) => error(e));
             })
         }
     }
