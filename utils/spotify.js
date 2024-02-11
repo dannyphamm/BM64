@@ -12,6 +12,7 @@ async function init() {
             clientSecret: config.spotifyClientSecret,
             accessToken: config.spotifyAccessToken,
         });
+        log("MiSaMo Spotify API Initialized")
         spotifyApi.setRefreshToken(config.spotifyRefreshToken)
         await refreshToken()
         setInterval(async () => {

@@ -3,6 +3,7 @@ const { log, error } = require('../utils/utils');
 const { socketIO } = require("../utils/socket");
 const { spotify } = require("../utils/spotify.js");
 const config = require('../config.json');
+const { ButtonBuilder, ButtonStyle, ActionRowBuilder } = require('discord.js');
 module.exports = {
     name: 'interactionCreate',
     async execute(interaction) {
@@ -11,6 +12,28 @@ module.exports = {
         if (interaction.type == InteractionType.MessageComponent) {
             if (!interaction.isButton()) return
             log(`${interaction.user.tag} in #${interaction.channel.name} triggered an interaction.`);
+
+            if (interaction.customId.includes('autodelete')) {
+                const [action, songData] = interaction.customId.split(';');
+                console.log(songData)
+                const song = JSON.parse(songData)
+                log('DELETE', song.uri)
+                let misamo = client.mongodb.db.collection(config.mongodbDBMiSaMo)
+                let spotifyApi = await spotify();
+                await spotifyApi.removeTracksFromPlaylist(config.spotifyPlaylist, [{ uri: song.uri}]);
+                await misamo.deleteOne({ uri: song.uri});
+                const button = new ButtonBuilder()
+                .setCustomId(`autodelete:${songData}`)
+                .setLabel('Deleted')
+                .setStyle(ButtonStyle.Danger)
+                .setDisabled(true); // Disable the button
+    
+            const row = new ActionRowBuilder()
+                .addComponents(button);
+                const trackId = song.uri.replace('spotify:track:', '');
+            // Edit the message to say "Deleted" and update the button
+            await interaction.update({ content: `**Auto Import: Deleted Song**\nhttps://open.spotify.com/track/${trackId}`, components: [row] });
+            }
             if (interaction.customId === 'skip') {
                 await interaction.reply({content:'Running...', ephemeral: true });
                 await socketIO().then((socket) => {

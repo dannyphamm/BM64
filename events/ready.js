@@ -9,7 +9,7 @@ const { trackUniqloItems, femaleSaleItems, maleSaleItems } = require('../service
 const { loadSpotify } = require('../services/spotifyStatus');
 const { socketIO } = require('../utils/socket');
 const { spotify, getAllPlaylistSongs } = require('../utils/spotify');
-
+const { misamoAutoImport } = require('../services/misamoAutoImport');
 
 
 module.exports = {
@@ -67,6 +67,7 @@ module.exports = {
                     await socketIO().then((socket) => {
                         socket.emit('refreshPage');
                     })
+                    misamoAutoImport(client);
                 } catch (e) {
                     error(e, "Refresh Spotify");
                 }
@@ -115,7 +116,7 @@ module.exports = {
             }
             delay()
         }
-
+        
 
         log("Socket.io listening on port 3000")
         log('Ready!');
