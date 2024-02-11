@@ -7,6 +7,7 @@ module.exports = {
         if (config.mode !== 'DEV') {
             const { client } = message;
             let misamo = client.mongodb.db.collection(config.mongodbDBMiSaMo)
+            if(message.author.bot) return;
             if (message.type === 0 && message.channelId === config.spotifyChannel) {
                 try {
                     const spotifyUrlPattern = /https?:\/\/(?:open|play)\.spotify\.com\/(?:track|playlist|album)\/(\w+)/;
