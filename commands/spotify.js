@@ -5,6 +5,7 @@ const { log } = require('../utils/utils');
 const { socketIO } = require('../utils/socket.js');
 const { spotify, addAllTracksToPlaylist, getAllPlaylistSongs, removeAllTracksFromPlaylist } = require('../utils/spotify.js');
 const { loadSpotify } = require('../services/spotifyStatus.js');
+const { misamoAutoImport } = require('../services/misamoAutoImport.js');
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('spotify').addSubcommand(subcommand =>
@@ -13,6 +14,9 @@ module.exports = {
         ).addSubcommand(subcommand =>
             subcommand.setName('purge')
                 .setDescription('Purge the spotify playlist')
+        ).addSubcommand(subcommand =>
+            subcommand.setName('autoimport')
+                .setDescription('Auto import songs from spotify playlists to MiSaMo')
         )
         .setDescription('Spotify related commands'),
     async execute(interaction) {
@@ -40,6 +44,10 @@ module.exports = {
             const songUris = songs.map(song => song.uri);
             await removeAllTracksFromPlaylist(config.spotifyPlaylist, songUris);
             await  interaction.reply('Spotify Purged!');
+        } else if (subcommand === 'autoimport') {
+            await interaction.deferReply({ ephemeral: true });
+            await misamoAutoImport(client);
+            await interaction.editReply('Auto Importing!');
         }
         // const { client } = interaction;
         // //load spotify

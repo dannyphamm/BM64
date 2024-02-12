@@ -22,6 +22,7 @@ const misamoAutoImport = async (client) => {
     // Get all the songs from the auto playlists and finds tracks that are not in the misamo collection
     for (const playlist of playlists) { 
         const data = await getAllPlaylistSongs(playlist.uri);
+        log(playlist.uri, data.length)
         const newData = data.map(song => ({
             uri: song.track.uri,
             name: song.track.name,
