@@ -16,18 +16,25 @@ const misamoAutoImport = async (client) => {
     // Misamo tracks
     const misamoTracks = await misamo.find().toArray();
     const misamoUris = misamoTracks.map(song => song.uri);
-
     let newTracks = [];
 
     // Get all the songs from the auto playlists and finds tracks that are not in the misamo collection
     for (const playlist of playlists) { 
-        const data = await getAllPlaylistSongs(playlist.uri);
-        log(playlist.uri, data.length)
-        const newData = data.map(song => ({
-            uri: song.track.uri,
-            name: song.track.name,
-            artists: song.track.artists.map(artist => artist.name).join(', ')
-        }));
+        const data = await getAllPlaylistSongs(playlist?.uri);
+
+        const newData = data.map(song => {
+
+            try {
+                return {
+                    uri: song.track.uri,
+                    name: song.track.name,
+                    artists: song.track.artists.map(artist => artist.name).join(', ')
+                };
+            } catch (error) {
+                console.error(`An error occurred with the following song: ${JSON.stringify(song, null, 2)}`);
+                console.error(error);
+            }
+        });
 
         for (const song of newData) {
             if (!misamoUris.includes(song.uri)) {
@@ -61,7 +68,6 @@ const misamoAutoImport = async (client) => {
             channel.send({ content: `**Auto Import: Detected new song**\nhttps://open.spotify.com/track/${trackId}`, components: [row] });
         }
     }
-    log(newTracks);
 }
 
 module.exports = { misamoAutoImport }

@@ -51,11 +51,13 @@ const getAllPlaylistSongs = async (id) => {
     for (let i = 0; i < rawSongData.length; i++) {
         songs = songs.concat(rawSongData[i].body.items);
     }
+
     return songs;
 }
 
 const getSongs = async (id, offset) => {
     var songs = await spotifyApi.getPlaylistTracks(id, { offset: offset });
+    songs.body.items = songs.body.items.filter(item => item.track !== null && !item.track.uri.startsWith('spotify:episode') && !item.track.uri.startsWith('spotify:local'));
     return songs;
 }
 
