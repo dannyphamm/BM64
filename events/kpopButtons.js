@@ -21,7 +21,7 @@ module.exports = {
                 let misamo = client.mongodb.db.collection(config.mongodbDBMiSaMo)
                 let spotifyApi = await spotify();
                 await spotifyApi.removeTracksFromPlaylist(config.spotifyPlaylist, [{ uri: song.uri}]);
-                await misamo.deleteOne({ uri: song.uri});
+                await misamo.updateOne({ uri: song.uri }, { $set: { status: "Auto: removed" } });
                 const button = new ButtonBuilder()
                 .setCustomId(`autodelete:${songData}`)
                 .setLabel('Deleted')
