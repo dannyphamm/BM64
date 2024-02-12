@@ -57,7 +57,7 @@ module.exports = {
                     playlist,
                     [{ uri: `spotify:track:${currentSong.body.item.id}` }])
                 const misamo = client.mongodb.db.collection(config.mongodbDBMiSaMo);
-                await misamo.deleteOne({ uri: `spotify:track:${currentSong.body.item.id}` });
+                await misamo.updateOne({ uri: `spotify:track:${currentSong.body.item.id}` }, { $set: { status: "Auto: removed" } });
                 await socketIO().then((socket) => {
                     const play = socket.timeout(10000).emitWithAck('skipMusic');
                     if (play) {
