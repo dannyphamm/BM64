@@ -49,10 +49,12 @@ module.exports = {
 
             if (interaction.customId === 'remove') {
                 await interaction.reply({content:'Running...', ephemeral: true });
+                
                 const spotifyApi = await spotify();
                 const currentSong = await spotifyApi.getMyCurrentPlayingTrack();
                 if (currentSong.body.currently_playing_type !== 'track') return await interaction.editReply({ content: 'Cannot remove. An ad is playing!', ephemeral: true });
                 const playlist = currentSong.body.context.uri.split(':')[2];
+                log('REMOVE', `spotify:track:${currentSong.body.item.id}`)
                 await spotifyApi.removeTracksFromPlaylist(
                     playlist,
                     [{ uri: `spotify:track:${currentSong.body.item.id}` }])
