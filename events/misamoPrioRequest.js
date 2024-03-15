@@ -13,7 +13,7 @@ module.exports = {
         if (message.type !== 0) return;
         if (message.channel.id === config.misamoVoiceChannel) {
             const song = message.content;
-
+            log(`Prio Queue request: ${queue}`);
             // Add the song to the queue
             queue.push({ song, message });
 
