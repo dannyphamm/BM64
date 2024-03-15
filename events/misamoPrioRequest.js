@@ -1,8 +1,7 @@
-const { error } = require('../utils/utils');
+const { error,log } = require('../utils/utils');
 const { loadSpotify } = require('../services/spotifyStatus');
 const { socketIO } = require('../utils/socket.js');
 const config = require('../config.json');
-const { error, log } = require('../utils/utils');
 const queue = [];
 
 module.exports = {
