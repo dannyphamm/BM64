@@ -2,7 +2,7 @@ const { EmbedBuilder, AttachmentBuilder } = require('discord.js');
 const { getUniqloItem, getLatestPrices, insertPrice } = require('../utils/uniqloApi');
 const config = require('../config');
 
-const { log, error, imageAttachment, pricePrecision} = require('../utils/utils');
+const { log, error, imageAttachment, pricePrecision } = require('../utils/utils');
 async function trackUniqloItems(client) {
     const uniqloCollection = await client.mongodb.db.collection(config.mongodbDBUniqlo);
     const itemIds = await uniqloCollection.distinct('itemId');
@@ -20,7 +20,7 @@ async function trackUniqloItems(client) {
         if (basePrice !== latestPrice.basePrice || promoPrice !== latestPrice.promoPrice) {
             // Save the new price to MongoDB
             const item = await getUniqloItem(itemId);
-            
+
             await insertPrice(client, itemId, basePrice, promoPrice, item.name, existingItem.imageURL);
 
             // Send an alert to a Discord channel
@@ -51,9 +51,15 @@ async function fetchSaleItems(client, gender, discordId) {
     try {
         // Fetch the current state of the sale items API
         const url = await fetch(`${config.uniqloApiUrl}/products?path=${gender}&flagCodes=discount&limit=1000&offset=0`);
-        const response = await url.json();
+        let response;
+        try {
+            response = await url.json();
+        } catch (error) {
+            error('Failed to parse response as JSON:', error);
+            // Handle the error...
+        }
         // If response is not 200 then return
-        if (response.status !== "ok" || response.result.items.length === 0) return (log("Error fetching sale items", gender, `${config.uniqloApiUrl}/products?path=${gender}&flagCodes=discount&limit=1000&offset=0`));
+        if (response.status !== "ok" || response.result.items.length === 0) return (error("Error fetching sale items", gender, `${config.uniqloApiUrl}/products?path=${gender}&flagCodes=discount&limit=1000&offset=0`));
         // Retrieve the previous state of the sale items from your database
         const collection = await client.mongodb.db.collection(`sale-items-${gender}`);
         const previousState = await collection.find().toArray();
@@ -79,7 +85,7 @@ async function fetchSaleItems(client, gender, discordId) {
 
         addedItems = await Promise.all(addedItems.map(async item => {
             const product = await getUniqloItem(item.productId)
-            if(product.length === 0) {
+            if (product.length === 0) {
                 available = []
             } else {
                 available = product.l2s.filter(item => item.prices.promo !== null && item.stock.quantity !== 0);
@@ -88,7 +94,7 @@ async function fetchSaleItems(client, gender, discordId) {
         }));
         removedItems = await Promise.all(removedItems.map(async item => {
             const product = await getUniqloItem(item.productId)
-            if(product.length === 0) {
+            if (product.length === 0) {
                 available = []
             } else {
                 available = product.l2s.filter(item => item.prices.promo !== null && item.stock.quantity !== 0);
@@ -98,12 +104,12 @@ async function fetchSaleItems(client, gender, discordId) {
         changedItems = await Promise.all(changedItems.map(async item => {
             const product = await getUniqloItem(item[1].productId)
             let available;
-            if(product.length === 0) {
+            if (product.length === 0) {
                 available = []
             } else {
                 available = product.l2s.filter(item => item.prices.promo !== null && item.stock.quantity !== 0);
             }
-            
+
             return [{ ...item[0], l2s: available, images: product.images }, { ...item[1], l2s: available, images: product.images }];
         }));
 
@@ -121,15 +127,15 @@ async function fetchSaleItems(client, gender, discordId) {
                 description: batch.map(item => {
                     log("Added ITEM", item.name)
                     const colorSizes = item.l2s.reduce((acc, l2) => {
-                      if (!acc[l2.color.name]) {
-                        acc[l2.color.name] = [];
-                      }
-                      acc[l2.color.name].push(`${l2.size.name} (${l2.stock.quantity}) (${pricePrecision(l2.prices.promo.value)})`);
-                      return acc;
+                        if (!acc[l2.color.name]) {
+                            acc[l2.color.name] = [];
+                        }
+                        acc[l2.color.name].push(`${l2.size.name} (${l2.stock.quantity}) (${pricePrecision(l2.prices.promo.value)})`);
+                        return acc;
                     }, {});
                     const colorSizeLines = Object.entries(colorSizes).map(([color, sizes]) => `${color}: ${sizes.join(', ')}`).join('\n');
                     return `**[${item.name}](https://www.uniqlo.com/au/en/products/${item.productId})**\nBase: ${pricePrecision(item.prices.base.value)}\nPromo: ${pricePrecision(item.prices.promo?.value)}\n${colorSizeLines}`;
-                  }).join('\n\n') || 'None',
+                }).join('\n\n') || 'None',
                 image: { url: `attachment://added-items.png` }
             }
             addedItemsEmbeds.push({ addedItemsEmbed, addedItemsImage });
@@ -154,24 +160,24 @@ async function fetchSaleItems(client, gender, discordId) {
             const changedItemsImageUrls = batch.map(item => item[1].images && item[1].images.main ? item[1].images.main[0].url : null);
             const changedItemsImage = await imageAttachment(changedItemsImageUrls, "changed-items");
             const changedItemsEmbed = new EmbedBuilder()
-            .setColor('#0099ff')
-            .setTitle(`Changed items (${i + 1}-${i + batch.length})`)
-            .setDescription(batch.map(item => {
-                log("Changed ITEM", item[1].name)
-                const colorSizes = item[1].l2s.reduce((acc, l2) => {
-                  if (!acc[l2.color.name]) {
-                    acc[l2.color.name] = [];
-                  }
-                  acc[l2.color.name].push(`${l2.size.name} (${l2.stock.quantity}) (${pricePrecision(l2.prices.promo.value)})`);
-                  return acc;
-                }, {});
-                const colorSizeLines = Object.entries(colorSizes).map(([color, sizes]) => `${color}: ${sizes.join(', ')}`).join('\n');
-                return `**[${item[0].name}](https://www.uniqlo.com/au/en/products/${item[0].productId})**\n
+                .setColor('#0099ff')
+                .setTitle(`Changed items (${i + 1}-${i + batch.length})`)
+                .setDescription(batch.map(item => {
+                    log("Changed ITEM", item[1].name)
+                    const colorSizes = item[1].l2s.reduce((acc, l2) => {
+                        if (!acc[l2.color.name]) {
+                            acc[l2.color.name] = [];
+                        }
+                        acc[l2.color.name].push(`${l2.size.name} (${l2.stock.quantity}) (${pricePrecision(l2.prices.promo.value)})`);
+                        return acc;
+                    }, {});
+                    const colorSizeLines = Object.entries(colorSizes).map(([color, sizes]) => `${color}: ${sizes.join(', ')}`).join('\n');
+                    return `**[${item[0].name}](https://www.uniqlo.com/au/en/products/${item[0].productId})**\n
                   **Base:** ${pricePrecision(item[0].prices.base?.value)}\t\t**New Base:** ${pricePrecision(item[1].prices.base?.value)} \t\t **Diff:** ${pricePrecision(parseInt(item[1].prices.base?.value) - parseInt(item[0].prices.base?.value))}\n
                   **Promo:** ${pricePrecision(item[0].prices.promo?.value)}\t\t**New Promo:** ${pricePrecision(item[1].prices.promo?.value)} **Diff:** ${pricePrecision(parseInt(item[1].prices.promo?.value) - parseInt(item[0].prices.promo?.value))}\n
                   ${colorSizeLines}`;
-              }).join('\n\n') || 'None')
-              .setImage(`attachment://changed-items.png`)
+                }).join('\n\n') || 'None')
+                .setImage(`attachment://changed-items.png`)
             changedItemsEmbeds.push({ changedItemsEmbed, changedItemsImage });
         }
 
