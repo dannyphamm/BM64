@@ -150,7 +150,7 @@ loadSpotify = async (client, clear) => {
                     await new Promise(resolve => { setTimeout(resolve, 3000) });
                     return loadSpotify(client, true);
                 }
-                if (next[0].songs === 0) {
+                if (!data[0] || data[0] === true) {
                     queue = [];
                 } else {
                     queue = next[0].songs.map((track, id) => ({
