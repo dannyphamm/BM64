@@ -67,6 +67,7 @@ loadSpotify = async (client, clear) => {
                     })
                     
                     const data = response;
+                    await new Promise(resolve => { setTimeout(resolve, 3000) });
                     const recent = await spotifyApi.getMyRecentlyPlayedTracks({ limit: 10 });
                     let queue;
                     if (!data) {
