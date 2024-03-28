@@ -111,8 +111,8 @@ loadSpotify = async (client, clear) => {
                         color: 0x0099ff,
                         title: 'Previously Played',
                         fields: tracks.map((track, id) => ({
-                            name: "-" + id - 1 + ". " + track.name,
-                            value: track.artists,
+                            name: "-" + id - 1 + ". " + track.name + " - " + track.artists,
+                            value: track.album.name,
                         })),
                         timestamp: new Date().toISOString(),
                     }
@@ -179,7 +179,7 @@ loadSpotify = async (client, clear) => {
                     title: 'Previously Played',
                     fields: tracks.map((track, id) => ({
                         name: "-" + id - 1 + ". " + track.name + " - " + track.artists,
-                        value: track.album,
+                        value: track.album.name,
                     })),
                     timestamp: new Date().toISOString(),
                 }
