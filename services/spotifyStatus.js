@@ -81,7 +81,7 @@ loadSpotify = async (client, clear) => {
                         queue = data[0].songs.map((track, id) => ({
                             name: track.name,
                             artists: track.artists,
-                            album: track.album
+                            //album: track.album
                         }));
                     }
                     const tracks = recent.body.items.map(item => ({
@@ -95,24 +95,24 @@ loadSpotify = async (client, clear) => {
                         color: 0x0099ff,
                         title: 'Next Up',
                         fields: (queue.slice(0, 4).map((track, id) => ({
-                            name: (1 + Number(id)) + ". " + track.name + " - " + track.artists,
-                            value: track.album,
+                            name: (1 + Number(id)) + ". " + track.name ,
+                            value: track.artists,
                         })))
                     }
                     const updatedCurrentEmbed = {
                         color: 0x0099ff,
                         title: 'Currently Playing',
                         fields: [{
-                            name: current.name + " - " + current.artists.map(artist => artist.name).join(', '),
-                            value: current.album.name,
+                            name: current.name,
+                            value: current.artists.map(artist => artist.name).join(', ')
                         }]
                     }
                     const updatedPreviousEmbed = {
                         color: 0x0099ff,
                         title: 'Previously Played',
                         fields: tracks.map((track, id) => ({
-                            name: "-" + id - 1 + ". " + track.name + " - " + track.artists,
-                            value: track.album,
+                            name: "-" + id - 1 + ". " + track.name,
+                            value: track.artists,
                         })),
                         timestamp: new Date().toISOString(),
                     }
@@ -157,7 +157,7 @@ loadSpotify = async (client, clear) => {
                     queue = next[0].songs.map((track, id) => ({
                         name: track.name,
                         artists: track.artists,
-                        album: track.album
+                        //album: track.album
                     }));
                 }
                 const updatedNextUpEmbed = {
