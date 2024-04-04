@@ -38,6 +38,8 @@ async function processQueue() {
                 await loadingReaction.remove().catch((e) => error(e));
                 await message.react('✅').catch((e) => error(e));
                 // get queue
+                // await 1 second
+                await new Promise((resolve) => setTimeout(resolve, 1000));
                 await loadSpotify(client, true);
             } else {
                 await loadingReaction.remove().catch((e) => error(e));
