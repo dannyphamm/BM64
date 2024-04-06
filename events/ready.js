@@ -108,7 +108,7 @@ module.exports = {
                 }
             });
             socketIO();
-
+            log("Socket.io listening on port 3000")
             const delay = async () => {
                 // await spotify();
                 await new Promise(resolve => { setTimeout(resolve, 5000) });
@@ -118,7 +118,7 @@ module.exports = {
         }
         
 
-        log("Socket.io listening on port 3000")
+        
         log('Ready!');
     },
 };
