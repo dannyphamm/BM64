@@ -73,7 +73,7 @@ module.exports = {
                 }
             });
             log("Spotify Play Music after restart 6 hours")
-            schedule.scheduleJob('30 0 */6 * * *', async () => {
+            schedule.scheduleJob('15 0 */6 * * *', async () => {
                 try {
                     log("Playing Music")
                     await socketIO().then(async (socket) => {
