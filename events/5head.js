@@ -11,7 +11,7 @@ module.exports = {
             //if (message.channel.id !== config['5headTextChannel']) return
             if (message.channel.type === 11 && message.channel.id === config['5headTextChannel']) {
                 const body = {
-                    "model": "gpt-4",
+                    "model": "hermes",
                     "messages": [
                         {
                             "role": "user",
