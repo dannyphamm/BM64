@@ -11,7 +11,7 @@ const misamoAutoImport = async (client) => {
 
     let spotifyApi = await spotify()
     // Auto playlists
-    const playlists = await mongodbDBMiSaMoAutoImport.find().toArray();
+    const playlists = await mongodbDBMiSaMoAutoImport.find({ disable: { $ne: true } }).toArray();
 
     // Misamo tracks
     const misamoTracks = await misamo.find().toArray();
@@ -65,7 +65,7 @@ const misamoAutoImport = async (client) => {
                 song
             );
             
-            channel.send({ content: `**Auto Import: Detected new song**\nhttps://open.spotify.com/track/${trackId}`, components: [row] });
+            channel.send({ content: `**Auto Import: Detected new song ${song.name} - ${song.artists} **\nhttps://open.spotify.com/track/${trackId}`, components: [row] });
         }
     }
 }
