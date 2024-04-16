@@ -161,7 +161,7 @@ module.exports = {
                 return interaction.reply(`Item ${itemId} not found in database.`);
             }
             const prices = existingItem.prices;
-            const item = await getUniqloItem(itemId);
+            //const item = await getUniqloItem(itemId);
 
 
 
@@ -223,7 +223,7 @@ module.exports = {
                         },
                         title: {
                             display: true,
-                            text: `Price history for ${item.name}`,
+                            text: `Price history for ${existingItem.title}`,
                         },
 
                     },
@@ -255,7 +255,7 @@ module.exports = {
             const historyEmbed = new EmbedBuilder()
                 .setTitle(`Price history for Uniqlo item ${itemId}`)
                 .setURL(`https://www.uniqlo.com/au/en/products/${itemId}`)
-                .setDescription(`Price history for ${item.name}.`)
+                .setDescription(`Price history for ${existingItem.title}.`)
                 .setThumbnail('attachment://image1.png')
                 .setImage('attachment://pricehistory.png')
                 .setColor('#0099ff');
@@ -301,11 +301,11 @@ module.exports = {
                     return interaction.reply('This item no longer exists.');
                 }
                 const basePrice = item.prices.base.value;
-                const promoPrice = item.prices.promoPrice ? item.prices.promo.value : null;
-
+                const promoPrice = item.prices.promo ? item.prices.promo.value : null;
+                console.log(existingItem.prices[existingItem.prices.length - 1].promoPrice, promoPrice)
                 // Check if the price has changed
-                if (basePrice !== existingItem.prices[existingItem.prices.length - 1].basePrice
-                    || promoPrice !== existingItem.prices[existingItem.prices.length - 1].promoPrice) {
+                if ((basePrice !== existingItem.prices[existingItem.prices.length - 1].basePrice)
+                || (promoPrice !== existingItem.prices[existingItem.prices.length - 1].promoPrice)) {
 
                     // Send an alert to a Discord channel
                     const alertEmbed = new EmbedBuilder()
@@ -315,12 +315,14 @@ module.exports = {
                         .addFields(
                             { name: 'Old Base Price', value: `$${parseInt(existingItem.prices[existingItem.prices.length - 1].basePrice).toFixed(2)}`, inline: true },
                             { name: 'New Base Price', value: `$${parseInt(basePrice).toFixed(2)}`, inline: true },
-
+                            { name: '\u200B', value: '\u200B'}
                         );
-                    if (promoPrice && existingItem.prices[existingItem.prices.length - 1].promoPrice) {
+                    if (promoPrice !== existingItem.prices[existingItem.prices.length - 1].promoPrice) {
                         alertEmbed.addFields(
+                            
                             { name: 'Old Promo Price', value: `$${parseInt(existingItem.prices[existingItem.prices.length - 1].promoPrice).toFixed(2)}`, inline: true },
                             { name: 'New Promo Price', value: `$${parseInt(promoPrice).toFixed(2)}`, inline: true },
+                            { name: '\u200B', value: '\u200B'}
                         );
                     }
                     const channel = client.channels.cache.get(config.discordChannelId);
@@ -332,7 +334,7 @@ module.exports = {
                     // Save the new price to MongoDB
                     await insertPrice(client, itemId, basePrice, promoPrice, item.name, item.images.main[0].url);
 
-                    return interaction.reply('The price has changed. The new price has been saved to the database and an alert has been sent to the Discord channel.');
+                    return interaction.reply('The price has changed.');
                 } else {
                     return interaction.reply('The price has not changed.');
                 }

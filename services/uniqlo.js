@@ -7,6 +7,14 @@ async function trackUniqloItems(client) {
     const uniqloCollection = await client.mongodb.db.collection(config.mongodbDBUniqlo);
     const itemIds = await uniqloCollection.distinct('itemId');
     for (const itemId of itemIds) {
+        // If getUniqloItem returns an empty array, the item is no longer available on the website
+        const item = await getUniqloItem(itemId);
+        if (item.length === 0) {
+            uniqloCollection.updateOne({ itemId }, { $set: { tracking: false } });
+            const channel = client.channels.cache.get(config.discordChannelId);
+            channel.send(`Item ${itemId} is no longer available on the Uniqlo website.`);
+            continue;
+        }
         const existingItem = await uniqloCollection.findOne({ itemId, tracking: true });
         if (!existingItem) {
             continue;
