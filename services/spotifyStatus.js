@@ -192,7 +192,6 @@ loadSpotify = async (client, clear) => {
                 if (!response) {
                     log("play length not found, retrying in 3 seconds")
                     await new Promise(resolve => { setTimeout(resolve, 3000) });
-                    return loadSpotify(client, true);
                 }
                 progressMs = data?.progress_ms;
                 durationMs = data?.duration_ms;
@@ -217,7 +216,7 @@ loadSpotify = async (client, clear) => {
                     // Call the loadSpotify function again
                     return loadSpotify(client, true);
                 }
-
+                return loadSpotify(client, true);
             }
         } else {
             // No track is currently playing, clear the voice channel status
