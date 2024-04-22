@@ -160,14 +160,21 @@ loadSpotify = async (client, clear) => {
                         //album: track.album
                     }));
                 }
-                const updatedNextUpEmbed = {
+                const updatedNextUpEmbed = queue.length === 0 ? {
                     color: 0x0099ff,
                     title: 'Next Up',
-                    fields: (queue.slice(0, 4).map((track, id) => ({
+                    fields: [{
+                        name: 'Queue not found',
+                        value: 'retrying',
+                    }]
+                } : {
+                    color: 0x0099ff,
+                    title: 'Next Up',
+                    fields: queue.slice(0, 4).map((track, id) => ({
                         name: (1 + Number(id)) + ". " + track.name + " - " + track.artists,
                         value: track.album,
-                    })))
-                }
+                    }))
+                };
                 const recent = await spotifyApi.getMyRecentlyPlayedTracks({ limit: 10 });
                 const tracks = recent.body.items.map(item => ({
                     name: item.track.name,

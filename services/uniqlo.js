@@ -28,7 +28,9 @@ async function trackUniqloItems(client) {
         if (basePrice !== latestPrice.basePrice || promoPrice !== latestPrice.promoPrice) {
             // Save the new price to MongoDB
             const item = await getUniqloItem(itemId);
-
+            if(item.length === 0) {
+                return error("FAIL: Item not found", itemId);
+            }
             await insertPrice(client, itemId, basePrice, promoPrice, item.name, existingItem.imageURL);
 
             // Send an alert to a Discord channel
