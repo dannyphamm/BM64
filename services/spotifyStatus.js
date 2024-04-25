@@ -240,6 +240,6 @@ loadSpotify = async (client, clear) => {
 
 module.exports = {
     loadSpotify: function (client) {
-        loadSpotify(client)
+        loadSpotify(client, true)
     },
 }
