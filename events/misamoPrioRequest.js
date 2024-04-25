@@ -1,4 +1,4 @@
-const { error,log } = require('../utils/utils');
+const { error, log } = require('../utils/utils');
 const { loadSpotify } = require('../services/spotifyStatus');
 const { socketIO } = require('../utils/socket.js');
 const config = require('../config.json');
@@ -12,7 +12,7 @@ module.exports = {
         if (message.type !== 0) return;
         if (message.channel.id === config.misamoVoiceChannel) {
             const song = message.content;
-            
+
             // Add the song to the queue
             queue.push({ song, message });
             log(`Prio Queue request: ${JSON.stringify(queue, null, 2)}`);
@@ -33,7 +33,8 @@ async function processQueue() {
 
         // Emit the addSongToQueue event
         await socketIO().then(async (socket) => {
-            const result = await socket.timeout(10000).emitWithAck('addSongToQueue', song);
+            const result = await socket.timeout(5000).emitWithAck('addSongToQueue', song);
+            log(`addSongToQueue result: ${result}`, result[0])
             if (result) {
                 await loadingReaction.remove().catch((e) => error(e));
                 await message.react('✅').catch((e) => error(e));
@@ -48,7 +49,13 @@ async function processQueue() {
 
             // Remove the loading emoji
             await loadingReaction.remove().catch((e) => error(e));
-        })
+        }).catch(async  (e) => {
+            await loadingReaction.remove().catch((e) => error(e));
+            await message.react('❌').catch((e) => error(e));
+            error(e)
+        }
+
+        );
 
         // Remove the song from the queue
         queue.shift();
