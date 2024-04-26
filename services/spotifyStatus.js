@@ -199,12 +199,23 @@ loadSpotify = async (client, clear) => {
                 if (!response) {
                     log("play length not found, retrying in 3 seconds")
                     await new Promise(resolve => { setTimeout(resolve, 3000) });
+                    return loadSpotify(client, true);
                 }
                 progressMs = data?.progress_ms;
                 durationMs = data?.duration_ms;
                 remainingMs = durationMs - progressMs + 4000;
                 const message = await voiceChannel.messages.fetch().then(messages => messages.find(msg => msg.author.id === client.user.id));
-                const updatedCurrentEmbed = {
+
+
+                const updatedCurrentEmbed = queue.length === 0 ? {
+                    color: 0x0099ff,
+                    title: 'Currently Playing',
+                    fields: [{
+                        name: "Queue Unavailable",
+                        value: "Ad is currently running",
+                    }]
+                } : 
+                {
                     color: 0x0099ff,
                     title: 'Currently Playing',
                     fields: [{
@@ -215,7 +226,7 @@ loadSpotify = async (client, clear) => {
                 if (!message) {
                     await voiceChannel.send({ embeds: [updatedNextUpEmbed, updatedCurrentEmbed, updatedPreviousEmbed], components: [buttons] })
                 } else {
-                    await message.edit({ embeds: [updatedNextUpEmbed, updatedCurrentEmbed, updatedPreviousEmbed], components: [buttons] })
+                    await message.edit({ embeds: [ , updatedCurrentEmbed, updatedPreviousEmbed], components: [buttons] })
                 }
                 if (remainingMs > 0) {
                     // Wait for the remaining time before calling the loadSpotify function again
