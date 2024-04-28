@@ -67,26 +67,35 @@ module.exports = {
                     await socketIO().then((socket) => {
                         socket.emit('refreshPage');
                     })
+                    const response = await socketIO().then((socket) => {
+                        return socket.timeout(3000).emitWithAck('getQueue');
+                    }).catch(async(e) => {
+                        error("Socket failure, retrying in 3 seconds",e)
+                        return loadSpotify(client, true);
+                    })
+                    if(response) {
+                        await loadSpotify(client, true);
+                    }
                     misamoAutoImport(client);
                 } catch (e) {
                     error(e, "Refresh Spotify");
                 }
             });
-            log("Spotify Play Music after restart 6 hours")
-            schedule.scheduleJob('15 0 */6 * * *', async () => {
-                try {
-                    log("Playing Music")
-                    await socketIO().then(async (socket) => {
-                        const play = await socket.timeout(10000).emitWithAck('playMusic');
-                        console.log(play)
-                        if (play) {
-                            loadSpotify(client, true)
-                        }
-                    })
-                } catch (e) {
-                    error(e, "Spotify play music");
-                }
-            });
+            // log("Spotify Play Music after restart 6 hours")
+            // schedule.scheduleJob('15 0 */6 * * *', async () => {
+            //     try {
+            //         log("Playing Music")
+            //         await socketIO().then(async (socket) => {
+            //             const play = await socket.timeout(10000).emitWithAck('playMusic');
+            //             console.log(play)
+            //             if (play) {
+            //                 loadSpotify(client, true)
+            //             }
+            //         })
+            //     } catch (e) {
+            //         error(e, "Spotify play music");
+            //     }
+            // });
 
             log("UniqloTracker: Scheduled job to run 15 minutes.")
             schedule.scheduleJob('0 */15 * * * *', async () => {

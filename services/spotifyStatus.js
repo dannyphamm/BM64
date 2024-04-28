@@ -193,7 +193,7 @@ loadSpotify = async (client, clear) => {
                 log("hit an ad or is paused")
                 // Wait for 15 seconds before calling the loadSpotify function again
                 const response = await socketIO().then((socket) => {
-                    return socket.timeout(10000).emitWithAck('getPlayLength');
+                    return socket.timeout(3000).emitWithAck('getPlayLength');
                 })
                 const data = response[0];
                 if (!response) {
@@ -234,6 +234,7 @@ loadSpotify = async (client, clear) => {
                     // Call the loadSpotify function again
                     return loadSpotify(client, true);
                 }
+                log("no track playing, retrying in 3 seconds")
                 return loadSpotify(client, true);
             }
         } else {
