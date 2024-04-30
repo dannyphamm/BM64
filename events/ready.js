@@ -64,16 +64,17 @@ module.exports = {
             schedule.scheduleJob('0 0 */12 * * *', async () => {
                 try {
                     log("Refreshing Page")
-                    await socketIO().then((socket) => {
-                        socket.emit('refreshPage');
+                    const refreshResponse = await socketIO().then((socket) => {
+                        return socket.timeout(3000).emitWithAck('refreshPage');
                     })
-                    const response = await socketIO().then((socket) => {
-                        return socket.timeout(3000).emitWithAck('getQueue');
-                    }).catch(async(e) => {
-                        error("Socket failure, retrying in 3 seconds",e)
-                        return loadSpotify(client, true);
-                    })
-                    if(response) {
+                    // const response = await socketIO().then((socket) => {
+                    //     return socket.timeout(3000).emitWithAck('getQueue');
+                    // }).catch(async(e) => {
+                    //     error("Socket failure, retrying in 3 seconds",e)
+                    //     return loadSpotify(client, true);
+                    // })
+                    
+                    if(refreshResponse) {
                         await loadSpotify(client, true);
                     }
                     misamoAutoImport(client);
