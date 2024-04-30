@@ -127,7 +127,7 @@ loadSpotify = async (client, clear) => {
                 // Check if the song has finished
                 progressMs = currentTrack.body.progress_ms;
                 durationMs = currentTrack.body.item.duration_ms;
-                remainingMs = durationMs - progressMs + 4000;
+                remainingMs = durationMs - progressMs + 2500;
                 log(progressMs, durationMs, remainingMs);
                 if (remainingMs > 0) {
                     // Wait for the remaining time before calling the loadSpotify function again
@@ -204,7 +204,7 @@ loadSpotify = async (client, clear) => {
                 log("Past socket call",data)
                 progressMs = data?.progress_ms;
                 durationMs = data?.duration_ms;
-                remainingMs = durationMs - progressMs + 4000;
+                remainingMs = durationMs - progressMs + 2500;
                 const message = await voiceChannel.messages.fetch().then(messages => messages.find(msg => msg.author.id === client.user.id));
 
 
