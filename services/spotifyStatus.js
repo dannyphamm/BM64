@@ -201,6 +201,7 @@ loadSpotify = async (client, clear) => {
                     await new Promise(resolve => { setTimeout(resolve, 3000) });
                     return loadSpotify(client, true);
                 }
+                log("Past socket call",data)
                 progressMs = data?.progress_ms;
                 durationMs = data?.duration_ms;
                 remainingMs = durationMs - progressMs + 4000;
@@ -228,12 +229,13 @@ loadSpotify = async (client, clear) => {
                 } else {
                     await message.edit({ embeds: [ , updatedCurrentEmbed, updatedPreviousEmbed], components: [buttons] })
                 }
-                if (remainingMs > 0) {
-                    // Wait for the remaining time before calling the loadSpotify function again
-                    await new Promise(resolve => { setTimeout(resolve, remainingMs) });
-                    // Call the loadSpotify function again
-                    return loadSpotify(client, true);
-                }
+                // if (remainingMs > 0) {
+                //     log("remainingMs", remainingMs)
+                //     // Wait for the remaining time before calling the loadSpotify function again
+                //     await new Promise(resolve => { setTimeout(resolve, remainingMs) });
+                //     // Call the loadSpotify function again
+                //     return loadSpotify(client, true);
+                // }
                 log("no track playing, retrying in 3 seconds")
                 return loadSpotify(client, true);
             }
