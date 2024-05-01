@@ -76,7 +76,7 @@ module.exports = {
                     
                     if(refreshResponse) {
                         log("Refreshing Page Success, loading spotify queue")
-                        await loadSpotify(client, true);
+                        loadSpotify(client, true);
                     }
                     misamoAutoImport(client);
                 } catch (e) {
