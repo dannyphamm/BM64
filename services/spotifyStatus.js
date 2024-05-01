@@ -224,10 +224,12 @@ loadSpotify = async (client, clear) => {
                         value: "Ad is currently running",
                     }]
                 }
+                log("updatedCurrentEmbed",updatedCurrentEmbed.fields[0].name, updatedCurrentEmbed.fields[0].value)
+                log("updatedNextEmbed", updatedNextUpEmbed.fields[0].name, updatedNextUpEmbed.fields[0].value)
                 if (!message) {
                     await voiceChannel.send({ embeds: [updatedNextUpEmbed, updatedCurrentEmbed, updatedPreviousEmbed], components: [buttons] })
                 } else {
-                    await message.edit({ embeds: [ , updatedCurrentEmbed, updatedPreviousEmbed], components: [buttons] })
+                    await message.edit({ embeds: [ updatedNextUpEmbed, updatedCurrentEmbed, updatedPreviousEmbed], components: [buttons] })
                 }
                 // if (remainingMs > 0) {
                 //     log("remainingMs", remainingMs)
