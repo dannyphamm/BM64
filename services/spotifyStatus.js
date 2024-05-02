@@ -238,7 +238,8 @@ loadSpotify = async (client, clear) => {
                 //     // Call the loadSpotify function again
                 //     return loadSpotify(client, true);
                 // }
-                log("no track playing, retrying in 3 seconds")
+                log("no track playing, retrying in 5 seconds")
+                await new Promise(resolve => { setTimeout(resolve, 5000) });
                 return loadSpotify(client, true);
             }
         } else {

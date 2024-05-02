@@ -73,10 +73,14 @@ module.exports = {
                     //     error("Socket failure, retrying in 3 seconds",e)
                     //     return loadSpotify(client, true);
                     // })
-                    
-                    if(refreshResponse) {
+
+                    if (refreshResponse) {
                         log("Refreshing Page Success, loading spotify queue")
-                        loadSpotify(client, true);
+                        const play = await socket.timeout(10000).emitWithAck('playMusic');
+                        log(play)
+                        if (play) {
+                            loadSpotify(client, true)
+                        }
                     }
                     misamoAutoImport(client);
                 } catch (e) {
@@ -127,9 +131,9 @@ module.exports = {
             }
             delay()
         }
-        
 
-        
+
+
         log('Ready!');
     },
 };
