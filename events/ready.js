@@ -76,7 +76,9 @@ module.exports = {
 
                     if (refreshResponse) {
                         log("Refreshing Page Success, loading spotify queue")
-                        const play = await socket.timeout(10000).emitWithAck('playMusic');
+                        const play = await socketIO().then((socket) => {
+                            return socket.timeout(10000).emitWithAck('playMusic');
+                        })
                         log(play)
                         if (play) {
                             loadSpotify(client, true)
