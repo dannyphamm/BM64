@@ -78,11 +78,20 @@ module.exports = {
                         log("Refreshing Page Success, loading spotify queue")
                         const play = await socketIO().then(async (socket) => {
                             // wait 3 seconds
-                            await new Promise(resolve => { setTimeout(resolve, 3000) });
+                            await new Promise(resolve => { 
+                                log("Waiting 3 seconds to play music")
+                                setTimeout(resolve, 3000) });
+                                log("Playing Music socket call")
                             return socket.timeout(3000).emitWithAck('playMusic');
                         })
-                        log(play)
+                        log("PlayMusic Response",play)
                         if (play) {
+                            //wait 3 seconds
+                            await new Promise(resolve => {
+                                log("Waiting 3 seconds to load spotify")
+                                setTimeout(resolve, 3000) });
+                            
+                            log("PlayMusic Success, loading spotify queue")
                             loadSpotify(client, true)
                         }
                     }
