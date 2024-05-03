@@ -28,7 +28,8 @@ const misamoAutoImport = async (client) => {
                 return {
                     uri: song.track.uri,
                     name: song.track.name,
-                    artists: song.track.artists.map(artist => artist.name).join(', ')
+                    artists: song.track.artists.map(artist => artist.name).join(', '),
+                    playlist: playlist?.uri,
                 };
             } catch (error) {
                 console.error(`An error occurred with the following song: ${JSON.stringify(song, null, 2)}`);
@@ -57,7 +58,7 @@ const misamoAutoImport = async (client) => {
 
             const row = new ActionRowBuilder()
                 .addComponents(deleteButton);
-            log("TRACK ADD", trackId)
+            log("TRACK ADD", trackId, playlist)
             
 
             await spotifyApi.addTracksToPlaylist(config.spotifyPlaylist, [`spotify:track:${trackId}`]);
