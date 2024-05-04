@@ -173,7 +173,7 @@ loadSpotify = async (client, clear) => {
                     title: 'Next Up',
                     fields: queue.slice(0, 4).map((track, id) => ({
                         name: (1 + Number(id)) + ". " + track.name + " - " + track.artists,
-                        value: track.album,
+                        value: track?.album || 'No Album',
                     }))
                 };
                 const recent = await spotifyApi.getMyRecentlyPlayedTracks({ limit: 10 });
