@@ -58,7 +58,7 @@ const misamoAutoImport = async (client) => {
 
             const row = new ActionRowBuilder()
                 .addComponents(deleteButton);
-            log("TRACK ADD", trackId, playlist)
+            log("TRACK ADD", trackId, song.playlist)
             
 
             await spotifyApi.addTracksToPlaylist(config.spotifyPlaylist, [`spotify:track:${trackId}`]);
