@@ -41,7 +41,12 @@ loadSpotify = async (client, clear) => {
 
     try {
         // Get the currently playing track from the Spotify API
-        const currentTrack = await spotifyApi.getMyCurrentPlayingTrack();
+        const currentTrack = await spotifyApi.getMyCurrentPlayingTrack().catch(async(e) => {
+            log("Spotify failure, retrying in 3 seconds")
+            error(e);
+            await new Promise(resolve => { setTimeout(resolve, 3000) });
+            return loadSpotify(client, true);
+        });
         if (durationMs === progressMs && remainingMs === 1000) {
             log("skipping, looks like we are stuck")
             await socketIO().then((socket) => {
@@ -69,7 +74,12 @@ loadSpotify = async (client, clear) => {
                     
                     const data = response;
                     await new Promise(resolve => { setTimeout(resolve, 3000) });
-                    const recent = await spotifyApi.getMyRecentlyPlayedTracks({ limit: 10 });
+                    const recent = await spotifyApi.getMyRecentlyPlayedTracks({ limit: 10 }).catch(async(e) => {
+                        log("Spotify failure, retrying in 3 seconds")
+                        error(e);
+                        await new Promise(resolve => { setTimeout(resolve, 3000) });
+                        return loadSpotify(client, true);
+                    });
                     let queue;
                     if (!data) {
                         log("queue not found, retrying in 3 seconds")
@@ -176,7 +186,12 @@ loadSpotify = async (client, clear) => {
                         value: track?.album || 'No Album',
                     }))
                 };
-                const recent = await spotifyApi.getMyRecentlyPlayedTracks({ limit: 10 });
+                const recent = await spotifyApi.getMyRecentlyPlayedTracks({ limit: 10 }).catch(async(e) => {
+                    log("Spotify failure, retrying in 3 seconds")
+                    error(e);
+                    await new Promise(resolve => { setTimeout(resolve, 3000) });
+                    return loadSpotify(client, true);
+                });
                 const tracks = recent.body.items.map(item => ({
                     name: item.track.name,
                     artists: item.track.artists.map(artist => artist.name).join(', '),
