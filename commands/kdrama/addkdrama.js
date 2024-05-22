@@ -8,7 +8,7 @@ module.exports = {
             subcommand
                 .setName('stoptracking')
                 .setDescription('Stop tracking a kdrama')
-                .addStringOption(option => 
+                .addStringOption(option =>
                     option.setName('name')
                         .setDescription('The name of the kdrama to stop tracking')
                         .setRequired(true)))
@@ -16,7 +16,7 @@ module.exports = {
             subcommand
                 .setName('starttracking')
                 .setDescription('Start tracking a kdrama')
-                .addStringOption(option => 
+                .addStringOption(option =>
                     option.setName('name')
                         .setDescription('The name of the kdrama to start tracking')
                         .setRequired(true))),
@@ -28,10 +28,17 @@ module.exports = {
             const name = interaction.options.getString('name');
             const kdramaCollection = client.mongodb.db.collection(config.mongodbDBKDrama);
             if (subcommand === 'stoptracking') {
-                await kdramaCollection.findAndUpdate(name, { tracking: false });
+                await kdramaCollection.fineOneAndUpdate({ title: name }, // filter
+                    { $set: { tracking: false } }, // update
+                    { new: true, upsert: true } // options
+                );
                 return interaction.reply(`Stopped tracking ${name}`);
             } else if (subcommand === 'starttracking') {
-                await kdramaCollection.findAndRemoveField(name, 'tracking');
+                await kdramaCollection.findOneAndUpdate(
+                    { title: name }, // filter
+                    { $unset: { tracking: "" } }, // update
+                    { new: true } // options
+                )
                 return interaction.reply(`Started tracking ${name}`);
             }
         } catch (e) {
