@@ -29,14 +29,14 @@ module.exports = {
             const kdramaCollection = client.mongodb.db.collection(config.mongodbDBKDrama);
             if (subcommand === 'stoptracking') {
                 await kdramaCollection.fineOneAndUpdate({ title: name }, // filter
-                    { $set: { tracking: false } }, // update
+                    { $set: { stoptracking: true } }, // update
                     { new: true, upsert: true } // options
                 );
                 return interaction.reply(`Stopped tracking ${name}`);
             } else if (subcommand === 'starttracking') {
                 await kdramaCollection.findOneAndUpdate(
                     { title: name }, // filter
-                    { $unset: { tracking: "" } }, // update
+                    { $unset: { stoptracking: "" } }, // update
                     { new: true } // options
                 )
                 return interaction.reply(`Started tracking ${name}`);

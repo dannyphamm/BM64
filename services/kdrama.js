@@ -31,7 +31,7 @@ const kdramaTrackerService = async (client) => {
         // If the title is found in the database
         if (index !== -1) {
             // If the title is not being tracked, remove it from the newTitles array
-            if (!kdramas[index].tracking) {
+            if (kdramas[index].stoptracking === true) {
                 log(`Title "${title}" found in database but tracking is disabled.`)
                 return false;
             
