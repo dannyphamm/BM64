@@ -20,11 +20,30 @@ const kdramaTrackerService = async (client) => {
     const $ = cheerio.load(response);
 
     // Extract the titles and episode numbers from the webpage
-    const newTitles = $('.section.group.list .col.info p:nth-child(1) a').map((i, el) => $(el).text()).get();
+    let newTitles = $('.section.group.list .col.info p:nth-child(1) a').map((i, el) => $(el).text()).get();
     const newLink = $('.section.group.list .col.cover a').map((i, el) => $(el).attr('href')).get();
     const newBanner = $('.section.group.list .col.cover a img').map((i, el) => $(el).attr('src')).get();
     const newEpisodes = $('.section.group.list .col.info p:nth-child(3)').map((i, el) => parseInt($(el).text().trim().replace('Episode ', ''))).get();
     log("Checking for new kdramas", newTitles.length)
+    //If database has this title and tracking is disabled, remove from newTitles
+    newTitles = newTitles.filter((title, i) => {
+        const index = titles.indexOf(title);
+        // If the title is found in the database
+        if (index !== -1) {
+            // If the title is not being tracked, remove it from the newTitles array
+            if (!kdramas[index].tracking) {
+                log(`Title "${title}" found in database but tracking is disabled.`)
+                return false;
+            
+            };
+        }
+        return true;
+    });
+    // Log each new titles name after filtering
+    newTitles.forEach((title) => {
+        log(`New title "${title}" found.`)
+    });
+
     //Check if there is a new title and update the JSON data accordingly
     newTitles.forEach(async (title, i) => {
         const index = titles.indexOf(title);
