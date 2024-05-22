@@ -28,7 +28,7 @@ module.exports = {
             const name = interaction.options.getString('name');
             const kdramaCollection = client.mongodb.db.collection(config.mongodbDBKDrama);
             if (subcommand === 'stoptracking') {
-                await kdramaCollection.fineOneAndUpdate({ title: name }, // filter
+                await kdramaCollection.findOneAndUpdate({ title: name }, // filter
                     { $set: { stoptracking: true } }, // update
                     { new: true, upsert: true } // options
                 );
