@@ -61,7 +61,7 @@ module.exports = {
             });
 
             log("Spotify Restart browser every 12 hours")
-            schedule.scheduleJob('0 0 */12 * * *', async () => {
+            schedule.scheduleJob('0 0 */8 * * *', async () => {
                 try {
                     log("Refreshing Page")
                     const refreshResponse = await socketIO().then((socket) => {
