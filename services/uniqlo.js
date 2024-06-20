@@ -65,7 +65,7 @@ async function fetchSaleItems(client, gender, discordId) {
         try {
             response = await url.json();
         } catch (e) {
-            error('Failed to parse response as JSON:', e, response);
+            error('Failed to parse response as JSON:', e, url.text());
             return;
             // Handle the error...
         }
