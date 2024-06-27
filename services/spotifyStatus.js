@@ -216,6 +216,11 @@ loadSpotify = async (client, clear) => {
                     await new Promise(resolve => { setTimeout(resolve, 3000) });
                     return loadSpotify(client, true);
                 })
+                if(!response) {
+                    log("no response, retrying in 3 seconds")
+                    await new Promise(resolve => { setTimeout(resolve, 3000) });
+                    return loadSpotify(client, true);
+                }
                 const data = response[0];
                 log("Past socket call",data)
                 progressMs = data?.progress_ms;

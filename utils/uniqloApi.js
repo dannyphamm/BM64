@@ -5,7 +5,14 @@ const config = require('../config');
 async function getUniqloItem(itemId) {
     log(`Fetching item ${itemId}`)
     const url = await fetch(`${config.uniqloApiUrl}/products/${itemId}`);
-    const response = await url.json();
+    let response = null;
+    try {
+        response = await url.json();
+    } catch (e) {
+        log("Error, failed to parse to json", itemId)
+        return []
+    }
+    
     if(response.status === 'nok') {
         log("NOK", itemId)
         return []
