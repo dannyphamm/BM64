@@ -3,7 +3,7 @@ const config = require("../config.json");
 const { error, log } = require('../utils/utils');
 const randomFactsService = async (client) => {
 
-    await fetch('https://api.api-ninjas.com/v1/facts?limit=1', { headers: { 'X-Api-Key': config.factKey } })
+    await fetch('https://api.api-ninjas.com/v1/facts', { headers: { 'X-Api-Key': config.factKey } })
         .then(response => response.json())
         .then(async data => {
             if (data[0] && !data.hasOwnProperty('message')) {
@@ -16,6 +16,7 @@ const randomFactsService = async (client) => {
                     }
                 };
                 const channel = await client.channels.cache.find(c => c.name === '💯phalans-facts💯');
+                console.log(channel)
                 if (!channel) return;
                 const webhooks = await channel.fetchWebhooks();
                 if (webhooks.size === 0) return;
