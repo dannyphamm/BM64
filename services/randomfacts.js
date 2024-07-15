@@ -16,7 +16,6 @@ const randomFactsService = async (client) => {
                     }
                 };
                 const channel = await client.channels.cache.find(c => c.name === '💯phalans-facts💯');
-                console.log(channel)
                 if (!channel) return;
                 const webhooks = await channel.fetchWebhooks();
                 if (webhooks.size === 0) return;
