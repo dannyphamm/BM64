@@ -4,6 +4,7 @@ const config = require('../config.json');
 const { randomFactsService } = require('../services/randomfacts');
 const { redditMemesService } = require('../services/redditmemes');
 const { wordOfTheDayService } = require('../services/wordoftheday');
+const { vaccineService } = require('../services/vaccine');
 const { kdramaTrackerService, kdramaCompleterService } = require('../services/kdrama');
 const { trackUniqloItems, femaleSaleItems, maleSaleItems } = require('../services/uniqlo');
 const { loadSpotify } = require('../services/spotifyStatus');
@@ -18,7 +19,14 @@ module.exports = {
     execute(client) {
 
         if (config.mode !== 'DEV') {
-
+            log("Vaccine: Scheduled job to run every 9AM")
+            schedule.scheduleJob('0 0 9 * * *', async () => {
+                try {
+                    await vaccineService(client);
+                } catch (e) {
+                    error(e, "TRY VACCINE");
+                }
+            });
             log("WordOfTheDay:  Scheduled job to run every day at 1:30 PM.")
             schedule.scheduleJob('0 30 13 * * *', async () => {
                 try {
@@ -144,6 +152,7 @@ module.exports = {
             }
             delay()
         }
+       
         log('Ready!');
     },
 };
