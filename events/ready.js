@@ -19,8 +19,8 @@ module.exports = {
     execute(client) {
 
         if (config.mode !== 'DEV') {
-            log("Vaccine: Scheduled job to run every 9AM")
-            schedule.scheduleJob('0 0 9 * * *', async () => {
+            log("Vaccine: Scheduled job to run every 11PM")
+            schedule.scheduleJob('0 0 23 * * *', async () => {
                 try {
                     await vaccineService(client);
                 } catch (e) {
