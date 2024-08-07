@@ -75,12 +75,6 @@ module.exports = {
                     const refreshResponse = await socketIO().then((socket) => {
                         return socket.timeout(3000).emitWithAck('refreshPage');
                     })
-                    // const response = await socketIO().then((socket) => {
-                    //     return socket.timeout(3000).emitWithAck('getQueue');
-                    // }).catch(async(e) => {
-                    //     error("Socket failure, retrying in 3 seconds",e)
-                    //     return loadSpotify(client, true);
-                    // })
 
                     if (refreshResponse) {
                         log("Refreshing Page Success, loading spotify queue")
@@ -108,21 +102,6 @@ module.exports = {
                     error(e, "Refresh Spotify");
                 }
             });
-            // log("Spotify Play Music after restart 6 hours")
-            // schedule.scheduleJob('15 0 */6 * * *', async () => {
-            //     try {
-            //         log("Playing Music")
-            //         await socketIO().then(async (socket) => {
-            //             const play = await socket.timeout(10000).emitWithAck('playMusic');
-            //             console.log(play)
-            //             if (play) {
-            //                 loadSpotify(client, true)
-            //             }
-            //         })
-            //     } catch (e) {
-            //         error(e, "Spotify play music");
-            //     }
-            // });
 
             log("UniqloTracker: Scheduled job to run 15 minutes.")
             schedule.scheduleJob('0 */15 * * * *', async () => {
@@ -133,16 +112,16 @@ module.exports = {
                     error(e, "TRY UNIQLO");
                 }
             });
-            // log("Health check for spotify. 1 minute")
-            // schedule.scheduleJob('0 * * * * *', async () => {
-            //     try {
-            //         await socketIO().then(async (socket) => {
-            //             const result = await socket.timeout(10000).emitWithAck('playMusic');
-            //         })
-            //     } catch (e) {
-            //         error(e, "TRY spotify health");
-            //     }
-            // });
+            log("Health check for spotify. 1 minute")
+            schedule.scheduleJob('0 * * * * *', async () => {
+                try {
+                    await socketIO().then(async (socket) => {
+                        const result = await socket.timeout(10000).emitWithAck('playMusic');
+                    })
+                } catch (e) {
+                    error(e, "TRY spotify health");
+                }
+            });
             socketIO();
             log("Socket.io listening on port 3000")
             const delay = async () => {
@@ -150,7 +129,7 @@ module.exports = {
                 await new Promise(resolve => { setTimeout(resolve, 5000) });
                 loadSpotify(client, true)
             }
-            //delay()
+            delay()
         }
        
         log('Ready!');
