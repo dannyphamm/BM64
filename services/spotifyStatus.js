@@ -9,6 +9,7 @@ let remainingMs;
 let progressMs;
 let durationMs;
 let timeoutId;
+let retryCount = 0;
 loadSpotify = async (client, clear) => {
     const spotifyApi = await spotify();
     const voiceChannelId = config.misamoVoiceChannel;
@@ -66,7 +67,7 @@ loadSpotify = async (client, clear) => {
                     const response = await socketIO().then((socket) => {
                         return socket.timeout(10000).emitWithAck('getQueue');
                     }).catch(async(e) => {
-                        log("Socket failure, retrying in 3 seconds")
+                        log("Socket failure, retrying in 3 seconds. 1")
                         error(e);
                         await new Promise(resolve => { setTimeout(resolve, 3000) });
                         return loadSpotify(client, true);
@@ -140,6 +141,7 @@ loadSpotify = async (client, clear) => {
                 durationMs = currentTrack.body.item.duration_ms;
                 remainingMs = durationMs - progressMs + 2500;
                 log(progressMs, durationMs, remainingMs);
+                retryCount = 0;
                 if (remainingMs > 0) {
                     // Wait for the remaining time before calling the loadSpotify function again
                     await new Promise(resolve => { timeoutId = setTimeout(resolve, remainingMs) });
@@ -150,7 +152,7 @@ loadSpotify = async (client, clear) => {
                 const response1 = await socketIO().then((socket) => {
                     return socket.timeout(10000).emitWithAck('getQueue');
                 }).catch(async(e) => {
-                    log("Socket failure, retrying in 3 seconds")
+                    log("Socket failure, retrying in 3 seconds. 2")
                     error(e);
                     await new Promise(resolve => { setTimeout(resolve, 3000) });
                     return loadSpotify(client, true);
@@ -210,12 +212,14 @@ loadSpotify = async (client, clear) => {
                 // Wait for 15 seconds before calling the loadSpotify function again
                 const response = await socketIO().then((socket) => {
                     return socket.timeout(3000).emitWithAck('getPlayLength');
-                }).catch(async(e) => {
-                    log("Socket failure, retrying in 3 seconds")
+                }).catch(async (e) => {
+                    retryCount++;
+                    log(`Socket failure, retrying in ${retryCount >= 3 ? '3 minutes' : '3 seconds'}.`);
                     error(e);
-                    await new Promise(resolve => { setTimeout(resolve, 3000) });
+                    const timeout = retryCount >= 3 ? 180000 : 3000; // 3 minutes or 3 seconds
+                    await new Promise(resolve => { setTimeout(resolve, timeout) });
                     return loadSpotify(client, true);
-                })
+                });
                 if(!response) {
                     log("no response, retrying in 3 seconds")
                     await new Promise(resolve => { setTimeout(resolve, 3000) });
