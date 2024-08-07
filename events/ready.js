@@ -150,7 +150,7 @@ module.exports = {
                 await new Promise(resolve => { setTimeout(resolve, 5000) });
                 loadSpotify(client, true)
             }
-            delay()
+            //delay()
         }
        
         log('Ready!');
