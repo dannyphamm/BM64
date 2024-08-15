@@ -78,12 +78,11 @@ module.exports = {
                         }
                         function_name = data.choices[0].message["function_call"]["name"]
                         fuction_to_call = available_functions[function_name]
-                        function_args = JSON.parse(data.choices[0].message["function_call"]["arguments"])
-                        function_response = fuction_to_call(
-                            city = function_args.get("city"),
-                            country = function_args.get("country")
-                        )
-
+                        function_args = JSON.parse(data.choices[0].message["function_call"]["arguments"]);
+                        function_response = function_to_call({
+                            city: function_args.city,
+                            country: function_args.country
+                        });
                         const body = {
                             "model": "meta-llama-3.1-8b-instruct",
                             "messages": [
