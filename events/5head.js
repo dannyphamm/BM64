@@ -27,7 +27,7 @@ tools = [
     }
 ]
 //function get current weather
-const get_current_weather = async (city, country) => {
+const get_weather = async (city, country) => {
     log(city, country)
     let result = await fetch(`https://api.api-ninjas.com/v1/weather?city=${city}&country=${country}`, { headers: { 'X-Api-Key': config.factKey } })
         .then(response => {
@@ -74,7 +74,7 @@ module.exports = {
                     log(data.choices[0].message)
                     if (data.choices[0].message.function_call) {
                         available_functions = {
-                            "get_current_weather": get_current_weather,
+                            "get_weather": get_weather,
                         }
                         const function_name = data.choices[0].message["function_call"]["name"]
                         const function_to_call = available_functions[function_name]
