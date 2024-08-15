@@ -7,7 +7,7 @@ tools = [
     {
         "type": "function",
         "function": {
-            "name": "get_current_weather",
+            "name": "get_weather",
             "description": "Get the current weather in a given city and country",
             "parameters": {
                 "type": "object",
@@ -21,7 +21,7 @@ tools = [
                         "description": "The country of the location e.g America",
                     },
                 },
-                "required": ["city"],
+                "required": ["city","country"],
             }
         }
     }
@@ -81,7 +81,8 @@ module.exports = {
                         const function_args = JSON.parse(data.choices[0].message["function_call"]["arguments"].replace(/^{|}$/g, ''));
                         log("function_args", function_args)
                         function_response = function_to_call({
-                            city: function_args.city
+                            city: function_args.city,
+                            country: function_args.country
                         });
                         const body = {
                             "model": "meta-llama-3.1-8b-instruct",
