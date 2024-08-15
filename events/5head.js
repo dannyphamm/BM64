@@ -14,11 +14,11 @@ tools = [
                 "properties": {
                     "city": {
                         "type": "string",
-                        "description": "The city e.g San Francisco",
+                        "description": "The city of the location e.g San Francisco",
                     },
                     "country": {
                         "type": "string",
-                        "description": "The country e.g America",
+                        "description": "The country of the location e.g America",
                     },
                 },
                 "required": ["city", "country"],
@@ -78,7 +78,7 @@ module.exports = {
                         }
                         function_name = data.choices[0].message["function_call"]["name"]
                         fuction_to_call = available_functions[function_name]
-                        function_args = json.loads(data.choices[0].message["function_call"]["arguments"])
+                        function_args = JSON.parse(data.choices[0].message["function_call"]["arguments"])
                         function_response = fuction_to_call(
                             city = function_args.get("city"),
                             country = function_args.get("country")
