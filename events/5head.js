@@ -2,6 +2,27 @@ const { EmbedBuilder } = require('@discordjs/builders');
 const config = require('../config.json');
 const { log, error } = require('../utils/utils');
 const { AttachmentBuilder } = require('discord.js');
+
+tools = [
+    {
+        "type": "function",
+        "function": {
+            "name": "get_current_weather",
+            "description": "Get the current weather in a given location",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "location": {
+                        "type": "string",
+                        "description": "The city and state, e.g. San Francisco, CA",
+                    },
+                },
+                "required": ["location"],
+            }
+        }
+    }
+]
+
 module.exports = {
     name: 'messageCreate',
     async execute(message) {
@@ -18,6 +39,8 @@ module.exports = {
                             "content": message.content // Use the content of the message
                         }
                     ],
+                    functions:tools,
+                    function_call:"auto",  
                     "temperature": 0.7
                 };
                 const reply = await message.reply('Generating response...');
@@ -30,6 +53,9 @@ module.exports = {
                         body: JSON.stringify(body)
                     });
                     const data = await response.json();
+                    if(data.choices[0].message.get('function_call')) {
+                        log('Function call detected')
+                    }
                     const content = data.choices[0].message.content;
                     const chunks = content.match(/[\s\S]{1,1990}/g);
                     // Edit the initial reply with the first chunk
