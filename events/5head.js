@@ -27,15 +27,19 @@ tools = [
     }
 ]
 //function get current weather
-const get_current_weather   = async (location,country) => {
-    let result = await fetch(`https://api.api-ninjas.com/v1/weather?city=${location}&country=${country}`, { headers: { 'X-Api-Key': config.factKey } })
-        .then(response => response.json())
+const get_current_weather = async (city, country) => {
+    log(city, country)
+    let result = await fetch(`https://api.api-ninjas.com/v1/weather?city=${city}&country=${country}`, { headers: { 'X-Api-Key': config.factKey } })
+        .then(response => {
+            log("response", data)
+            return response.json()
+        })
         .then(async data => {
-            log(data)
+            log("data", data)
             return data;
         });
     return result;
-        
+
 }
 module.exports = {
     name: 'messageCreate',
@@ -53,8 +57,8 @@ module.exports = {
                             "content": message.content // Use the content of the message
                         }
                     ],
-                    functions:tools,
-                    function_call:"auto",  
+                    functions: tools,
+                    function_call: "auto",
                     "temperature": 0.7
                 };
                 const reply = await message.reply('Generating response...');
@@ -68,29 +72,29 @@ module.exports = {
                     });
                     let data = await response.json();
                     log(data.choices[0].message)
-                    if(data.choices[0].message.function_call) {
+                    if (data.choices[0].message.function_call) {
                         available_functions = {
                             "get_current_weather": get_current_weather,
-                        }  
+                        }
                         function_name = data.choices[0].message["function_call"]["name"]
                         fuction_to_call = available_functions[function_name]
                         function_args = json.loads(data.choices[0].message["function_call"]["arguments"])
                         function_response = fuction_to_call(
-                            location=function_args.get("location"),
-                            country=function_args.get("country")
+                            city = function_args.get("city"),
+                            country = function_args.get("country")
                         )
 
                         const body = {
                             "model": "meta-llama-3.1-8b-instruct",
                             "messages": [
-                                    data.choices[0].message
+                                data.choices[0].message
                                 , {
                                     "role": "function",
                                     "name": function_name,
                                     "content": function_response
                                 }
                             ],
-                            
+
                         };
                         const response = await fetch(config['5headAPI'] + '/v1/chat/completions', {
                             method: 'POST',
