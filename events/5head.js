@@ -21,7 +21,7 @@ tools = [
                         "description": "The country of the location e.g America",
                     },
                 },
-                "required": ["city", "country"],
+                "required": ["city"],
             }
         }
     }
@@ -78,11 +78,10 @@ module.exports = {
                         }
                         function_name = data.choices[0].message["function_call"]["name"]
                         fuction_to_call = available_functions[function_name]
-                        function_args = JSON.parse(data.choices[0].message["function_call"]["arguments"]);
+                        function_args = JSON.parse(data.choices[0].message["function_call"]["arguments"].replace(/^{|}$/g, ''));
                         log("function_args", function_args)
                         function_response = function_to_call({
-                            city: function_args.city,
-                            country: function_args.country
+                            city: function_args.city
                         });
                         const body = {
                             "model": "meta-llama-3.1-8b-instruct",
