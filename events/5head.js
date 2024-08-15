@@ -11,7 +11,7 @@ module.exports = {
             //if (message.channel.id !== config['5headTextChannel']) return
             if (message.channel.type === 11 && message.channel.id === config['5headTextChannel']) {
                 const body = {
-                    "model": "hermes",
+                    "model": "meta-llama-3.1-8b-instruct",
                     "messages": [
                         {
                             "role": "user",
