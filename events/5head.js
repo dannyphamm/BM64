@@ -31,7 +31,7 @@ const get_weather = async (city, country) => {
     log(city, country)
     let result = await fetch(`https://api.api-ninjas.com/v1/weather?city=${city}&country=${country}`, { headers: { 'X-Api-Key': config.factKey } })
         .then(response => {
-            log("response", data)
+            log("response", response)
             return response.json()
         })
         .then(async data => {
@@ -79,10 +79,11 @@ module.exports = {
                         const function_name = data.choices[0].message["function_call"]["name"]
                         const function_to_call = available_functions[function_name]
                         const function_args = JSON.parse(data.choices[0].message["function_call"]["arguments"].replace(/^{|}$/g, ''));
+                        const [city, country] = function_args.location.split(',').map(s => s.trim());
                         log("function_args", function_args)
                         function_response = function_to_call({
-                            city: function_args.city,
-                            country: function_args.country
+                            city: city,
+                            country: country
                         });
                         const body = {
                             "model": "meta-llama-3.1-8b-instruct",
