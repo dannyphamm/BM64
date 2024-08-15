@@ -29,9 +29,8 @@ tools = [
 //function get current weather
 const get_weather = async (city, country) => {
     log(city, country)
-    let result = await fetch(`https://api.api-ninjas.com/v1/weather?city=${city}&country=${country}`, { headers: { 'X-Api-Key': config.factKey } })
+    let result = await fetch(`https://api.openweathermap.org/data/2.5/weather?q=${city},${country}&appid=${config.openWeatherMapKey}`)
         .then(response => {
-            log("response", response)
             return response.json()
         })
         .then(async data => {
