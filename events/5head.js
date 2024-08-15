@@ -53,7 +53,8 @@ module.exports = {
                         body: JSON.stringify(body)
                     });
                     const data = await response.json();
-                    if(data.choices[0].message.get('function_call')) {
+                    log(data.choices[0].message)
+                    if(data.choices[0].message.function_call) {
                         log('Function call detected')
                     }
                     const content = data.choices[0].message.content;
