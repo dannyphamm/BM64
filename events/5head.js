@@ -8,7 +8,7 @@ tools = [
         "type": "function",
         "function": {
             "name": "get_current_weather",
-            "description": "Get the current weather in a given location",
+            "description": "Get the current weather in a given city and country",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -79,6 +79,7 @@ module.exports = {
                         function_name = data.choices[0].message["function_call"]["name"]
                         fuction_to_call = available_functions[function_name]
                         function_args = JSON.parse(data.choices[0].message["function_call"]["arguments"]);
+                        log("function_args", function_args)
                         function_response = function_to_call({
                             city: function_args.city,
                             country: function_args.country
