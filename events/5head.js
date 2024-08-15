@@ -76,9 +76,9 @@ module.exports = {
                         available_functions = {
                             "get_current_weather": get_current_weather,
                         }
-                        function_name = data.choices[0].message["function_call"]["name"]
-                        function_to_call = available_functions[function_name]
-                        function_args = JSON.parse(data.choices[0].message["function_call"]["arguments"].replace(/^{|}$/g, ''));
+                        const function_name = data.choices[0].message["function_call"]["name"]
+                        const function_to_call = available_functions[function_name]
+                        const function_args = JSON.parse(data.choices[0].message["function_call"]["arguments"].replace(/^{|}$/g, ''));
                         log("function_args", function_args)
                         function_response = function_to_call({
                             city: function_args.city
