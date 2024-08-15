@@ -77,7 +77,7 @@ module.exports = {
                             "get_current_weather": get_current_weather,
                         }
                         function_name = data.choices[0].message["function_call"]["name"]
-                        fuction_to_call = available_functions[function_name]
+                        function_to_call = available_functions[function_name]
                         function_args = JSON.parse(data.choices[0].message["function_call"]["arguments"].replace(/^{|}$/g, ''));
                         log("function_args", function_args)
                         function_response = function_to_call({
