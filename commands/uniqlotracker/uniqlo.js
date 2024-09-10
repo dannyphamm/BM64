@@ -3,8 +3,9 @@ const { AttachmentBuilder, EmbedBuilder, ButtonBuilder, ActionRowBuilder } = req
 const { insertPrice, getPriceHistory, getUniqloItem } = require('../../utils/uniqloApi');
 const { createCanvas, loadImage } = require('@napi-rs/canvas');
 const { trackUniqloItems, femaleSaleItems, maleSaleItems } = require('../../services/uniqlo');
+const config = require('../../config');
 const Chart = require('chart.js/auto');
-const { imageAttachment } = require('../../utils/utils');
+const { imageAttachment, fetchMessagesWithCriteria } = require('../../utils/utils');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -52,6 +53,15 @@ module.exports = {
             subcommand
                 .setName('list')
                 .setDescription('List all tracked Uniqlo items with their current price')
+        ).addSubcommand(subcommand =>
+            subcommand
+                .setName('trackpricing')
+                .setDescription('Track pricing for a Uniqlo item')
+                .addStringOption(option =>
+                    option.setName('itemid')
+                        .setDescription('The ID of the Uniqlo item to track pricing for')
+                        .setRequired(true)
+                )
         ),
 
     async execute(interaction) {
@@ -147,7 +157,7 @@ module.exports = {
             const uniqloCollection = client.mongodb.db.collection(config.mongodbDBUniqlo);
             // check if itemId exists in the collection
             const existingItem = await uniqloCollection.findOne({ itemId });
-            if(!existingItem) {
+            if (!existingItem) {
                 return interaction.reply('This item is not being tracked.')
             }
             await uniqloCollection.updateOne({ itemId }, { $set: { tracking: false } });
@@ -305,7 +315,7 @@ module.exports = {
                 console.log(existingItem.prices[existingItem.prices.length - 1].promoPrice, promoPrice)
                 // Check if the price has changed
                 if ((basePrice !== existingItem.prices[existingItem.prices.length - 1].basePrice)
-                || (promoPrice !== existingItem.prices[existingItem.prices.length - 1].promoPrice)) {
+                    || (promoPrice !== existingItem.prices[existingItem.prices.length - 1].promoPrice)) {
 
                     // Send an alert to a Discord channel
                     const alertEmbed = new EmbedBuilder()
@@ -315,14 +325,14 @@ module.exports = {
                         .addFields(
                             { name: 'Old Base Price', value: `$${parseInt(existingItem.prices[existingItem.prices.length - 1].basePrice).toFixed(2)}`, inline: true },
                             { name: 'New Base Price', value: `$${parseInt(basePrice).toFixed(2)}`, inline: true },
-                            { name: '\u200B', value: '\u200B'}
+                            { name: '\u200B', value: '\u200B' }
                         );
                     if (promoPrice !== existingItem.prices[existingItem.prices.length - 1].promoPrice) {
                         alertEmbed.addFields(
-                            
+
                             { name: 'Old Promo Price', value: `$${parseInt(existingItem.prices[existingItem.prices.length - 1].promoPrice).toFixed(2)}`, inline: true },
                             { name: 'New Promo Price', value: `$${parseInt(promoPrice).toFixed(2)}`, inline: true },
-                            { name: '\u200B', value: '\u200B'}
+                            { name: '\u200B', value: '\u200B' }
                         );
                     }
                     const channel = client.channels.cache.get(config.discordChannelId);
@@ -346,11 +356,12 @@ module.exports = {
         } else if (subcommand === 'list') {
             // Handle the list subcommand
             const uniqloCollection = client.mongodb.db.collection(config.mongodbDBUniqlo);
-            const items = await uniqloCollection.find().toArray();
+            const items = await uniqloCollection.find({ tracking: { $ne: false } }).toArray();
             const embed = new EmbedBuilder()
                 .setTitle('Tracked Uniqlo Items')
                 .setColor('#0099ff');
             for (const item of items) {
+                console.log(item.itemId)
                 const latestPrice = item.prices[item.prices.length - 1];
                 embed.addFields(
                     { name: 'Item ID', value: item.itemId, inline: true },
@@ -363,6 +374,188 @@ module.exports = {
                 );
             }
             return interaction.reply({ embeds: [embed] });
+        } else if (subcommand === 'trackpricing') {
+            const itemId = interaction.options.getString('itemid');
+            if (!itemId) {
+                return interaction.reply('Item ID is required.');
+            }
+
+            // Acknowledge the interaction immediately
+            await interaction.deferReply();
+
+            const priceData = await trackItemPricing(client, itemId);
+            if (!priceData) {
+                return interaction.editReply('No price data found for this item.');
+            }
+
+            const chart = await createPriceChart(priceData);
+            const attachment = new AttachmentBuilder(chart.toBuffer('image/png'), { name: 'price_chart.png' });
+            const embed = new EmbedBuilder()
+                .setTitle(`Price Tracking for Uniqlo Item ${itemId}`)
+                .setImage('attachment://price_chart.png');
+            return interaction.editReply({ embeds: [embed], files: [attachment] });
         }
     }
 };
+async function fetchAndLogAllEmbedsUsingRegex(client) {
+    const channel = client.channels.cache.get('1133373625672679464');
+    const messages = await channel.messages.fetch({ limit: 100 });
+
+    for (const message of messages.values()) {
+        for (const embed of message.embeds) {
+            if (embed.title && embed.title.startsWith('Added items')) {
+                const description = embed.description;
+                const regex = /\*\*\[(.*?)\]\((.*?)\)\*\*\s*Base:\s*\$(\d+\.\d+)\s*Promo:\s*\$(\d+\.\d+)/g;
+                let match;
+                while ((match = regex.exec(description)) !== null) {
+                    console.log(`Item Name: ${match[1]}`);
+                    console.log(`Item URL: ${match[2]}`);
+                    console.log(`Base Price: ${match[3]}`);
+                    console.log(`Promo Price: ${match[4]}`);
+                }
+            }
+        }
+    }
+}
+async function trackItemPricing(client, itemId) {
+    const channel = client.channels.cache.get(config.maleSaleDiscordId);
+    const messages = await fetchMessagesWithCriteria(channel, itemId);
+    const priceData = [];
+
+    for (const message of messages) {
+        for (const embed of message.embeds) {
+            if (embed.title && embed.title.startsWith('Added items')) {
+                const description = embed.description;
+                if (!description) continue; // Skip if description is undefined
+
+                const regex = /\*\*\[(.*?)\]\((.*?)\)\*\*\s*Base:\s*\$(\d+\.\d+)\s*Promo:\s*\$(\d+\.\d+)/g;
+                let match;
+                while ((match = regex.exec(description)) !== null) {
+                    if (match[2].includes(itemId)) {
+                        console.log(`Matched Item ID: ${itemId}`);
+                        console.log(`Matched Base Price: ${match[3]}`);
+                        console.log(`Matched Promo Price: ${match[4]}`);
+                        priceData.push({
+                            date: message.createdAt,
+                            basePrice: parseFloat(match[3]),
+                            promoPrice: parseFloat(match[4])
+                        });
+                    }
+                }
+            }
+        }
+    }
+
+    // Sort priceData by date in ascending order
+    priceData.sort((a, b) => a.date - b.date);
+
+    return priceData.length > 0 ? priceData : null;
+}
+async function createPriceChart(priceData) {
+    const canvas = createCanvas(600, 400);
+    const ctx = canvas.getContext('2d');
+
+    // Set background color
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Set chart title
+    ctx.fillStyle = '#000000';
+    ctx.font = '20px Arial';
+    ctx.fillText('Price History', 200, 30);
+
+    // Set axis labels
+    ctx.font = '12px Arial';
+    ctx.fillText('Date', 280, 380);
+    ctx.save();
+    ctx.rotate(-Math.PI / 2);
+    ctx.fillText('Price', -200, 20);
+    ctx.restore();
+
+    // Calculate chart dimensions
+    const chartWidth = 500;
+    const chartHeight = 300;
+    const chartX = 50;
+    const chartY = 50;
+
+    // Draw axes
+    ctx.strokeStyle = '#000000';
+    ctx.beginPath();
+    ctx.moveTo(chartX, chartY);
+    ctx.lineTo(chartX, chartY + chartHeight);
+    ctx.lineTo(chartX + chartWidth, chartY + chartHeight);
+    ctx.stroke();
+
+    // Calculate data points
+    const maxPrice = Math.max(...priceData.flatMap(data => [data.basePrice, data.promoPrice]));
+    const minPrice = Math.min(...priceData.flatMap(data => [data.basePrice, data.promoPrice]));
+    const priceRange = maxPrice - minPrice;
+    const dateRange = priceData.length - 1;
+
+    // Draw base price line
+    ctx.strokeStyle = '#ff0000';
+    ctx.beginPath();
+    priceData.forEach((data, index) => {
+        const x = chartX + (index / dateRange) * chartWidth;
+        const y = chartY + chartHeight - ((data.basePrice - minPrice) / priceRange) * chartHeight;
+        if (index === 0) {
+            ctx.moveTo(x, y);
+        } else {
+            ctx.lineTo(x, y);
+        }
+    });
+    ctx.stroke();
+
+    // Draw promo price line
+    ctx.strokeStyle = '#00ff00';
+    ctx.beginPath();
+    priceData.forEach((data, index) => {
+        const x = chartX + (index / dateRange) * chartWidth;
+        const y = chartY + chartHeight - ((data.promoPrice - minPrice) / priceRange) * chartHeight;
+        if (index === 0) {
+            ctx.moveTo(x, y);
+        } else {
+            ctx.lineTo(x, y);
+        }
+    });
+    ctx.stroke();
+
+    // Draw data points for base price
+    ctx.fillStyle = '#ff0000';
+    priceData.forEach((data, index) => {
+        const x = chartX + (index / dateRange) * chartWidth;
+        const y = chartY + chartHeight - ((data.basePrice - minPrice) / priceRange) * chartHeight;
+        ctx.beginPath();
+        ctx.arc(x, y, 3, 0, 2 * Math.PI);
+        ctx.fill();
+    });
+
+    // Draw data points for promo price
+    ctx.fillStyle = '#00ff00';
+    priceData.forEach((data, index) => {
+        const x = chartX + (index / dateRange) * chartWidth;
+        const y = chartY + chartHeight - ((data.promoPrice - minPrice) / priceRange) * chartHeight;
+        ctx.beginPath();
+        ctx.arc(x, y, 3, 0, 2 * Math.PI);
+        ctx.fill();
+    });
+
+    // Draw x-axis labels
+    ctx.fillStyle = '#000000';
+    ctx.font = '10px Arial';
+    priceData.forEach((data, index) => {
+        const x = chartX + (index / dateRange) * chartWidth;
+        const date = data.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        ctx.fillText(date, x - 10, chartY + chartHeight + 15);
+    });
+
+    // Draw y-axis labels
+    const yLabelCount = 5;
+    for (let i = 0; i <= yLabelCount; i++) {
+        const y = chartY + chartHeight - (i / yLabelCount) * chartHeight;
+        const price = minPrice + (i / yLabelCount) * priceRange;
+        ctx.fillText(price.toFixed(2), chartX - 40, y + 5);
+    }
+
+    return canvas;
+}

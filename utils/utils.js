@@ -51,4 +51,68 @@ const pricePrecision = (price) => {
 }
 
 
-module.exports = { log, error, imageAttachment, pricePrecision }
+async function fetchAllMessages(channel) {
+    let allMessages = [];
+    let lastMessageId = null;
+    let fetchMore = true;
+
+    while (fetchMore) {
+        const options = { limit: 100 };
+        if (lastMessageId) {
+            options.before = lastMessageId;
+        }
+
+        const messages = await channel.messages.fetch(options);
+        allMessages = allMessages.concat(Array.from(messages.values()));
+        lastMessageId = messages.last()?.id;
+
+        if (messages.size < 100) {
+            fetchMore = false;
+        }
+    }
+
+    return allMessages;
+}
+
+async function fetchMessagesWithCriteria(channel, itemId, limit = 1000) {
+    let allMessages = [];
+    let lastMessageId = null;
+    let fetchMore = true;
+    let fetchedCount = 0;
+
+    while (fetchMore && fetchedCount < limit) {
+        const options = { limit: 100 };
+        if (lastMessageId) {
+            options.before = lastMessageId;
+        }
+
+        const messages = await channel.messages.fetch(options);
+        allMessages = allMessages.concat(Array.from(messages.values()));
+        lastMessageId = messages.last()?.id;
+        fetchedCount += messages.size;
+
+        if (messages.size < 100) {
+            fetchMore = false;
+        }
+    }
+
+    return allMessages.filter(message => {
+        for (const embed of message.embeds) {
+            if (embed.title && embed.title.startsWith('Added items')) {
+                const description = embed.description;
+                if (!description) continue; // Skip if description is undefined
+
+                const regex = /\*\*\[(.*?)\]\((.*?)\)\*\*\s*Base:\s*\$(\d+\.\d+)\s*Promo:\s*\$(\d+\.\d+)/g;
+                let match;
+                while ((match = regex.exec(description)) !== null) {
+                    if (match[2].includes(itemId)) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    });
+}
+
+module.exports = { log, error, imageAttachment, pricePrecision, fetchAllMessages, fetchMessagesWithCriteria }

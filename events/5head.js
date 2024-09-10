@@ -27,7 +27,8 @@ tools = [
     }
 ]
 //function get current weather
-const get_weather = async (city, country) => {
+const get_weather = async (args)=> {
+    const { city, country } = args;
     log(city, country)
     let result = await fetch(`https://api.openweathermap.org/data/2.5/weather?q=${city},${country}&appid=${config.openWeatherMapKey}`)
         .then(response => {
@@ -43,22 +44,22 @@ const get_weather = async (city, country) => {
 module.exports = {
     name: 'messageCreate',
     async execute(message) {
-        if (config.mode !== 'DEV') {
+        if (config.mode == 'DEV') {
             if (message.author.bot) return;
             if (message.type !== 0) return;
             //if (message.channel.id !== config['5headTextChannel']) return
             if (message.channel.type === 11 && message.channel.id === config['5headTextChannel']) {
                 const body = {
-                    "model": "meta-llama-3.1-8b-instruct",
-                    "messages": [
+                    model: "meta-llama-3.1-8b-instruct",
+                    messages: [
                         {
                             "role": "user",
                             "content": message.content // Use the content of the message
                         }
                     ],
-                    functions: tools,
-                    function_call: "auto",
-                    "temperature": 0.7
+                    tools: tools,
+                    tool_choice: "auto",
+                    temperature: 0.7
                 };
                 const reply = await message.reply('Generating response...');
                 try {
@@ -71,37 +72,38 @@ module.exports = {
                     });
                     let data = await response.json();
                     log(data.choices[0].message)
-                    if (data.choices[0].message.function_call) {
+                    if (data.choices[0].message.tool_calls) {
                         available_functions = {
                             "get_weather": get_weather,
                         }
-                        const function_name = data.choices[0].message["function_call"]["name"]
+                        log(data.choices[0].message["tool_calls"][0]["function"])
+                        const function_name = data.choices[0].message["tool_calls"][0]["function"]["name"]
                         const function_to_call = available_functions[function_name]
-                        const function_args = JSON.parse(data.choices[0].message["function_call"]["arguments"].replace(/^{|}$/g, ''));
-                        const [city, country] = function_args.location.split(',').map(s => s.trim());
+                        const function_args = JSON.parse(data.choices[0].message["tool_calls"][0]["function"]["arguments"].replace(/^{|}$/g, ''));
                         log("function_args", function_args)
-                        function_response = function_to_call({
-                            city: city,
-                            country: country
+                        function_response = await function_to_call({
+                            city: function_args.city,
+                            country: function_args.country
                         });
-                        const body = {
-                            "model": "meta-llama-3.1-8b-instruct",
-                            "messages": [
-                                data.choices[0].message
+                        const body1 = {
+                            model: "meta-llama-3.1-8b-instruct",
+                            messages: [
+                                body.messages[0]
                                 , {
-                                    "role": "function",
-                                    "name": function_name,
-                                    "content": function_response
+                                    role: "function",
+                                    name: function_name,
+                                    content: function_response
                                 }
                             ],
 
                         };
+                        log("body", body1.messages)
                         const response = await fetch(config['5headAPI'] + '/v1/chat/completions', {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json'
                             },
-                            body: JSON.stringify(body)
+                            body: JSON.stringify(body1)
                         });
                         data = await response.json();
                     }

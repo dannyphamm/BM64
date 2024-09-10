@@ -41,7 +41,7 @@ module.exports = {
             schedule.scheduleJob('30 32 * * * *', async () => {
                 try {
 
-                    await kdramaCompleterService(client);
+                    //await kdramaCompleterService(client);
                 } catch (e) {
                     error(e, "TRY KDRAMACOMPLETER");
                 }
@@ -50,7 +50,7 @@ module.exports = {
             log("Memes, Facts, Kdrama Tracker: Scheduled job to run every 5 minutes.")
             schedule.scheduleJob('0 */5 * * * *', async () => {
                 try {
-                    await kdramaTrackerService(client);
+                    //await kdramaTrackerService(client);
                     await redditMemesService(client);
                     await randomFactsService(client);
 
