@@ -168,7 +168,12 @@ const kdramaCompleterService = async (client) => {
     // Code for new drama detection
     async function scrapeKoreanDrama() {
         const url = 'https://asianc.sh/category/korean-drama';
-        const { data } = await axios.get(url);
+        const { data, status } = await axios.get(url);
+        // If status code is not 200, return
+        if (status !== 200) {
+            error(`Error: ${status}`);
+            return;
+        }
         const $ = cheerio.load(data);
 
         // Set the selects
@@ -176,28 +181,39 @@ const kdramaCompleterService = async (client) => {
 
         // Filter and get all li tags with class show
         const currentTitles = []; // Initialize an array to hold current titles
-        $('.block.list > div > .list-content .filter-char li.country_1.status_Ongoing').each(async (index, element) => {
-            const title = $(element).find('a').text().trim();  // Get the title text
-            currentTitles.push(title); // Add title to currentTitles array
-        });
-
-        $('.block.list > div > .list-content .filter-char li.country_1.status_Ongoing').each(async (index, element) => {
-            const title = $(element).find('a').text().trim();  // Get the title text
-
-            const genre = $(element).data('genre'); // Assuming genre is a data attribute
-
-            // Check if the genre includes "Historical"
+        const titlePromises = $('.block.list > div > .list-content .filter-char li.country_1.status_Ongoing').map(async (index, element) => {
+            const genre = $(element).data('genre');
             if (Array.isArray(genre) && genre.includes('Historical')) {
+                const title = $(element).find('a').text().trim();  // Get the title text
+
+                currentTitles.push(title); // Add title to currentTitles array
 
                 const existingKDrama = await kdramaCollection.findOne({ title });
-                if (!existingKDrama) {   
-                    await kdramaCollection.insertOne({ title, isCompleted: false });
+                // If the title is not in the database, add it
+                if (!existingKDrama) {
+                    const link = $(element).find('a').attr('href');
+                    // Go the link and get the image src url and save it to the database
+                    const { data, } = await axios.get("https://asianc.sh" + link);
+                    const $$ = cheerio.load(data);
+                    const imageURL = $$('.img img').attr('src');
+                    await kdramaCollection.insertOne({ title, banner: imageURL, isCompleted: false });
+                    const buffer = await axios(imageURL, {
+                        responseType: 'arraybuffer'
+                    }).then(response => { return response.data })
+                    const imageBuffer = Buffer.from(buffer);
+                    const attachment = new AttachmentBuilder(imageBuffer, { name: 'discordjs.jpg' });
                     const embed = new EmbedBuilder()
-                    .setTitle(`New Drama Detected: ${title}`)
-                    .setDescription(`This drama is now available!`)
-                    .setColor('#0099ff')
-                    .setTimestamp()
-                    .setFooter({ text: 'KDRAMA Tracker', iconURL: 'https://i.imgur.com/AfFp7pu.png' });
+                        .setTitle(`New Drama Detected:\n ${title}`)
+                        .setDescription(`This drama is now available!`)
+                        .setColor('#0099ff')
+                        .setTimestamp()
+                        .setThumbnail('attachment://discordjs.jpg')
+
+                    const button = new ButtonBuilder()
+                        .setStyle(ButtonStyle.Link)
+                        .setLabel('Watch now')
+                        .setURL("https://asianc.sh" + link);
+                    const row = new ActionRowBuilder().addComponents(button);
                     const channel = await client.channels.cache.find(c => c.name === 'movie-night');
                     if (!channel) return;
                     const webhooks = await channel.fetchWebhooks();
@@ -205,37 +221,41 @@ const kdramaCompleterService = async (client) => {
                     const webhook = new WebhookClient({ id: webhooks.first().id, token: webhooks.first().token });
                     webhook.send({
                         embeds: [embed],
+                        files: [attachment],
+                        components: [row]
                     });
-                    console.log(`New entry created for title: ${title}`);
-                }
-
-                // Mark titles in the database that are not in the current title list as complete
-                const allKdramas = await kdramaCollection.find().toArray();
-                for (const kdrama of allKdramas) {
-                    if (!currentTitles.includes(kdrama.title) && kdrama.isCompleted === false) {
-                        await kdramaCollection.updateOne({ _id: kdrama._id }, { $set: { isCompleted: true } });
-                        console.log(`Marked "${kdrama.title}" as complete.`);
-                        const embed = new EmbedBuilder()
-                        .setTitle(`${title}`)
-                        .setDescription(`This drama has completed!`)
-                        .addFields(
-                            { name: 'Total Episodes', value: `${kdrama.episode}`, inline: true },
-                        )
-                        .setColor(0x7289da)
-                        .setThumbnail('attachment://discordjs.jpg')
-                        .setTimestamp();
-                        const channel = await client.channels.cache.find(c => c.name === 'movie-night');
-                        if (!channel) return;
-                        const webhooks = await channel.fetchWebhooks();
-                        if (webhooks.size === 0) return;
-                        const webhook = new WebhookClient({ id: webhooks.first().id, token: webhooks.first().token });
-                        webhook.send({
-                            embeds: [embed],
-                        });
-                    }
+                    log(`New entry created for title: ${title}`);
                 }
             }
-        });
+        }).get(); // Get the array of promises
+
+        await Promise.all(titlePromises); // Wait for all promises to resolve
+
+        // After the promises resolve, mark titles in the database that are not in the current title list as complete
+        const allKdramas = await kdramaCollection.find().toArray();
+        for (const kdrama of allKdramas) {
+            if (!currentTitles.includes(kdrama.title) && kdrama.isCompleted === false) {
+                await kdramaCollection.updateOne({ _id: kdrama._id }, { $set: { isCompleted: true } });
+                log(`Marked "${kdrama.title}" as complete.`);
+                const embed = new EmbedBuilder()
+                    .setTitle(`${kdrama.title}`)
+                    .setDescription(`This drama has completed!`)
+                    .addFields(
+                        { name: 'Total Episodes', value: `${kdrama.episode}`, inline: true },
+                    )
+                    .setColor(0x7289da)
+                    .setThumbnail('attachment://discordjs.jpg')
+                    .setTimestamp();
+                const channel = await client.channels.cache.find(c => c.name === 'movie-night');
+                if (!channel) return;
+                const webhooks = await channel.fetchWebhooks();
+                if (webhooks.size === 0) return;
+                const webhook = new WebhookClient({ id: webhooks.first().id, token: webhooks.first().token });
+                webhook.send({
+                    embeds: [embed],
+                });
+            }
+        }
 
     }
 
@@ -249,7 +269,6 @@ const kdramaTrackerService = async (client) => {
     const kdramaCollection = client.mongodb.db.collection(config.mongodbDBKDrama);
     //Extract the titles and episode numbers from the JSON data
     const kdramas = await kdramaCollection.find().toArray();
-    console.log(kdramas)
     async function scrapeKoreanDrama() {
         const url = 'https://asianc.sh/recently-added?page=1';
         const { data } = await axios.get(url);
@@ -261,19 +280,28 @@ const kdramaTrackerService = async (client) => {
 
         $('.switch-block.list-episode-item li a').each(async (index, element) => {
             const title = $(element).find('h3').text().trim();  // Get the title text
-            console.log(title)
             const ep = $(element).find('.ep.SUB').text().trim().replace('EP ', '');
-            console.log(ep)
+            const link = $(element).attr('href');
             const existingKDrama = await kdramaCollection.findOne({ title });
             if (existingKDrama) {
-                // Check if the episode number is greater than the database episode
-                if (parseInt(ep) > existingKDrama.episode) {
+                if (!existingKDrama.episode) {
+                    await kdramaCollection.updateOne({ title }, { $set: { episode: ep } });
+                    const buffer = await axios(existingKDrama.banner, {
+                        responseType: 'arraybuffer'
+                    }).then(response => { return response.data })
+                    const imageBuffer = Buffer.from(buffer);
+                    const attachment = new AttachmentBuilder(imageBuffer, { name: 'discordjs.jpg' });
                     const embed = new EmbedBuilder()
-                        .setTitle(`New Episode Detected: ${title}`)
+                        .setTitle(`NEW EPISODE DETECTED:\n${title}`)
                         .setDescription(`Episode ${ep} is now available!`)
                         .setColor('#0099ff')
                         .setTimestamp()
-                        .setFooter({ text: 'KDRAMA Tracker', iconURL: 'https://i.imgur.com/AfFp7pu.png' });
+                        .setThumbnail('attachment://discordjs.jpg')
+                    const button = new ButtonBuilder()
+                        .setStyle(ButtonStyle.Link)
+                        .setLabel('Watch now')
+                        .setURL("https://asianc.sh" + link);
+                    const row = new ActionRowBuilder().addComponents(button);
 
                     const channel = await client.channels.cache.find(c => c.name === 'movie-night');
                     if (!channel) return;
@@ -282,25 +310,48 @@ const kdramaTrackerService = async (client) => {
                     const webhook = new WebhookClient({ id: webhooks.first().id, token: webhooks.first().token });
                     webhook.send({
                         embeds: [embed],
+                        files: [attachment],
+                        components: [row]
                     });
-                    // Update the episode number in the database
+                }
+                // Check if the episode number is greater than the database episode
+                if (parseInt(ep) > existingKDrama.episode) {
+                    // If the show is marked as complete, update it to not complete
+                    if (existingKDrama.isCompleted) {
+                        await kdramaCollection.updateOne({ title }, { $set: { isCompleted: false } });
+                        log(`Marked "${title}" as not complete due to new episode.`);
+                    }
+                    // Update the episode number
                     await kdramaCollection.updateOne({ title }, { $set: { episode: ep } });
+                    const buffer = await axios(existingKDrama.banner, {
+                        responseType: 'arraybuffer'
+                    }).then(response => { return response.data })
+                    const imageBuffer = Buffer.from(buffer);
+                    const attachment = new AttachmentBuilder(imageBuffer, { name: 'discordjs.jpg' });
+                    const embed = new EmbedBuilder()
+                        .setTitle(`NEW EPISODE DETECTED:\n${title}`)
+                        .setDescription(`Episode ${ep} is now available!`)
+                        .setColor('#0099ff')
+                        .setTimestamp()
+                        .setThumbnail('attachment://discordjs.jpg')
+                    const button = new ButtonBuilder()
+                        .setStyle(ButtonStyle.Link)
+                        .setLabel('Watch now')
+                        .setURL("https://asianc.sh" + link);
+                    const row = new ActionRowBuilder().addComponents(button);
+
+                    const channel = await client.channels.cache.find(c => c.name === 'movie-night');
+                    if (!channel) return;
+                    const webhooks = await channel.fetchWebhooks();
+                    if (webhooks.size === 0) return;
+                    const webhook = new WebhookClient({ id: webhooks.first().id, token: webhooks.first().token });
+                    webhook.send({
+                        embeds: [embed],
+                        files: [attachment],
+                        components: [row]
+                    });
                 }
             }
-            // const title = $(element).find('a').text().trim();  // Get the title text
-
-            // const genre = $(element).data('genre'); // Assuming genre is a data attribute
-
-            // // Check if the genre includes "Historical"
-            // if (Array.isArray(genre) && genre.includes('Historical')) {
-            //     // Print the classes and additional information for debugging
-            //     const classes = $(element).attr('class');
-            //     console.log(`Classes for li element ${index}: ${classes}`);
-            //     console.log(`Title: ${title},  Genre: ${genre}`);
-
-            //     // Push the information to the shows array
-            //     shows.push({ title, genre });
-
         });
     }
 
