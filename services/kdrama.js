@@ -283,7 +283,7 @@ const kdramaTrackerService = async (client) => {
             const ep = $(element).find('.ep.SUB').text().trim().replace('EP ', '');
             const link = $(element).attr('href');
             const existingKDrama = await kdramaCollection.findOne({ title });
-            if (existingKDrama) {
+            if (existingKDrama && !existingKDrama?.isTracking) {
                 if (!existingKDrama.episode) {
                     await kdramaCollection.updateOne({ title }, { $set: { episode: ep } });
                     const buffer = await axios(existingKDrama.banner, {
