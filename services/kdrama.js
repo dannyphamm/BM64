@@ -234,7 +234,7 @@ const kdramaCompleterService = async (client) => {
         // After the promises resolve, mark titles in the database that are not in the current title list as complete
         const allKdramas = await kdramaCollection.find().toArray();
         for (const kdrama of allKdramas) {
-            if (!currentTitles.includes(kdrama.title) && kdrama.isCompleted === false) {
+            if (!currentTitles.includes(kdrama.title) && kdrama.isCompleted === false && kdrama.isCustom !== true) {
                 await kdramaCollection.updateOne({ _id: kdrama._id }, { $set: { isCompleted: true } });
                 log(`Marked "${kdrama.title}" as complete.`);
                 const embed = new EmbedBuilder()
