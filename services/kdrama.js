@@ -280,10 +280,12 @@ const kdramaTrackerService = async (client) => {
 
         $('.switch-block.list-episode-item li a').each(async (index, element) => {
             const title = $(element).find('h3').text().trim();  // Get the title text
+            log(title)
             const ep = $(element).find('.ep.SUB').text().trim().replace('EP ', '');
             const link = $(element).attr('href');
             const existingKDrama = await kdramaCollection.findOne({ title });
-            if (existingKDrama && !existingKDrama?.isTracking === false) {
+            console.log(existingKDrama)
+            if (existingKDrama && existingKDrama?.isTracking !== false) {
                 if (!existingKDrama.episode) {
                     await kdramaCollection.updateOne({ title }, { $set: { episode: ep } });
                     const buffer = await axios(existingKDrama.banner, {
