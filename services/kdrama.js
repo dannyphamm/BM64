@@ -183,16 +183,16 @@ const kdramaCompleterService = async (client) => {
         const currentTitles = []; // Initialize an array to hold current titles
         const titlePromises = $('.block.list > div > .list-content .filter-char li.country_1.status_Ongoing').map(async (index, element) => {
             const genre = $(element).data('genre');
-            if (Array.isArray(genre) && genre.includes('Historical')) {
-                const title = $(element).find('a').text().trim();  // Get the title text
+            const title = $(element).find('a').text().trim();
 
+            if ((Array.isArray(genre) && genre.includes('Historical')) || await kdramaCollection.findOne({ title, isCustom: true })) {  // Get the title text
                 currentTitles.push(title); // Add title to currentTitles array
 
                 const existingKDrama = await kdramaCollection.findOne({ title });
                 // If the title is not in the database, add it
                 if (!existingKDrama) {
                     const link = $(element).find('a').attr('href');
-                    // Go the link and get the image src url and save it to the database
+                    //Go the link and get the image src url and save it to the database
                     const { data, } = await axios.get("https://asianc.sh" + link);
                     const $$ = cheerio.load(data);
                     const imageURL = $$('.img img').attr('src');
@@ -235,6 +235,7 @@ const kdramaCompleterService = async (client) => {
         const allKdramas = await kdramaCollection.find().toArray();
         for (const kdrama of allKdramas) {
             if (!currentTitles.includes(kdrama.title) && kdrama.isCompleted === false && kdrama.isCustom !== true) {
+
                 await kdramaCollection.updateOne({ _id: kdrama._id }, { $set: { isCompleted: true } });
                 log(`Marked "${kdrama.title}" as complete.`);
                 const embed = new EmbedBuilder()
@@ -282,15 +283,25 @@ const kdramaTrackerService = async (client) => {
             const title = $(element).find('h3').text().trim();  // Get the title text
             log(title)
             const ep = $(element).find('.ep.SUB').text().trim().replace('EP ', '');
+            const banner = $(element).find('img').attr('data-original')
             const link = $(element).attr('href');
             const existingKDrama = await kdramaCollection.findOne({ title });
             console.log(existingKDrama)
             if (existingKDrama && existingKDrama?.isTracking !== false) {
                 if (!existingKDrama.episode) {
                     await kdramaCollection.updateOne({ title }, { $set: { episode: ep } });
-                    const buffer = await axios(existingKDrama.banner, {
-                        responseType: 'arraybuffer'
-                    }).then(response => { return response.data })
+                    let buffer;
+                    if (!existingKDrama.banner) {
+                        await kdramaCollection.updateOne({ title }, { $set: { banner } });
+                        buffer = await axios(banner, {
+                            responseType: 'arraybuffer'
+                        }).then(response => { return response.data })
+                    } else {
+                        buffer = await axios(existingKDrama.banner, {
+                            responseType: 'arraybuffer'
+                        }).then(response => { return response.data })
+
+                    }
                     const imageBuffer = Buffer.from(buffer);
                     const attachment = new AttachmentBuilder(imageBuffer, { name: 'discordjs.jpg' });
                     const embed = new EmbedBuilder()
