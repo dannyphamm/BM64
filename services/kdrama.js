@@ -282,7 +282,7 @@ const kdramaTrackerService = async (client) => {
 
         $('.switch-block.list-episode-item li a').each(async (index, element) => {
             const title = $(element).find('h3').text().trim();  // Get the title text
-            log(title)
+
             const ep = $(element).find('.ep.SUB').text().trim().replace('EP ', '');
             const banner = $(element).find('img').attr('data-original')
             const link = $(element).attr('href');
