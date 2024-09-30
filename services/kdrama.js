@@ -187,7 +187,7 @@ const kdramaCompleterService = async (client) => {
 
             if ((Array.isArray(genre) && genre.includes('Historical')) || await kdramaCollection.findOne({ title, isCustom: true })) {  // Get the title text
                 currentTitles.push(title); // Add title to currentTitles array
-                console.log(title)
+                //console.log(title)
                 const existingKDrama = await kdramaCollection.findOne({ title });
                 // If the title is not in the database, add it
                 if (!existingKDrama) {
