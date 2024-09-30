@@ -49,7 +49,7 @@ module.exports = {
                     })).toArray();
                    
                     const attachment = await Promise.all(results.map(async (result, index) => {
-                        console.log(result.banner)
+                    
                         const buffer = await axios(result.banner, {
                             responseType: 'arraybuffer'
                         }).then(response => { return response.data })

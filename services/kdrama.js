@@ -187,7 +187,7 @@ const kdramaCompleterService = async (client) => {
 
             if ((Array.isArray(genre) && genre.includes('Historical')) || await kdramaCollection.findOne({ title, isCustom: true })) {  // Get the title text
                 currentTitles.push(title); // Add title to currentTitles array
-
+                console.log(title)
                 const existingKDrama = await kdramaCollection.findOne({ title });
                 // If the title is not in the database, add it
                 if (!existingKDrama) {
@@ -196,7 +196,7 @@ const kdramaCompleterService = async (client) => {
                     const { data, } = await axios.get("https://asianc.sh" + link);
                     const $$ = cheerio.load(data);
                     const imageURL = $$('.img img').attr('src');
-                    await kdramaCollection.insertOne({ title, banner: imageURL, isCompleted: false });
+                    //await kdramaCollection.insertOne({ title, banner: imageURL, isCompleted: false });
                     const buffer = await axios(imageURL, {
                         responseType: 'arraybuffer'
                     }).then(response => { return response.data })
@@ -233,10 +233,11 @@ const kdramaCompleterService = async (client) => {
 
         // After the promises resolve, mark titles in the database that are not in the current title list as complete
         const allKdramas = await kdramaCollection.find().toArray();
+        console.log(currentTitles)
         for (const kdrama of allKdramas) {
-            if (!currentTitles.includes(kdrama.title) && kdrama.isCompleted === false && kdrama.isCustom !== true) {
+            if (!currentTitles.includes(kdrama.title) && kdrama.isCompleted === false) {
 
-                await kdramaCollection.updateOne({ _id: kdrama._id }, { $set: { isCompleted: true } });
+                //await kdramaCollection.updateOne({ _id: kdrama._id }, { $set: { isCompleted: true } });
                 log(`Marked "${kdrama.title}" as complete.`);
                 const embed = new EmbedBuilder()
                     .setTitle(`${kdrama.title}`)
@@ -286,7 +287,6 @@ const kdramaTrackerService = async (client) => {
             const banner = $(element).find('img').attr('data-original')
             const link = $(element).attr('href');
             const existingKDrama = await kdramaCollection.findOne({ title });
-            console.log(existingKDrama)
             if (existingKDrama && existingKDrama?.isTracking !== false) {
                 if (!existingKDrama.episode) {
                     await kdramaCollection.updateOne({ title }, { $set: { episode: ep } });
