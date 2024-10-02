@@ -196,7 +196,7 @@ const kdramaCompleterService = async (client) => {
                     const { data, } = await axios.get("https://asianc.sh" + link);
                     const $$ = cheerio.load(data);
                     const imageURL = $$('.img img').attr('src');
-                    //await kdramaCollection.insertOne({ title, banner: imageURL, isCompleted: false });
+                    await kdramaCollection.insertOne({ title, banner: imageURL, isCompleted: false });
                     const buffer = await axios(imageURL, {
                         responseType: 'arraybuffer'
                     }).then(response => { return response.data })
@@ -237,7 +237,7 @@ const kdramaCompleterService = async (client) => {
         for (const kdrama of allKdramas) {
             if (!currentTitles.includes(kdrama.title) && kdrama.isCompleted === false) {
 
-                //await kdramaCollection.updateOne({ _id: kdrama._id }, { $set: { isCompleted: true } });
+                await kdramaCollection.updateOne({ _id: kdrama._id }, { $set: { isCompleted: true } });
                 log(`Marked "${kdrama.title}" as complete.`);
                 const embed = new EmbedBuilder()
                     .setTitle(`${kdrama.title}`)
