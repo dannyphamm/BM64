@@ -74,7 +74,7 @@ async function fetchAllMessages(channel) {
     return allMessages;
 }
 
-async function fetchMessagesWithCriteria(channel, itemId, limit = 1000) {
+async function fetchMessagesWithCriteria(channel, itemId, limit = 5000) {
     let allMessages = [];
     let lastMessageId = null;
     let fetchMore = true;
