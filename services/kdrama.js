@@ -164,9 +164,10 @@ const kdramaCompleterService = async (client) => {
     //         }
     //     }
 
-    const kdramaCollection = client.mongodb.db.collection(config.mongodbDBKDrama);
+    
     // Code for new drama detection
     async function scrapeKoreanDrama() {
+        const kdramaCollection = client.mongodb.db.collection(config.mongodbDBKDrama);
         const url = 'https://asianc.sh/category/korean-drama';
         const { data, status } = await axios.get(url);
         // If status code is not 200, return
