@@ -272,7 +272,7 @@ const kdramaTrackerService = async (client) => {
     const kdramaCollection = client.mongodb.db.collection(config.mongodbDBKDrama);
     //Extract the titles and episode numbers from the JSON data
     const kdramas = await kdramaCollection.find().toArray();
-    async function scrapeKoreanDrama() {
+    async function scrapeKoreanDrama1() {
         const url = 'https://asianc.sh/recently-added?page=1';
         const { data } = await axios.get(url);
         const $ = cheerio.load(data);
@@ -369,7 +369,7 @@ const kdramaTrackerService = async (client) => {
         });
     }
 
-    scrapeKoreanDrama()
+    scrapeKoreanDrama1()
 }
 //module.exports = { kdramaTrackerService,  }
 module.exports = { kdramaTrackerService, kdramaCompleterService }
