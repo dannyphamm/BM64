@@ -166,19 +166,23 @@ const kdramaCompleterService = async (client) => {
 
     
     // Code for new drama detection
-    async function scrapeKoreanDrama() {
         const kdramaCollection = client.mongodb.db.collection(config.mongodbDBKDrama);
         const url = 'https://asianc.sh/category/korean-drama';
-        const { data, status } = await axios.get(url);
-        // If status code is not 200, return
-        if (status !== 200) {
-            error(`Error: ${status}`);
-            return;
+        let data, status;
+        try {
+            data, status  = await axios.get(url);
+            // If status code is not 200, return
+            if (status !== 200) {
+                error(`Error: ${status}`);
+                return;
+            }
+        } catch (e) {
+            error("Unable to fetch https://asianc.sh/category/korean-drama")
+        }
+        if(!data) {
+            return
         }
         const $ = cheerio.load(data);
-
-        // Set the selects
-
 
         // Filter and get all li tags with class show
         const currentTitles = []; // Initialize an array to hold current titles
@@ -259,22 +263,26 @@ const kdramaCompleterService = async (client) => {
                 });
             }
         }
-
-    }
-
-    scrapeKoreanDrama()
-
-
-
 }
 
 const kdramaTrackerService = async (client) => {
     const kdramaCollection = client.mongodb.db.collection(config.mongodbDBKDrama);
     //Extract the titles and episode numbers from the JSON data
-    const kdramas = await kdramaCollection.find().toArray();
-    async function scrapeKoreanDrama1() {
         const url = 'https://asianc.sh/recently-added?page=1';
-        const { data } = await axios.get(url);
+        let data, status;
+        try {
+            data, status  = await axios.get(url);
+            // If status code is not 200, return
+            if (status !== 200) {
+                error(`Error: ${status}`);
+                return;
+            }
+        } catch (e) {
+            error("Unable to fetch https://asianc.sh/recently-added?page=1")
+        }
+        if(!data) {
+            return
+        }
         const $ = cheerio.load(data);
 
         // Set the selects
@@ -367,9 +375,6 @@ const kdramaTrackerService = async (client) => {
                 }
             }
         });
-    }
-
-    scrapeKoreanDrama1()
 }
 //module.exports = { kdramaTrackerService,  }
 module.exports = { kdramaTrackerService, kdramaCompleterService }
