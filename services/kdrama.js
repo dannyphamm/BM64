@@ -167,7 +167,7 @@ const kdramaCompleterService = async (client) => {
     
     // Code for new drama detection
         const kdramaCollection = client.mongodb.db.collection(config.mongodbDBKDrama);
-        const url = 'https://asianc.sh/category/korean-drama';
+        const url = 'https://asianc.co/category/korean-drama';
         let data, status;
         try {
             data, status  = await axios.get(url);
@@ -177,7 +177,7 @@ const kdramaCompleterService = async (client) => {
                 return;
             }
         } catch (e) {
-            error("Unable to fetch https://asianc.sh/category/korean-drama")
+            error("Unable to fetch https://asianc.co/category/korean-drama")
         }
         if(!data) {
             return
@@ -198,7 +198,7 @@ const kdramaCompleterService = async (client) => {
                 if (!existingKDrama) {
                     const link = $(element).find('a').attr('href');
                     //Go the link and get the image src url and save it to the database
-                    const { data, } = await axios.get("https://asianc.sh" + link);
+                    const { data, } = await axios.get("https://asianc.co" + link);
                     const $$ = cheerio.load(data);
                     const imageURL = $$('.img img').attr('src');
                     await kdramaCollection.insertOne({ title, banner: imageURL, isCompleted: false });
@@ -217,7 +217,7 @@ const kdramaCompleterService = async (client) => {
                     const button = new ButtonBuilder()
                         .setStyle(ButtonStyle.Link)
                         .setLabel('Watch now')
-                        .setURL("https://asianc.sh" + link);
+                        .setURL("https://asianc.co" + link);
                     const row = new ActionRowBuilder().addComponents(button);
                     const channel = await client.channels.cache.find(c => c.name === 'movie-night');
                     if (!channel) return;
@@ -268,7 +268,7 @@ const kdramaCompleterService = async (client) => {
 const kdramaTrackerService = async (client) => {
     const kdramaCollection = client.mongodb.db.collection(config.mongodbDBKDrama);
     //Extract the titles and episode numbers from the JSON data
-        const url = 'https://asianc.sh/recently-added?page=1';
+        const url = 'https://asianc.co/recently-added?page=1';
         let data, status;
         try {
             data, status  = await axios.get(url);
@@ -278,7 +278,7 @@ const kdramaTrackerService = async (client) => {
                 return;
             }
         } catch (e) {
-            error("Unable to fetch https://asianc.sh/recently-added?page=1")
+            error("Unable to fetch https://asianc.co/recently-added?page=1")
         }
         if(!data) {
             return
@@ -322,7 +322,7 @@ const kdramaTrackerService = async (client) => {
                     const button = new ButtonBuilder()
                         .setStyle(ButtonStyle.Link)
                         .setLabel('Watch now')
-                        .setURL("https://asianc.sh" + link);
+                        .setURL("https://asianc.co" + link);
                     const row = new ActionRowBuilder().addComponents(button);
 
                     const channel = await client.channels.cache.find(c => c.name === 'movie-night');
@@ -359,7 +359,7 @@ const kdramaTrackerService = async (client) => {
                     const button = new ButtonBuilder()
                         .setStyle(ButtonStyle.Link)
                         .setLabel('Watch now')
-                        .setURL("https://asianc.sh" + link);
+                        .setURL("https://asianc.co" + link);
                     const row = new ActionRowBuilder().addComponents(button);
 
                     const channel = await client.channels.cache.find(c => c.name === 'movie-night');
