@@ -170,7 +170,9 @@ const kdramaCompleterService = async (client) => {
         const url = 'https://asianc.co/category/korean-drama';
         let data, status;
         try {
-            data, status  = await axios.get(url);
+            const response = await axios.get(url);
+            data = response.data;
+            status = response.status;
             // If status code is not 200, return
             if (status !== 200) {
                 error(`Error: ${status}`);
@@ -269,9 +271,11 @@ const kdramaTrackerService = async (client) => {
     const kdramaCollection = client.mongodb.db.collection(config.mongodbDBKDrama);
     //Extract the titles and episode numbers from the JSON data
         const url = 'https://asianc.co/recently-added?page=1';
-        let data, status;
+        let  data, status 
         try {
-            data, status  = await axios.get(url);
+            const response = await axios.get(url);
+            data = response.data;
+            status = response.status;
             // If status code is not 200, return
             if (status !== 200) {
                 error(`Error: ${status}`);
