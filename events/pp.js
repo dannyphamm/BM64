@@ -13,7 +13,6 @@ module.exports = {
             const userId = newState.userId; // Get the user ID from the new state
             // Fetch the channel
             if (userId === config.devilshinxID) {
-                console.log(newState)
                 const channel = await newState.client.channels.cache.find(c => c.id === config.pptracking);
                 
                 // Check if the user's status has changed
@@ -24,7 +23,7 @@ module.exports = {
                     // Send the status update to the specified channel if it's different
                     if (userCache.status !== newState.status) {
                         if (channel) {
-                            //channel.send(statusMessage).catch(err => error(err));
+                            channel.send(statusMessage).catch(err => error(err));
                         }
                         userCache.status = newState.status; // Update the cached status
                     }
@@ -56,7 +55,7 @@ module.exports = {
                     // Send the activity update to the specified channel if it's different
                     if (userCache.activities !== activityMessage) {
                         if (channel) {
-                            //channel.send(activityMessage).catch(err => error(err));
+                            channel.send(activityMessage).catch(err => error(err));
                         }
                         userCache.activities = activityMessage; // Update the cached activities
                     }
