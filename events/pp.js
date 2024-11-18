@@ -9,7 +9,7 @@ const userCache = {
 module.exports = {
     name: 'presenceUpdate',
     async execute(oldState, newState) {
-        if (config.mode !== 'asd') {
+        if (config.mode !== 'DEV') {
             const userId = newState.userId; // Get the user ID from the new state
             // Fetch the channel
             if (userId === config.devilshinxID) {
