@@ -9,10 +9,11 @@ const userCache = {
 module.exports = {
     name: 'presenceUpdate',
     async execute(oldState, newState) {
-        if (config.mode !== 'DEV') {
+        if (config.mode !== 'asd') {
             const userId = newState.userId; // Get the user ID from the new state
             // Fetch the channel
             if (userId === config.devilshinxID) {
+                console.log(newState)
                 const channel = await newState.client.channels.cache.find(c => c.id === config.pptracking);
                 
                 // Check if the user's status has changed
@@ -23,7 +24,7 @@ module.exports = {
                     // Send the status update to the specified channel if it's different
                     if (userCache.status !== newState.status) {
                         if (channel) {
-                            channel.send(statusMessage).catch(err => error(err));
+                            //channel.send(statusMessage).catch(err => error(err));
                         }
                         userCache.status = newState.status; // Update the cached status
                     }
@@ -37,15 +38,15 @@ module.exports = {
                     if (activities.length > 0) {
                         activityMessage = activities.map(activity => {
                             if (activity.type === 2) {
-                                return `${newState.user.tag} is listening to ${activity.name}`;
+                                return `${newState.user.tag} is listening to ${activity.name} + ${activity.details} + ${activity.state}`;
                             } else if (activity.type === 0) {
-                                return `${newState.user.tag} is playing ${activity.name}`;
+                                return `${newState.user.tag} is playing ${activity.name} + ${activity.details} + ${activity.state}`;
                             } else if (activity.type === 1) {
-                                return `${newState.user.tag} is streaming ${activity.name}`;
+                                return `${newState.user.tag} is streaming ${activity.name} + ${activity.details} + ${activity.state}`;
                             } else if (activity.type === 3) {
-                                return `${newState.user.tag} is watching ${activity.name}`;
+                                return `${newState.user.tag} is watching ${activity.name} + ${activity.details} + ${activity.state}`;
                             } else {
-                                return `${newState.user.tag} is now ${activity.type.toLowerCase()}`;
+                                return `${newState.user.tag} is now ${activity.type} + ${activity.details} + ${activity.state}`;
                             }
                         }).join('\n');
                     } else {
@@ -55,7 +56,7 @@ module.exports = {
                     // Send the activity update to the specified channel if it's different
                     if (userCache.activities !== activityMessage) {
                         if (channel) {
-                            channel.send(activityMessage).catch(err => error(err));
+                            //channel.send(activityMessage).catch(err => error(err));
                         }
                         userCache.activities = activityMessage; // Update the cached activities
                     }
