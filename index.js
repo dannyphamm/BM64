@@ -12,7 +12,7 @@ const GeniusClient = new Genius.Client();
 const MongoConnection = require('./utils/db');
 // Create a new client instance
 const myIntents = new IntentsBitField();
-myIntents.add(IntentsBitField.Flags.Guilds, IntentsBitField.Flags.GuildMessages, IntentsBitField.Flags.GuildVoiceStates, IntentsBitField.Flags.MessageContent);
+myIntents.add(IntentsBitField.Flags.Guilds, IntentsBitField.Flags.GuildMessages, IntentsBitField.Flags.GuildVoiceStates, IntentsBitField.Flags.MessageContent,IntentsBitField.Flags.GuildPresences);
 const client = new Client(
     {
         intents: myIntents

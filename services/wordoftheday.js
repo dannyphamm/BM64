@@ -81,7 +81,7 @@ const wordOfTheDayService = async (client) => {
             const examples = {
                 title: data.word.charAt(0).toUpperCase() + data.word.slice(1) + " Examples",
                 color: 0x7289da,
-                fields: createExamples(data.examples),
+                fields: createExamples(data.examples.slice(0, 25)),
                 timestamp: new Date().toISOString(),
                 footer: {
                     text: 'Powered by BM64',
