@@ -38,7 +38,7 @@ module.exports = {
                 return interaction.reply(`Stopped tracking ${name}`);
             } else if (subcommand === 'starttracking') {
                 const axios = require('axios'); // Import axios
-                const searchUrl = `https://asianc.sh/search?type=movies&keyword=${encodeURIComponent(name)}`; // Construct search URL
+                const searchUrl = `https://watchasia.is/search?type=movies&keyword=${encodeURIComponent(name)}`; // Construct search URL
 
                 try {
                     const response = await axios.get(searchUrl); // Make the GET request
