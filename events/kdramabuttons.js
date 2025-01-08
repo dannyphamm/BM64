@@ -21,7 +21,6 @@ module.exports = {
                 const kdramaCollection = client.mongodb.db.collection(config.mongodbDBKDrama);
                 kdramaCollection.insertOne({ 
                     title: kdramaName, 
-                    isTracking: true, 
                     isCompleted: false 
                 }, (err, result) => {
                     if (err) {

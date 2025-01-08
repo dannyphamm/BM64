@@ -369,7 +369,6 @@ const kdramaTrackerService = async (client) => {
         const fullTitle = $(article).find('img').attr('title');
         const title = fullTitle.split(' Episode ')[0];
         const ep = parseInt(fullTitle.split(' Episode ')[1]) || 0;
-        log(title)
         // Skip if we can't parse the episode number
         if (isNaN(ep)) continue;
         
