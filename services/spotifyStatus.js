@@ -163,9 +163,10 @@ loadSpotify = async (client, clear) => {
                     await new Promise(resolve => { setTimeout(resolve, 3000) });
                     return loadSpotify(client, true);
                 }
-                if (!next || !next[0] || next[0] === true) {
+                if (!next[0] || next[0] === true) {
                     queue = [];
                 } else {
+                    log("next", next)
                     queue = next[0].songs.map((track, id) => ({
                         name: track.name,
                         artists: track.artists,
