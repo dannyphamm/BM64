@@ -87,7 +87,7 @@ loadSpotify = async (client, clear) => {
                         await new Promise(resolve => { setTimeout(resolve, 3000) });
                         return loadSpotify(client, true);
                     }
-                    if (!data[0] || data[0] === true) {
+                    if (!data || !data[0] || data[0] === true) {
                         queue = [];
                     } else {
                         queue = data[0].songs.map((track, id) => ({
@@ -163,7 +163,7 @@ loadSpotify = async (client, clear) => {
                     await new Promise(resolve => { setTimeout(resolve, 3000) });
                     return loadSpotify(client, true);
                 }
-                if (!next[0] || next[0] === true) {
+                if (!next || !next[0] || next[0] === true) {
                     queue = [];
                 } else {
                     queue = next[0].songs.map((track, id) => ({
