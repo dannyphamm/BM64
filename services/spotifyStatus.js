@@ -42,6 +42,7 @@ loadSpotify = async (client, clear) => {
 
     try {
         // Get the currently playing track from the Spotify API
+        log("SPOTIFYAPI: getting current track")
         const currentTrack = await spotifyApi.getMyCurrentPlayingTrack().catch(async(e) => {
             log("Spotify failure, retrying in 3 seconds")
             error(e);
@@ -75,6 +76,7 @@ loadSpotify = async (client, clear) => {
                     
                     const data = response;
                     await new Promise(resolve => { setTimeout(resolve, 3000) });
+                    log("SPOTIFYAPI: getting recent tracks")
                     const recent = await spotifyApi.getMyRecentlyPlayedTracks({ limit: 10 }).catch(async(e) => {
                         log("Spotify failure, retrying in 3 seconds")
                         error(e);
@@ -187,6 +189,7 @@ loadSpotify = async (client, clear) => {
                         value: track?.album || 'No Album',
                     }))
                 };
+                log("SPOTIFYAPI: getting recent tracks 2")
                 const recent = await spotifyApi.getMyRecentlyPlayedTracks({ limit: 10 }).catch(async(e) => {
                     log("Spotify failure, retrying in 3 seconds")
                     error(e);
