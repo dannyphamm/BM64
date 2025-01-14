@@ -11,6 +11,7 @@ let durationMs;
 let timeoutId;
 
 loadSpotify = async (client, clear) => {
+    log("loadSpotify")
     const spotifyApi = await spotify();
     const voiceChannelId = config.misamoVoiceChannel;
     const voiceChannel = await client.channels.fetch(voiceChannelId);
