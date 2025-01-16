@@ -12,7 +12,12 @@ let timeoutId;
 
 loadSpotify = async (client, clear) => {
     log("loadSpotify")
-    const spotifyApi = await spotify();
+    const spotifyApi = await spotify().catch(async(e) => {
+        log("Spotify API init failure, retrying in 3 seconds");
+        error(e);
+        await new Promise(resolve => { setTimeout(resolve, 3000) });
+        return loadSpotify(client, true);
+    });
     const voiceChannelId = config.misamoVoiceChannel;
     const voiceChannel = await client.channels.fetch(voiceChannelId);
     // refresh token if expired
