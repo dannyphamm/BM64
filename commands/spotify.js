@@ -22,6 +22,10 @@ module.exports = {
       subcommand.setName('test')
         .setDescription('Test')
     )
+    .addSubcommand(subcommand =>
+      subcommand.setName('duplicatecleanup')
+        .setDescription('Find and remove duplicate tracks from the MiSaMo playlist')
+    )
     .setDescription('Spotify related commands'),
   async execute(interaction) {
     const { client } = interaction;
@@ -91,6 +95,105 @@ module.exports = {
       duplicates.forEach(track => {
         console.log(`Track: ${track.track.name}, Artist: ${track.track.artists[0].name}, Count: ${track.count}`);
       });
+    }
+    else if (subcommand === 'duplicatecleanup') {
+      await interaction.deferReply({ ephemeral: true });
+      let spotifyApi = await spotify();
+      
+      // Fetch all tracks from the MiSaMo playlist
+      const playlistTracks = await getAllPlaylistSongs(config.spotifyPlaylist);
+      
+      // Create maps for both types of duplicates
+      const nameArtistMap = new Map();
+      const uriMap = new Map();
+      const duplicatesByNameArtist = [];
+      const duplicatesByUri = [];
+
+      // Find duplicates
+      playlistTracks.forEach(item => {
+        const track = item.track;
+        const nameArtistKey = `${track.name}___${track.artists.map(a => a.name).join(',')}`.toLowerCase();
+        const uriKey = track.uri;
+        
+        // Check name + artist duplicates
+        if (!nameArtistMap.has(nameArtistKey)) {
+          nameArtistMap.set(nameArtistKey, [track]);
+        } else {
+          nameArtistMap.get(nameArtistKey).push(track);
+          if (nameArtistMap.get(nameArtistKey).length === 2) {
+            duplicatesByNameArtist.push({
+              name: track.name,
+              artists: track.artists.map(a => a.name).join(', '),
+              tracks: nameArtistMap.get(nameArtistKey)
+            });
+          }
+        }
+
+        // Check URI duplicates
+        if (!uriMap.has(uriKey)) {
+          uriMap.set(uriKey, [track]);
+        } else {
+          uriMap.get(uriKey).push(track);
+          if (uriMap.get(uriKey).length === 2) {
+            duplicatesByUri.push({
+              uri: uriKey,
+              name: track.name,
+              artists: track.artists.map(a => a.name).join(', '),
+              tracks: uriMap.get(uriKey)
+            });
+          }
+        }
+      });
+
+      if (duplicatesByNameArtist.length === 0 && duplicatesByUri.length === 0) {
+        return await interaction.editReply('No duplicates found!');
+      }
+
+      // Prepare messages
+      let messages = ['Found the following duplicates:\n'];
+      let currentMessage = 0;
+
+      // Add URI duplicates first
+      if (duplicatesByUri.length > 0) {
+        messages[currentMessage] += '\n=== EXACT URI DUPLICATES ===\n';
+        duplicatesByUri.forEach(dup => {
+          const dupText = `\n${dup.name} by ${dup.artists}\nInstances: ${dup.tracks.length}\nURI: ${dup.uri}\n`;
+          
+          if (messages[currentMessage].length + dupText.length > 1900) {
+            currentMessage++;
+            messages[currentMessage] = '';
+          }
+          messages[currentMessage] += dupText;
+        });
+      }
+
+      // Add name + artist duplicates
+      if (duplicatesByNameArtist.length > 0) {
+        const headerText = '\n=== SAME SONG DIFFERENT URI ===\n';
+        if (messages[currentMessage].length + headerText.length > 1900) {
+          currentMessage++;
+          messages[currentMessage] = '';
+        }
+        messages[currentMessage] += headerText;
+
+        duplicatesByNameArtist.forEach(dup => {
+          const dupText = `\n${dup.name} by ${dup.artists}\nInstances: ${dup.tracks.length}\nURIs:\n${dup.tracks.map(track => track.uri).join('\n')}\n`;
+          
+          if (messages[currentMessage].length + dupText.length > 1900) {
+            currentMessage++;
+            messages[currentMessage] = '';
+          }
+          messages[currentMessage] += dupText;
+        });
+      }
+
+      // Send all messages
+      await interaction.editReply(messages[0]);
+      
+      // Send follow-up messages if there are any
+      for (let i = 1; i < messages.length; i++) {
+        await interaction.followUp({ content: messages[i], ephemeral: true });
+      }
     }
   },
 };

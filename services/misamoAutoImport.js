@@ -16,6 +16,7 @@ const misamoAutoImport = async (client) => {
     // Misamo tracks
     const misamoTracks = await misamo.find().toArray();
     const misamoUris = misamoTracks.map(song => song.uri);
+    const misamoSignatures = misamoTracks.map(song => `${song.name}___${song.artists}`.toLowerCase());
     let newTracks = [];
 
     // Get all the songs from the auto playlists and finds tracks that are not in the misamo collection
@@ -23,7 +24,6 @@ const misamoAutoImport = async (client) => {
         const data = await getAllPlaylistSongs(playlist?.uri);
 
         const newData = data.map(song => {
-
             try {
                 return {
                     uri: song.track.uri,
@@ -38,13 +38,24 @@ const misamoAutoImport = async (client) => {
         });
 
         for (const song of newData) {
-            if (!misamoUris.includes(song.uri)) {
+            const songSignature = `${song.name}___${song.artists}`.toLowerCase();
+            if (!misamoUris.includes(song.uri) && !misamoSignatures.includes(songSignature)) {
                 newTracks.push(song);
             }
         }
     }
-    // Remove duplicates
-    newTracks = [...new Set(newTracks.map(song => song.uri))].map(uri => newTracks.find(song => song.uri === uri));
+    
+    // Remove duplicates checking both URI and name+artists
+    const seen = new Set();
+    newTracks = newTracks.filter(song => {
+        const signature = `${song.uri}___${song.name}___${song.artists}`.toLowerCase();
+        if (seen.has(signature)) {
+            return false;
+        }
+        seen.add(signature);
+        return true;
+    });
+
     // send a message in MiSaMo Import that a new song is detected
     if (newTracks.length > 0) {
         const channel = client.channels.cache.get(config.spotifyChannel);
@@ -72,5 +83,3 @@ const misamoAutoImport = async (client) => {
 }
 
 module.exports = { misamoAutoImport }
-
-
