@@ -11,7 +11,7 @@ const { loadSpotify } = require('../services/spotifyStatus');
 const { socketIO } = require('../utils/socket');
 const { spotify, getAllPlaylistSongs } = require('../utils/spotify');
 const { misamoAutoImport } = require('../services/misamoAutoImport');
-
+const { uniqloStreamService } = require('../services/uniqlostream');
 
 module.exports = {
     name: 'ready',
@@ -129,8 +129,10 @@ module.exports = {
                 await new Promise(resolve => { setTimeout(resolve, 5000) });
                 loadSpotify(client, true)
             }
-            delay()
+            delay();
+            uniqloStreamService(client);
         }
+        
         log('Ready!');
     },
 };
