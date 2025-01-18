@@ -11,13 +11,7 @@ let durationMs;
 let timeoutId;
 
 loadSpotify = async (client, clear) => {
-    log("loadSpotify")
-    const spotifyApi = await spotify().catch(async(e) => {
-        log("Spotify API init failure, retrying in 3 seconds");
-        error(e);
-        await new Promise(resolve => { setTimeout(resolve, 3000) });
-        return loadSpotify(client, true);
-    });
+    const spotifyApi = await spotify();
     const voiceChannelId = config.misamoVoiceChannel;
     const voiceChannel = await client.channels.fetch(voiceChannelId);
     // refresh token if expired
@@ -48,7 +42,6 @@ loadSpotify = async (client, clear) => {
 
     try {
         // Get the currently playing track from the Spotify API
-        log("SPOTIFYAPI: getting current track")
         const currentTrack = await spotifyApi.getMyCurrentPlayingTrack().catch(async(e) => {
             log("Spotify failure, retrying in 3 seconds")
             error(e);
@@ -82,7 +75,6 @@ loadSpotify = async (client, clear) => {
                     
                     const data = response;
                     await new Promise(resolve => { setTimeout(resolve, 3000) });
-                    log("SPOTIFYAPI: getting recent tracks")
                     const recent = await spotifyApi.getMyRecentlyPlayedTracks({ limit: 10 }).catch(async(e) => {
                         log("Spotify failure, retrying in 3 seconds")
                         error(e);
@@ -114,7 +106,7 @@ loadSpotify = async (client, clear) => {
                     const updatedNextUpEmbed = {
                         color: 0x0099ff,
                         title: 'Next Up',
-                        fields: (queue.slice(0, 4).map((track, id) => ({
+                        fields: (queue.slice(0, 5).map((track, id) => ({
                             name: (1 + Number(id)) + ". " + track.name ,
                             value: track.artists,
                         })))
@@ -190,12 +182,11 @@ loadSpotify = async (client, clear) => {
                 } : {
                     color: 0x0099ff,
                     title: 'Next Up',
-                    fields: queue.slice(0, 4).map((track, id) => ({
+                    fields: queue.slice(0, 5).map((track, id) => ({
                         name: (1 + Number(id)) + ". " + track.name + " - " + track.artists,
                         value: track?.album || 'No Album',
                     }))
                 };
-                log("SPOTIFYAPI: getting recent tracks 2")
                 const recent = await spotifyApi.getMyRecentlyPlayedTracks({ limit: 10 }).catch(async(e) => {
                     log("Spotify failure, retrying in 3 seconds")
                     error(e);

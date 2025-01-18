@@ -197,7 +197,6 @@ const kdramaCompleterService = async (client) => {
             const existingDrama = existingKdramas.find(drama => drama.title === title);
             if (existingDrama) {
                 if (existingDrama.isCompleted) {
-                    log(`Skipping "${title}" as it is marked as completed`);
                     continue; // Skip this title and move to next one
                 }
                 // If it exists but isn't completed, skip it anyway as it's not new
