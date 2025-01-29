@@ -65,9 +65,9 @@ async function fetchSaleItems(client, gender, discordId) {
         try {
             response = await url.json();
         } catch (e) {
-            error('Failed to parse response as JSON:', e, url.text());
-            return;
-            // Handle the error...
+            const text = await url.text();
+            error('Failed to parse JSON. Response:', text, 'Error:', e);
+            throw new Error(`Invalid JSON response: ${e.message}`);
         }
         // If response is not 200 then return
         if (response.status !== "ok" || response.result.items.length === 0) return (error("Error fetching sale items", gender, `${config.uniqloApiUrl}/products?path=${gender}&flagCodes=discount&limit=1000&offset=0`));

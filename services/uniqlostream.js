@@ -110,10 +110,48 @@ async function uniqloStreamService(client) {
             }
         });
 
+        await cleanChannelOrphans(client, config.maleCurrentChannelId, maleCollection);
+        await cleanChannelOrphans(client, config.femaleCurrentChannelId, femaleCollection);
+
         log('Uniqlo change streams initialized successfully');
 
     } catch (err) {
         error('Error initializing Uniqlo change streams:', err);
+    }
+}
+
+async function cleanChannelOrphans(client, channelId, collection) {
+    try {
+        const channel = await client.channels.cache.find(c => c.id === channelId);
+        if (!channel) {
+            error(`Channel ${channelId} not found`);
+            return;
+        }
+
+        // Get all messages from the channel
+        const messages = await fetchAllMessages(channel);
+        
+        // Get all item IDs from database for quick lookup
+        const dbItems = await collection.find({}, { _id: 1 }).toArray();
+        const dbIds = new Set(dbItems.map(item => item._id));
+
+        // Check each message
+        for (const msg of messages) {
+            if (msg.embeds.length > 0) {
+                const footer = msg.embeds[0].footer?.text;
+                if (footer) {
+                    const idMatch = footer.match(/ID: (.+)$/);
+                    if (idMatch && !dbIds.has(idMatch[1])) {
+                        await msg.delete().catch(e => error(`Failed to delete message: ${e}`));
+                        log(`Deleted orphaned message for item ${idMatch[1]}`);
+                    }
+                }
+            }
+        }
+
+        log(`Channel cleanup completed for ${channelId}`);
+    } catch (err) {
+        error('Error in cleanChannelOrphans:', err);
     }
 }
 
