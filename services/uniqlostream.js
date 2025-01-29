@@ -185,7 +185,7 @@ async function preloadChannelItems(client, channelId, collection) {
         // Get all items from database that aren't already posted
         const dbItems = await collection.find({}).toArray();
         let loadCount = 0;
-
+        log(`Existing IDs: ${Array.from(existingIds).join(', ')}`);
         for (const item of dbItems) {
             log(`Checking DB item: ${item._id}, Exists: ${existingIds.has(item._id)}`);
             if (!existingIds.has(item._id)) {
