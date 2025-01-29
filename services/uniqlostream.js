@@ -112,11 +112,11 @@ async function uniqloStreamService(client) {
             }
         });
 
-        // await cleanChannelOrphans(client, config.maleCurrentChannelId, maleCollection);
-        // await cleanChannelOrphans(client, config.femaleCurrentChannelId, femaleCollection);
+        await cleanChannelOrphans(client, config.maleCurrentChannelId, maleCollection);
+        await cleanChannelOrphans(client, config.femaleCurrentChannelId, femaleCollection);
 
-        await preloadChannelItems(client, config.maleCurrentChannelId, maleCollection);
-        await preloadChannelItems(client, config.femaleCurrentChannelId, femaleCollection);
+        // await preloadChannelItems(client, config.maleCurrentChannelId, maleCollection);
+        // await preloadChannelItems(client, config.femaleCurrentChannelId, femaleCollection);
 
         log('Uniqlo change streams initialized successfully');
 
@@ -138,7 +138,7 @@ async function cleanChannelOrphans(client, channelId, collection) {
         
         // Get all item IDs from database for quick lookup
         const dbItems = await collection.find({}, { _id: 1 }).toArray();
-        const dbIds = new Set(dbItems.map(item => item._id));
+        const dbIds = new Set(dbItems.map(item => item._id.toString())); // Convert ObjectIds to strings
 
         // Check each message
         for (const msg of messages) {
@@ -146,7 +146,7 @@ async function cleanChannelOrphans(client, channelId, collection) {
                 const footer = msg.embeds[0].footer?.text;
                 if (footer) {
                     const idMatch = footer.match(/ID: (.+)$/);
-                    if (idMatch && !dbIds.has(idMatch[1])) {
+                    if (idMatch && !dbIds.has(idMatch[1].toString())) { // Compare strings
                         await msg.delete().catch(e => error(`Failed to delete message: ${e}`));
                         log(`Deleted orphaned message for item ${idMatch[1]}`);
                     }
