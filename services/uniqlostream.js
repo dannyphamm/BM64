@@ -176,7 +176,7 @@ async function preloadChannelItems(client, channelId, collection) {
                     const idMatch = footer.match(/ID: (.+)$/);
                     if (idMatch) {
                         log(`Existing ID: ${idMatch[1]}`);
-                        existingIds.add(idMatch[1]);
+                        existingIds.add(idMatch[1].toString());
                     }
                 }
             }
@@ -186,9 +186,11 @@ async function preloadChannelItems(client, channelId, collection) {
         const dbItems = await collection.find({}).toArray();
         let loadCount = 0;
         log(`Existing IDs: ${Array.from(existingIds).join(', ')}`);
+        
         for (const item of dbItems) {
-            log(`Checking DB item: ${item._id}, Exists: ${existingIds.has(item._id)}`);
-            if (!existingIds.has(item._id)) {
+            const itemId = item._id.toString();
+            log(`Checking DB item: ${itemId}, Exists: ${existingIds.has(itemId)}`);
+            if (!existingIds.has(itemId)) {
                 const colorSizes = item.l2s.reduce((acc, l2) => {
                     if (!acc[l2.color.name]) {
                         acc[l2.color.name] = [];
@@ -205,7 +207,7 @@ async function preloadChannelItems(client, channelId, collection) {
                     .setURL(`https://www.uniqlo.com/au/en/products/${item.productId}`)
                     .setImage(item.images?.main?.[0]?.url || '')
                     .setTimestamp()
-                    .setFooter({ text: `Uniqlo ${channelId === config.maleCurrentChannelId ? "Men's" : "Women's"} Sale Updates | ID: ${item._id}` });
+                    .setFooter({ text: `Uniqlo ${channelId === config.maleCurrentChannelId ? "Men's" : "Women's"} Sale Updates | ID: ${itemId}` });
                 
                 await channel.send({ embeds: [embed] }).catch(e => error(`Failed to create message: ${e}`));
                 loadCount++;
