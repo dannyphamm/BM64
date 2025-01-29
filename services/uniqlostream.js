@@ -187,6 +187,7 @@ async function preloadChannelItems(client, channelId, collection) {
         let loadCount = 0;
 
         for (const item of dbItems) {
+            log(`Checking DB item: ${item._id}, Exists: ${existingIds.has(item._id)}`);
             if (!existingIds.has(item._id)) {
                 const colorSizes = item.l2s.reduce((acc, l2) => {
                     if (!acc[l2.color.name]) {
@@ -202,7 +203,7 @@ async function preloadChannelItems(client, channelId, collection) {
                     .setDescription(`**Base:** ${pricePrecision(item.prices.base.value)}\n**Promo:** ${pricePrecision(item.prices.promo?.value)}\n${colorSizeLines}`)
                     .setColor(channelId === config.maleCurrentChannelId ? 0x0066cc : 0xff69b4)
                     .setURL(`https://www.uniqlo.com/au/en/products/${item.productId}`)
-                    .setImage(item.images.main?.[0]?.url)
+                    .setImage(item.images?.main?.[0]?.url || '')
                     .setTimestamp()
                     .setFooter({ text: `Uniqlo ${channelId === config.maleCurrentChannelId ? "Men's" : "Women's"} Sale Updates | ID: ${item._id}` });
                 
@@ -212,6 +213,7 @@ async function preloadChannelItems(client, channelId, collection) {
         }
 
         log(`Preload completed for channel ${channelId}. Added ${loadCount} new items.`);
+        log(`Total existing IDs: ${existingIds.size}, Total DB items: ${dbItems.length}`);
     } catch (err) {
         error('Error in preloadChannelItems:', err);
     }
