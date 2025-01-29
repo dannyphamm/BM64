@@ -175,6 +175,7 @@ async function preloadChannelItems(client, channelId, collection) {
                 if (footer) {
                     const idMatch = footer.match(/ID: (.+)$/);
                     if (idMatch) {
+                        log(`Existing ID: ${idMatch[1]}`);
                         existingIds.add(idMatch[1]);
                     }
                 }
@@ -201,7 +202,7 @@ async function preloadChannelItems(client, channelId, collection) {
                     .setDescription(`**Base:** ${pricePrecision(item.prices.base.value)}\n**Promo:** ${pricePrecision(item.prices.promo?.value)}\n${colorSizeLines}`)
                     .setColor(channelId === config.maleCurrentChannelId ? 0x0066cc : 0xff69b4)
                     .setURL(`https://www.uniqlo.com/au/en/products/${item.productId}`)
-                    .setImage(item.images.main[0].url)
+                    .setImage(item.images.main?.[0]?.url)
                     .setTimestamp()
                     .setFooter({ text: `Uniqlo ${channelId === config.maleCurrentChannelId ? "Men's" : "Women's"} Sale Updates | ID: ${item._id}` });
                 
