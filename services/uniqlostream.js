@@ -110,8 +110,11 @@ async function uniqloStreamService(client) {
             }
         });
 
-        await cleanChannelOrphans(client, config.maleCurrentChannelId, maleCollection);
-        await cleanChannelOrphans(client, config.femaleCurrentChannelId, femaleCollection);
+        // await cleanChannelOrphans(client, config.maleCurrentChannelId, maleCollection);
+        // await cleanChannelOrphans(client, config.femaleCurrentChannelId, femaleCollection);
+
+        await preloadChannelItems(client, config.maleCurrentChannelId, maleCollection);
+        await preloadChannelItems(client, config.femaleCurrentChannelId, femaleCollection);
 
         log('Uniqlo change streams initialized successfully');
 
@@ -155,5 +158,67 @@ async function cleanChannelOrphans(client, channelId, collection) {
     }
 }
 
-module.exports = {uniqloStreamService};
+async function preloadChannelItems(client, channelId, collection) {
+    try {
+        const channel = await client.channels.cache.find(c => c.id === channelId);
+        if (!channel) {
+            error(`Channel ${channelId} not found`);
+            return;
+        }
+
+        // Get existing message IDs
+        const messages = await fetchAllMessages(channel);
+        const existingIds = new Set();
+        messages.forEach(msg => {
+            if (msg.embeds.length > 0) {
+                const footer = msg.embeds[0].footer?.text;
+                if (footer) {
+                    const idMatch = footer.match(/ID: (.+)$/);
+                    if (idMatch) {
+                        existingIds.add(idMatch[1]);
+                    }
+                }
+            }
+        });
+
+        // Get all items from database that aren't already posted
+        const dbItems = await collection.find({}).toArray();
+        let loadCount = 0;
+
+        for (const item of dbItems) {
+            if (!existingIds.has(item._id)) {
+                const colorSizes = item.l2s.reduce((acc, l2) => {
+                    if (!acc[l2.color.name]) {
+                        acc[l2.color.name] = [];
+                    }
+                    acc[l2.color.name].push(`${l2.size.name} (${l2.stock.quantity}) (${pricePrecision(l2.prices.promo.value)})`);
+                    return acc;
+                }, {});
+                const colorSizeLines = Object.entries(colorSizes).map(([color, sizes]) => `${color}: ${sizes.join(', ')}`).join('\n');
+
+                const embed = new EmbedBuilder()
+                    .setTitle(item.name)
+                    .setDescription(`**Base:** ${pricePrecision(item.prices.base.value)}\n**Promo:** ${pricePrecision(item.prices.promo?.value)}\n${colorSizeLines}`)
+                    .setColor(channelId === config.maleCurrentChannelId ? 0x0066cc : 0xff69b4)
+                    .setURL(`https://www.uniqlo.com/au/en/products/${item.productId}`)
+                    .setImage(item.images.main[0].url)
+                    .setTimestamp()
+                    .setFooter({ text: `Uniqlo ${channelId === config.maleCurrentChannelId ? "Men's" : "Women's"} Sale Updates | ID: ${item._id}` });
+                
+                await channel.send({ embeds: [embed] }).catch(e => error(`Failed to create message: ${e}`));
+                loadCount++;
+            }
+        }
+
+        log(`Preload completed for channel ${channelId}. Added ${loadCount} new items.`);
+    } catch (err) {
+        error('Error in preloadChannelItems:', err);
+    }
+}
+
+module.exports = {
+    uniqloStreamService,
+    cleanChannelOrphans,
+    preloadChannelItems
+};
 
