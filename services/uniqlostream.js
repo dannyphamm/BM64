@@ -140,17 +140,46 @@ async function cleanChannelOrphans(client, channelId, collection) {
         const dbItems = await collection.find({}, { _id: 1 }).toArray();
         const dbIds = new Set(dbItems.map(item => item._id.toString())); // Convert ObjectIds to strings
 
-        // Check each message
+        // Track message counts per ID
+        const messageCountById = new Map();
+        const messagesByItemId = new Map();
+
+        // First pass - count messages per ID and track messages
         for (const msg of messages) {
             if (msg.embeds.length > 0) {
                 const footer = msg.embeds[0].footer?.text;
                 if (footer) {
                     const idMatch = footer.match(/ID: (.+)$/);
-                    if (idMatch && !dbIds.has(idMatch[1].toString())) { // Compare strings
-                        await msg.delete().catch(e => error(`Failed to delete message: ${e}`));
-                        log(`Deleted orphaned message for item ${idMatch[1]}`);
+                    if (idMatch) {
+                        const itemId = idMatch[1].toString();
+                        messageCountById.set(itemId, (messageCountById.get(itemId) || 0) + 1);
+                        
+                        if (!messagesByItemId.has(itemId)) {
+                            messagesByItemId.set(itemId, []);
+                        }
+                        messagesByItemId.get(itemId).push(msg);
                     }
                 }
+            }
+        }
+
+        // Second pass - handle duplicates and orphans
+        for (const [itemId, count] of messageCountById) {
+            const messages = messagesByItemId.get(itemId);
+            
+            if (!dbIds.has(itemId)) {
+                // Delete all messages for orphaned IDs
+                for (const msg of messages) {
+                    await msg.delete().catch(e => error(`Failed to delete orphaned message: ${e}`));
+                }
+                log(`Deleted orphaned message(s) for item ${itemId}`);
+            } else if (count > 1) {
+                // Keep only the most recent message for items with duplicates
+                const sortedMessages = messages.sort((a, b) => b.createdTimestamp - a.createdTimestamp);
+                for (let i = 1; i < sortedMessages.length; i++) {
+                    await sortedMessages[i].delete().catch(e => error(`Failed to delete duplicate message: ${e}`));
+                }
+                log(`Deleted ${count - 1} duplicate message(s) for item ${itemId}`);
             }
         }
 
