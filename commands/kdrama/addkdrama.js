@@ -23,14 +23,18 @@ module.exports = {
                 .addStringOption(option =>
                     option.setName('name')
                         .setDescription('The name of the kdrama to start tracking')
-                        .setRequired(true))),
-
+                        .setRequired(true)))
+        .addSubcommand(subcommand =>
+            subcommand
+                .setName('test')
+                .setDescription('Add a kdrama to the database')),
     async execute(interaction) {
         try {
             const client = interaction.client;
             const subcommand = interaction.options.getSubcommand();
             const name = interaction.options.getString('name');
             const kdramaCollection = client.mongodb.db.collection(config.mongodbDBKDrama);
+
             if (subcommand === 'stoptracking') {
                 await kdramaCollection.findOneAndUpdate({ title: name }, // filter
                     { $set: { isCompleted: true } }, // update
@@ -115,9 +119,13 @@ module.exports = {
                     error(e);
                     return interaction.editReply(`Error searching: ${e.message}`);
                 }
+            } else if (subcommand === 'test') {
+                await kdramaTrackerService(client);
+                return interaction.reply(`Tested`);
             }
         } catch (e) {
             return interaction.reply(`${e}`, { ephemeral: true });
         }
+
     },
 };

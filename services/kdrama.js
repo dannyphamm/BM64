@@ -447,9 +447,9 @@ const kdramaTrackerService = async (client) => {
                     )
                     .setColor(0x7289da)
                     .setTimestamp();
-
+                let attachment;
                 if (existingKDrama.banner) {
-                    const attachment = new AttachmentBuilder(existingKDrama.banner, { name: 'discordjs.jpg' });
+                    attachment = new AttachmentBuilder(existingKDrama.banner, { name: 'discordjs.jpg' });
                     embed.setThumbnail('attachment://discordjs.jpg');
                 }
 
