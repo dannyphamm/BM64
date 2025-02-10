@@ -2,6 +2,7 @@ const { SlashCommandBuilder } = require('@discordjs/builders');
 const config = require('../../config');
 const cheerio = require('cheerio');
 const axios = require('axios');
+const { kdramaTrackerService } = require('../../services/kdrama');
 const { AttachmentBuilder, ButtonBuilder, WebhookClient, EmbedBuilder, ActionRowBuilder, ButtonStyle } = require('discord.js');
 const {error, log} = require('../../utils/utils')
 module.exports = {
