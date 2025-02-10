@@ -374,7 +374,7 @@ const kdramaTrackerService = async (client) => {
         const existingKDrama = await kdramaCollection.findOne({ title });
         
         if (existingKDrama && !existingKDrama.isCompleted) {
-            // If no episode number exists in database, set it
+            // Handle episode updates first
             if (!existingKDrama.episode) {
                 const link = $(article).find('a').attr('href');
                 const banner = $(article).find('img').attr('src');
@@ -401,7 +401,6 @@ const kdramaTrackerService = async (client) => {
                 
                 log(`Set initial episode ${ep} for "${title}"`);
             }
-            // Check if the episode number is greater than the database episode
             else if (ep > existingKDrama.episode) {
                 const link = $(article).find('a').attr('href');
                 const banner = $(article).find('img').attr('src');
@@ -427,6 +426,48 @@ const kdramaTrackerService = async (client) => {
                 });
                 
                 log(`New episode ${ep} found for "${title}"`);
+            }
+
+            // Now check for completion status
+            const isCompleted = $(article).find('.status.Completed').length > 0;
+            
+            if (isCompleted) {
+                // Update database to mark as completed
+                await kdramaCollection.updateOne(
+                    { title },
+                    { $set: { isCompleted: true } }
+                );
+
+                // Send completion notification
+                const embed = new EmbedBuilder()
+                    .setTitle(`${title}`)
+                    .setDescription(`This drama has completed!`)
+                    .addFields(
+                        { name: 'Total Episodes', value: `${ep}`, inline: true },
+                    )
+                    .setColor(0x7289da)
+                    .setTimestamp();
+
+                if (existingKDrama.banner) {
+                    const attachment = new AttachmentBuilder(existingKDrama.banner, { name: 'discordjs.jpg' });
+                    embed.setThumbnail('attachment://discordjs.jpg');
+                }
+
+                const channel = await client.channels.cache.find(c => c.name === 'movie-night');
+                if (!channel) continue;
+                
+                const webhooks = await channel.fetchWebhooks();
+                if (webhooks.size === 0) continue;
+                
+                const webhook = webhooks.find(wh => wh.owner.id === client.user.id);
+                if (!webhook) continue;
+
+                await webhook.send({
+                    embeds: [embed],
+                    ...(existingKDrama.banner ? { files: [attachment] } : {})
+                });
+
+                log(`Marked "${title}" as completed`);
             }
         }
     }
