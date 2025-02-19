@@ -44,7 +44,7 @@ async function uniqloStreamService(client) {
                 } else if (change.operationType === 'insert' || change.operationType === 'update') {
                     const item = change.fullDocument;
                     // Clean up old messages before sending new one
-                    await cleanupOldMessages(channel, item.name);
+                    await cleanupOldMessages(channel, item._id);
                     
                     const colorSizes = item.l2s.reduce((acc, l2) => {
                         if (!acc[l2.color.name]) {
@@ -84,7 +84,7 @@ async function uniqloStreamService(client) {
                 } else if (change.operationType === 'insert' || change.operationType === 'update') {
                     const item = change.fullDocument;
                     // Clean up old messages before sending new one
-                    await cleanupOldMessages(channel, item.name);
+                    await cleanupOldMessages(channel, item._id);
                     
                     const colorSizes = item.l2s.reduce((acc, l2) => {
                         if (!acc[l2.color.name]) {
