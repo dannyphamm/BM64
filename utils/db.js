@@ -19,8 +19,8 @@ class MongoConnection {
   async connect() {
     try {
       this.client = new MongoClient(MONGODB_URI, {
-        useNewUrlParser: true,
-        useUnifiedTopology: true,
+        // useNewUrlParser: true,
+        // useUnifiedTopology: true,
       });
 
       await this.client.connect();

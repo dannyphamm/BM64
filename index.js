@@ -62,15 +62,16 @@ loadCommands(commandsPath);
 
 const distube = new DisTube(client, {
     plugins: [
-        new YtDlpPlugin({ update: false }),
+        
         new SpotifyPlugin({
-            emitEventsAfterFetching: true
-        })
+            //emitEventsAfterFetching: true
+        }),
+        new YtDlpPlugin({ update: false }),
     ],
-    ytdlOptions: {
-        filter: 'audioonly',
-        quality: 'highestaudio',
-    }
+    // ytdlOptions: {
+    //     filter: 'audioonly',
+    //     quality: 'highestaudio',
+    // }
 })
 distube.on('error', (channel, e) => {
     if (channel) channel.send(`An error encountered: ${e}`)
