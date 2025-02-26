@@ -9,6 +9,7 @@ let remainingMs;
 let progressMs;
 let durationMs;
 let timeoutId;
+let timeoutIds = [];
 
 loadSpotify = async (client, clear) => {
     const spotifyApi = await spotify();
@@ -18,8 +19,13 @@ loadSpotify = async (client, clear) => {
 
     if (clear) {
         clearTimeout(timeoutId);
-        log("clearing timeout")
-        await new Promise(resolve => { setTimeout(resolve, 1500) });
+        timeoutIds.forEach(id => clearTimeout(id));
+        timeoutIds = [];
+        log("clearing timeouts")
+        await new Promise(resolve => { 
+            const id = setTimeout(resolve, 1500);
+            timeoutIds.push(id);
+        });
     }
     buttons = new ActionRowBuilder()
     .addComponents(
@@ -143,7 +149,9 @@ loadSpotify = async (client, clear) => {
                 log(progressMs, durationMs, remainingMs);
                 if (remainingMs > 0) {
                     // Wait for the remaining time before calling the loadSpotify function again
-                    await new Promise(resolve => { timeoutId = setTimeout(resolve, remainingMs) });
+                    await new Promise(resolve => { 
+                        timeoutId = createTrackedTimeout(resolve, remainingMs);
+                    });
                     // Call the loadSpotify function again
                     loadSpotify(client, true);
                 }
@@ -277,8 +285,21 @@ loadSpotify = async (client, clear) => {
     }
 };
 
+// Helper function to create tracked timeouts
+const createTrackedTimeout = (callback, ms) => {
+    const id = setTimeout(callback, ms);
+    timeoutIds.push(id);
+    return id;
+};
+
 module.exports = {
     loadSpotify: function (client) {
         loadSpotify(client, true)
     },
+    clearAllTimeouts: function() {
+        clearTimeout(timeoutId);
+        timeoutIds.forEach(id => clearTimeout(id));
+        timeoutIds = [];
+        log("All timeouts cleared");
+    }
 }
