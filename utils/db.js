@@ -5,58 +5,32 @@ const { log, error } = require('./utils');
 const MONGODB_URI = config.mongodbURI;
 const MONGODB_DB_NAME = config.mongodbDBName;
 
-class Database {
-  constructor(uri) {
-    this.uri = uri;
+class MongoConnection {
+  constructor() {
+    if (MongoConnection.instance) {
+      return MongoConnection.instance;
+    }
+
     this.client = null;
+    this.db = null;
+    MongoConnection.instance = this;
   }
 
   async connect() {
     try {
-      this.client = new MongoClient(this.uri, {
-        retryWrites: true,
-        serverSelectionTimeoutMS: 5000,
-        socketTimeoutMS: 30000,
+      this.client = new MongoClient(MONGODB_URI, {
+        // useNewUrlParser: true,
+        // useUnifiedTopology: true,
       });
 
       await this.client.connect();
+      this.db = this.client.db(MONGODB_DB_NAME);
       log('Connected to MongoDB');
-
-      // Add event listeners for connection monitoring
-      this.client.on('close', () => {
-        log('MongoDB connection closed. Attempting to reconnect...');
-        this.reconnect();
-      });
-
-      this.client.on('error', (error) => {
-        error('MongoDB error:', error);
-        this.reconnect();
-      });
-
-      return this.client;
-    } catch (error) {
-      error('Failed to connect:', error);
-      await this.reconnect();
+      
+    } catch (err) {
+      error('Error connecting to MongoDB:', err);
     }
-  }
-
-  async reconnect() {
-    if (this.client) {
-      try {
-        await this.client.close();
-      } catch (err) {
-        error('Error closing existing connection:', err);
-      }
-    }
-
-    // Wait 5 seconds before trying to reconnect
-    await new Promise(resolve => setTimeout(resolve, 5000));
-    return this.connect();
-  }
-
-  getClient() {
-    return this.client;
   }
 }
 
-module.exports = new Database(MONGODB_URI);
+module.exports = new MongoConnection();
