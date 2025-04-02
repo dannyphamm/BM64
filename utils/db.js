@@ -15,8 +15,6 @@ class Database {
     try {
       this.client = new MongoClient(this.uri, {
         retryWrites: true,
-        w: 'majority',
-        useUnifiedTopology: true,
         serverSelectionTimeoutMS: 5000,
         socketTimeoutMS: 30000,
       });
