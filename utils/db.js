@@ -19,18 +19,11 @@ class MongoConnection {
   async connect() {
     try {
       this.client = new MongoClient(MONGODB_URI, {
-        serverSelectionTimeoutMS: 5000, // Time to find an available server
-        heartbeatFrequencyMS: 2000,     // How often to check server status
-        replicaSet: 'atlas-aexofr-shard-0',
-        readPreference: 'primaryPreferred',
-        w: 'majority',                   // Write concern
         retryWrites: true,
+        w: 'majority',
         useUnifiedTopology: true,
-        maxPoolSize: 50,
-        minPoolSize: 10,
-        // High availability options
-        ha: true,                        // Enable high availability monitoring
-        haInterval: 10000,  
+        serverSelectionTimeoutMS: 5000,
+        socketTimeoutMS: 30000,  
       });
 
       await this.client.connect();
