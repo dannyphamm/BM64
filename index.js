@@ -18,6 +18,9 @@ const client = new Client(
         intents: myIntents
     });
 
+// Make client available globally for scheduled tasks
+global.discordClient = client;
+
 const connectToDB = async () => {
     await MongoConnection.connect();
     client.mongodb = MongoConnection;

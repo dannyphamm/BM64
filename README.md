@@ -6,6 +6,8 @@ This is a Discord Bot for my Discord Server. It creates a new text channel under
 
 -   Music from a variety of providers. Eg. PlugDJ, YouTube, Spotify, SoundCloud
 -   Temporary text channels
+-   Presence tracking with daily gaming summaries
+-   Game session tracking with duration and session count
 
 ## Requirements
 
@@ -43,3 +45,19 @@ If you have nodemon installed
 ```bash
 nodemon .
 ```
+
+## Gaming Features
+
+### Daily Gaming Summary
+The bot automatically tracks gaming activity and sends a daily summary at 12 AM to the configured tracking channel. The summary includes:
+- Total time spent playing each game
+- Number of gaming sessions per game
+- Games sorted by total playtime
+
+### Commands
+- `/gamesummary` - View current daily gaming statistics without waiting for the scheduled summary
+
+### Configuration
+Make sure to set the following in your `config.json`:
+- `devilshinxID` - The user ID to track for gaming activity
+- `pptracking` - The channel ID where gaming updates and summaries will be sent
