@@ -10,7 +10,7 @@ const redditMemesService = async (client) => {
         .then(async data => {
             if (!data) return;
             const exampleEmbed = {
-                title: data.title,
+                title: data.title.length > 256 ? data.title.substring(0, 253) + '...' : data.title,
                 url: data.url,
                 image: {
                     url: data.url,
