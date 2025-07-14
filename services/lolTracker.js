@@ -280,8 +280,8 @@ class LoLTracker {
         const team2 = info.participants.filter(p => p.teamId === 200);
 
         // Create team fields
-        const team1Field = this.createTeamField(team1, 'Blue Team', trackedParticipant.puuid);
-        const team2Field = this.createTeamField(team2, 'Red Team', trackedParticipant.puuid);
+        const team1Field = this.createTeamField(team1, 'Blue Team', [trackedParticipant.puuid]);
+        const team2Field = this.createTeamField(team2, 'Red Team', [trackedParticipant.puuid]);
 
         const embed = new EmbedBuilder()
             .setColor(color)
@@ -299,7 +299,7 @@ class LoLTracker {
         return embed;
     }
 
-    createTeamField(participants, teamName, trackedPlayerPuuid) {
+    createTeamField(participants, teamName, trackedPlayerPuuids) {
         const sortedParticipants = participants.sort((a, b) => {
             // Sort by damage dealt to champions (descending)
             return b.totalDamageDealtToChampions - a.totalDamageDealtToChampions;
@@ -310,7 +310,11 @@ class LoLTracker {
             const champion = this.getChampionName(p.championId);
             const kda = `${p.kills}/${p.deaths}/${p.assists}`;
             const damage = p.totalDamageDealtToChampions.toLocaleString();
-            const isTrackedPlayer = p.puuid === trackedPlayerPuuid;
+            
+            // Handle both single PUUID (string) and multiple PUUIDs (array)
+            const isTrackedPlayer = Array.isArray(trackedPlayerPuuids) 
+                ? trackedPlayerPuuids.includes(p.puuid)
+                : p.puuid === trackedPlayerPuuids;
             
             // Add indicator for tracked player
             const indicator = isTrackedPlayer ? '👁️ ' : '';
@@ -428,6 +432,9 @@ class LoLTracker {
 
         console.log('🔍 Checking API for new games...');
 
+        // Group players by their new game IDs to consolidate embeds
+        const gameGroups = new Map(); // gameId -> { matchData, players }
+
         for (const [key, player] of this.trackedPlayers) {
             try {
                 console.log(`📊 Checking API for ${player.summonerName} (${player.region})`);
@@ -438,28 +445,56 @@ class LoLTracker {
                     const matchData = await this.getMatchData(lastGameId, player.region);
                     
                     if (matchData) {
-                        // Update last game ID
-                        const collection = db.db.collection('lol_tracked_players');
-                        await collection.updateOne(
-                            { _id: player._id },
-                            { $set: { lastGameId: lastGameId } }
-                        );
-                        player.lastGameId = lastGameId;
-
-                        // Send match summary
-                        await this.sendMatchSummary(matchData, player);
+                        // Group by game ID
+                        if (!gameGroups.has(lastGameId)) {
+                            gameGroups.set(lastGameId, {
+                                matchData: matchData,
+                                players: []
+                            });
+                        }
+                        
+                        gameGroups.get(lastGameId).players.push(player);
                     }
                 }
             } catch (error) {
                 console.error(`Error checking games for ${player.summonerName}:`, error);
             }
         }
+
+        // Process each game group and send consolidated embeds
+        for (const [gameId, gameData] of gameGroups) {
+            try {
+                // Update all players' last game ID
+                const collection = db.db.collection('lol_tracked_players');
+                
+                // Update each player individually to avoid issues with _id
+                for (const player of gameData.players) {
+                    await collection.updateOne(
+                        { 
+                            summonerName: player.summonerName,
+                            tag: player.tag,
+                            region: player.region
+                        },
+                        { $set: { lastGameId: gameId } }
+                    );
+                }
+
+                // Update in memory
+                gameData.players.forEach(player => {
+                    player.lastGameId = gameId;
+                });
+
+                // Send consolidated match summary
+                await this.sendConsolidatedMatchSummary(gameData.matchData, gameData.players);
+            } catch (error) {
+                console.error(`Error processing game group ${gameId}:`, error);
+            }
+        }
     }
 
-    async sendMatchSummary(matchData, player) {
+    async sendConsolidatedMatchSummary(matchData, players) {
         try {
-            const displayName = player.tag ? `${player.summonerName}#${player.tag}` : player.summonerName;
-            console.log(`📊 New game for ${displayName} (${player.region})`);
+            console.log(`📊 New game with ${players.length} tracked players`);
             
             // Get Discord client from global
             const client = global.discordClient;
@@ -468,18 +503,101 @@ class LoLTracker {
                 return;
             }
 
-            // Send embed to Discord channel
-            const embed = this.createMatchEmbed(matchData, displayName, player.puuid);
-            const channel = await client.channels.fetch(player.channelId);
-            if (channel) {
-                await channel.send({ embeds: [embed] });
-            } else {
-                console.error(`Channel ${player.channelId} not found`);
+            // Group players by channel to send appropriate embeds
+            const channelGroups = new Map(); // channelId -> players
+            
+            for (const player of players) {
+                if (!channelGroups.has(player.channelId)) {
+                    channelGroups.set(player.channelId, []);
+                }
+                channelGroups.get(player.channelId).push(player);
+            }
+
+            // Send consolidated embed to each channel
+            for (const [channelId, channelPlayers] of channelGroups) {
+                const embed = this.createConsolidatedMatchEmbed(matchData, channelPlayers);
+                const channel = await client.channels.fetch(channelId);
+                if (channel) {
+                    await channel.send({ embeds: [embed] });
+                } else {
+                    console.error(`Channel ${channelId} not found`);
+                }
             }
         } catch (error) {
-            console.error('Error sending match summary:', error);
+            console.error('Error sending consolidated match summary:', error);
         }
     }
+
+    createConsolidatedMatchEmbed(matchData, players) {
+        const info = matchData.info;
+        
+        // Find all tracked participants
+        const trackedParticipants = [];
+        for (const player of players) {
+            const participant = info.participants.find(p => p.puuid === player.puuid);
+            if (participant) {
+                trackedParticipants.push({
+                    participant: participant,
+                    player: player
+                });
+            }
+        }
+
+        if (trackedParticipants.length === 0) {
+            return new EmbedBuilder()
+                .setColor(0xFF0000)
+                .setTitle('Match Summary')
+                .setDescription('Could not find tracked player data in this match.');
+        }
+
+        // Determine overall result (if all players are on same team, use that result; otherwise show mixed)
+        const allSameTeam = trackedParticipants.every(tp => tp.participant.teamId === trackedParticipants[0].participant.teamId);
+        const allWon = trackedParticipants.every(tp => tp.participant.win);
+        const allLost = trackedParticipants.every(tp => !tp.participant.win);
+        
+        let color, result;
+        if (allSameTeam) {
+            color = allWon ? 0x00FF00 : 0xFF0000;
+            result = allWon ? 'Victory' : 'Defeat';
+        } else {
+            color = 0xFFA500; // Orange for mixed results
+            result = 'Mixed Results';
+        }
+
+        // Separate participants by team
+        const team1 = info.participants.filter(p => p.teamId === 100);
+        const team2 = info.participants.filter(p => p.teamId === 200);
+
+        // Create team fields
+        const team1Field = this.createTeamField(team1, 'Blue Team', players.map(p => p.puuid));
+        const team2Field = this.createTeamField(team2, 'Red Team', players.map(p => p.puuid));
+
+        // Create tracked players summary
+        const trackedPlayersSummary = trackedParticipants.map(tp => {
+            const displayName = tp.player.tag ? `${tp.player.summonerName}#${tp.player.tag}` : tp.player.summonerName;
+            const champion = this.getChampionName(tp.participant.championId);
+            const kda = `${tp.participant.kills}/${tp.participant.deaths}/${tp.participant.assists}`;
+            const result = tp.participant.win ? '✅' : '❌';
+            return `${result} **${displayName}** (${champion}) - ${kda}`;
+        }).join('\n');
+
+        const embed = new EmbedBuilder()
+            .setColor(color)
+            .setTitle(`${result} - ${this.getGameMode(info.queueId)}`)
+            .setDescription(`**${trackedParticipants.length} tracked player${trackedParticipants.length > 1 ? 's' : ''}** in this game`)
+            .addFields(
+                { name: 'Game Duration', value: this.formatDuration(info.gameDuration), inline: true },
+                { name: 'Game Mode', value: this.getGameMode(info.queueId), inline: true },
+                { name: '\u200b', value: '\u200b', inline: true }, // Empty field for spacing
+                { name: 'Tracked Players', value: trackedPlayersSummary, inline: false },
+                team1Field,
+                team2Field
+            )
+            .setTimestamp(new Date(info.gameCreation + info.gameDuration * 1000));
+
+        return embed;
+    }
+
 }
 
 module.exports = new LoLTracker(); 
