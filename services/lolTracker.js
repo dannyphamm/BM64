@@ -250,46 +250,79 @@ class LoLTracker {
 
     createMatchEmbed(matchData, summonerName, puuid = null) {
         const info = matchData.info;
-        let participant;
+        let trackedParticipant;
         
         if (puuid) {
             // Find participant by PUUID
-            participant = info.participants.find(p => p.puuid === puuid);
+            trackedParticipant = info.participants.find(p => p.puuid === puuid);
         } else {
             // Fallback: try to find by summoner name or Riot ID
-            participant = info.participants.find(p => 
+            trackedParticipant = info.participants.find(p => 
                 p.riotIdGameName === summonerName || 
                 p.summonerName === summonerName ||
                 p.riotIdName === summonerName
             );
         }
 
-        if (!participant) {
+        if (!trackedParticipant) {
             return new EmbedBuilder()
                 .setColor(0xFF0000)
                 .setTitle('Match Summary')
                 .setDescription('Could not find player data in this match.');
         }
 
-        const isWin = participant.win;
+        const isWin = trackedParticipant.win;
         const color = isWin ? 0x00FF00 : 0xFF0000;
         const result = isWin ? 'Victory' : 'Defeat';
+
+        // Separate participants by team
+        const team1 = info.participants.filter(p => p.teamId === 100);
+        const team2 = info.participants.filter(p => p.teamId === 200);
+
+        // Create team fields
+        const team1Field = this.createTeamField(team1, 'Blue Team', trackedParticipant.puuid);
+        const team2Field = this.createTeamField(team2, 'Red Team', trackedParticipant.puuid);
 
         const embed = new EmbedBuilder()
             .setColor(color)
             .setTitle(`${result} - ${this.getGameMode(info.queueId)}`)
             .setDescription(`**${summonerName}**'s latest game`)
             .addFields(
-                { name: 'Champion', value: this.getChampionName(participant.championId), inline: true },
-                { name: 'KDA', value: `${participant.kills}/${participant.deaths}/${participant.assists}`, inline: true },
-                { name: 'CS', value: `${participant.totalMinionsKilled + participant.neutralMinionsKilled}`, inline: true },
-                { name: 'Duration', value: this.formatDuration(info.gameDuration), inline: true },
-                { name: 'Level', value: participant.champLevel.toString(), inline: true },
-                { name: 'Damage', value: participant.totalDamageDealtToChampions.toLocaleString(), inline: true }
+                { name: 'Game Duration', value: this.formatDuration(info.gameDuration), inline: true },
+                { name: 'Game Mode', value: this.getGameMode(info.queueId), inline: true },
+                { name: '\u200b', value: '\u200b', inline: true }, // Empty field for spacing
+                team1Field,
+                team2Field
             )
             .setTimestamp(new Date(info.gameCreation + info.gameDuration * 1000));
 
         return embed;
+    }
+
+    createTeamField(participants, teamName, trackedPlayerPuuid) {
+        const sortedParticipants = participants.sort((a, b) => {
+            // Sort by damage dealt to champions (descending)
+            return b.totalDamageDealtToChampions - a.totalDamageDealtToChampions;
+        });
+
+        const teamLines = sortedParticipants.map(p => {
+            const playerName = p.riotIdGameName ? `${p.riotIdGameName}#${p.riotIdTagline}` : p.summonerName;
+            const champion = this.getChampionName(p.championId);
+            const kda = `${p.kills}/${p.deaths}/${p.assists}`;
+            const damage = p.totalDamageDealtToChampions.toLocaleString();
+            const isTrackedPlayer = p.puuid === trackedPlayerPuuid;
+            
+            // Add indicator for tracked player
+            const indicator = isTrackedPlayer ? '👁️ ' : '';
+            
+            return `${indicator}**${playerName}** (${champion})\n└ KDA: ${kda} | DMG: ${damage}`;
+        });
+
+        return {
+            name: teamName,
+            value: teamLines.join('\n'),
+            inline: true
+        };
     }
 
     async addPlayer(summonerName, channelId, region = 'NA') {
