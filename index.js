@@ -101,6 +101,20 @@ distube.on("playSong", (queue, song) => queue.textChannel.send(
 client.genius = GeniusClient;
 client.distube = distube;
 
+// Initialize and start LoL Tracker service
+const lolTracker = require('./services/lolTracker');
+client.lolTracker = lolTracker;
+
+// Initialize LoL Tracker service
+lolTracker.init().then(success => {
+    if (success) {
+        log('LoL Tracker service initialized successfully');
+    } else {
+        error('Failed to initialize LoL Tracker service');
+    }
+}).catch(err => {
+    error('Error initializing LoL Tracker service:', err);
+});
 
 // Login to Discord with your client's token
 client.login(token);

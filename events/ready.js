@@ -131,6 +131,12 @@ module.exports = {
             }
             delay();
             uniqloStreamService(client);
+            
+            // Start LoL Tracker service
+            if (client.lolTracker) {
+                client.lolTracker.start();
+                log('LoL Tracker service started');
+            }
         }
         
         log('Ready!');
