@@ -1,6 +1,7 @@
 const { log, error } = require('../utils/utils')
 const config = require('../config.json')
 const schedule = require('node-schedule')
+const db = require('../utils/db')
 
 // Cache to store the last known status and activities
 const userCache = {
@@ -24,6 +25,45 @@ const dailySummaryJob = schedule.scheduleJob('0 0 * * *', async () => {
     dailyGameStats.isTracking = false;
 });
 
+// Function to save daily stats to database
+async function saveDailyStatsToDatabase(statsData) {
+    try {
+        await db.connect();
+        const collection = db.db.collection('daily_gaming_stats');
+        
+        const today = new Date();
+        const dateString = today.toISOString().split('T')[0]; // YYYY-MM-DD format
+        
+        const document = {
+            date: dateString,
+            userId: config.devilshinxID,
+            username: 'devilshinx', // You can make this dynamic if needed
+            totalGames: statsData.length,
+            totalPlayTime: statsData.reduce((total, game) => total + game.totalDuration, 0),
+            games: statsData.map(game => ({
+                name: game.name,
+                totalDuration: game.totalDuration,
+                sessions: game.sessions,
+                hours: Math.floor(game.totalDuration / (1000 * 60 * 60)),
+                minutes: Math.floor((game.totalDuration % (1000 * 60 * 60)) / (1000 * 60))
+            })),
+            createdAt: new Date(),
+            updatedAt: new Date()
+        };
+
+        // Use upsert to either insert new record or update existing one for the same date
+        await collection.updateOne(
+            { date: dateString, userId: config.devilshinxID },
+            { $set: document },
+            { upsert: true }
+        );
+
+        log(`📊 Daily gaming stats saved to database for ${dateString}`);
+    } catch (err) {
+        error('Error saving daily gaming stats to database:', err);
+    }
+}
+
 // Make the function globally available for the command
 global.sendDailyGameSummary = async function() {
     if (config.mode === 'DEV') return;
@@ -41,6 +81,8 @@ global.sendDailyGameSummary = async function() {
 
         if (dailyGameStats.games.size === 0) {
             await channel.send('📊 **Daily Gaming Summary**\nNo games were played today.');
+            // Still save empty stats to database for record keeping
+            await saveDailyStatsToDatabase([]);
             return;
         }
 
@@ -53,6 +95,15 @@ global.sendDailyGameSummary = async function() {
             sessions: stats.sessions
         })).sort((a, b) => b.totalDuration - a.totalDuration);
 
+        // Calculate total play time for the day
+        const totalPlayTime = gamesArray.reduce((total, game) => total + game.totalDuration, 0);
+        const totalHours = Math.floor(totalPlayTime / (1000 * 60 * 60));
+        const totalMinutes = Math.floor((totalPlayTime % (1000 * 60 * 60)) / (1000 * 60));
+
+        summaryMessage += `📅 **Date:** ${new Date().toLocaleDateString()}\n`;
+        summaryMessage += `⏱️ **Total Play Time:** ${totalHours > 0 ? `${totalHours}h ${totalMinutes}m` : `${totalMinutes}m`}\n`;
+        summaryMessage += `🎮 **Games Played:** ${gamesArray.length}\n\n`;
+
         for (const game of gamesArray) {
             const hours = Math.floor(game.totalDuration / (1000 * 60 * 60));
             const minutes = Math.floor((game.totalDuration % (1000 * 60 * 60)) / (1000 * 60));
@@ -64,6 +115,10 @@ global.sendDailyGameSummary = async function() {
         }
 
         await channel.send(summaryMessage);
+        
+        // Save stats to database after sending the message
+        await saveDailyStatsToDatabase(gamesArray);
+        
     } catch (err) {
         error('Error sending daily game summary:', err);
     }
@@ -100,6 +155,57 @@ global.getCurrentGameStats = function() {
     }
 
     return summaryMessage;
+}
+
+// Function to get historical stats from database
+global.getHistoricalGameStats = async function(days = 7) {
+    try {
+        await db.connect();
+        const collection = db.db.collection('daily_gaming_stats');
+        
+        const endDate = new Date();
+        const startDate = new Date();
+        startDate.setDate(startDate.getDate() - days);
+        
+        const stats = await collection.find({
+            userId: config.devilshinxID,
+            date: {
+                $gte: startDate.toISOString().split('T')[0],
+                $lte: endDate.toISOString().split('T')[0]
+            }
+        }).sort({ date: -1 }).toArray();
+        
+        if (stats.length === 0) {
+            return `📊 **Historical Gaming Stats (Last ${days} days)**\nNo data available for the specified period.`;
+        }
+        
+        let summaryMessage = `📊 **Historical Gaming Stats (Last ${days} days)**\n\n`;
+        
+        for (const dayStats of stats) {
+            const date = new Date(dayStats.date).toLocaleDateString();
+            const totalHours = Math.floor(dayStats.totalPlayTime / (1000 * 60 * 60));
+            const totalMinutes = Math.floor((dayStats.totalPlayTime % (1000 * 60 * 60)) / (1000 * 60));
+            const timeStr = totalHours > 0 ? `${totalHours}h ${totalMinutes}m` : `${totalMinutes}m`;
+            
+            summaryMessage += `📅 **${date}**\n`;
+            summaryMessage += `⏱️ Total Play Time: ${timeStr}\n`;
+            summaryMessage += `🎮 Games Played: ${dayStats.totalGames}\n`;
+            
+            if (dayStats.games && dayStats.games.length > 0) {
+                summaryMessage += `📋 Games:\n`;
+                dayStats.games.forEach(game => {
+                    const gameTimeStr = game.hours > 0 ? `${game.hours}h ${game.minutes}m` : `${game.minutes}m`;
+                    summaryMessage += `  • ${game.name}: ${gameTimeStr} (${game.sessions} sessions)\n`;
+                });
+            }
+            summaryMessage += `\n`;
+        }
+        
+        return summaryMessage;
+    } catch (err) {
+        error('Error getting historical game stats:', err);
+        return '❌ Error retrieving historical gaming stats.';
+    }
 }
 
 function updateGameStats(gameName, isStarting) {
