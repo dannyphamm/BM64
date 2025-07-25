@@ -1,7 +1,7 @@
 const { EmbedBuilder } = require('discord.js');
 const config = require('../config');
 const db = require('../utils/db');
-const { log, error } = require('../utils/logger');
+const { log, error } = require('../utils/utils');
 class LoLTracker {
     constructor() {
         this.riotApiKey = config.riotApiKey;
