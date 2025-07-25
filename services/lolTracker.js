@@ -1,7 +1,7 @@
 const { EmbedBuilder } = require('discord.js');
 const config = require('../config');
 const db = require('../utils/db');
-
+const { log, error } = require('../utils/logger');
 class LoLTracker {
     constructor() {
         this.riotApiKey = config.riotApiKey;
@@ -53,7 +53,7 @@ class LoLTracker {
 
     async init() {
         if (!this.riotApiKey) {
-            console.error('❌ Riot API key not configured');
+            error('❌ Riot API key not configured');
             return false;
         }
 
@@ -61,10 +61,10 @@ class LoLTracker {
             await db.connect();
             await this.loadTrackedPlayers();
             await this.loadChampionNames();
-            console.log('✅ LoL Tracker initialized');
+            log('✅ LoL Tracker initialized');
             return true;
         } catch (error) {
-            console.error('❌ Error initializing LoL Tracker:', error);
+            error('❌ Error initializing LoL Tracker:', error);
             return false;
         }
     }
@@ -80,9 +80,9 @@ class LoLTracker {
                 this.trackedPlayers.set(key, player);
             }
             
-            console.log(`📋 Loaded ${this.trackedPlayers.size} tracked players`);
+            //log(`📋 Loaded ${this.trackedPlayers.size} tracked players`);
         } catch (error) {
-            console.error('Error loading tracked players:', error);
+            error('Error loading tracked players:', error);
         }
     }
 
@@ -95,7 +95,7 @@ class LoLTracker {
                 this.championNames[parseInt(champion.key)] = champion.name;
             }
         } catch (error) {
-            console.error('Error loading champion names:', error);
+            error('Error loading champion names:', error);
         }
     }
 
@@ -123,7 +123,7 @@ class LoLTracker {
             // Fallback: try to get by summoner name (legacy method)
             const baseUrl = this.riotApiRegionalUrls[region];
             const url = `${baseUrl}/lol/summoner/v4/summoners/by-name/${encodeURIComponent(summonerName)}`;
-            console.log(url);
+            //log(url);
             const response = await fetch(url, {
                 headers: {
                     'X-Riot-Token': this.riotApiKey
@@ -137,7 +137,7 @@ class LoLTracker {
             if (response.status === 404) return null;
             throw new Error(`Riot API error: ${response.status}`);
         } catch (error) {
-            console.error('Error fetching summoner:', error);
+            error('Error fetching summoner:', error);
             return null;
         }
     }
@@ -147,7 +147,7 @@ class LoLTracker {
             // Always use Americas API for account lookup
             const baseUrl = 'https://americas.api.riotgames.com';
             const url = `${baseUrl}/riot/account/v1/accounts/by-riot-id/${encodeURIComponent(gameName)}/${encodeURIComponent(tagLine)}`;
-            console.log(url);
+            //log(url);
             const response = await fetch(url, {
                 headers: {
                     'X-Riot-Token': this.riotApiKey
@@ -161,7 +161,7 @@ class LoLTracker {
             if (response.status === 404) return null;
             throw new Error(`Riot API error: ${response.status}`);
         } catch (error) {
-            console.error('Error fetching account by Riot ID:', error);
+            error('Error fetching account by Riot ID:', error);
             return null;
         }
     }
@@ -184,7 +184,7 @@ class LoLTracker {
             if (response.status === 404) return null;
             throw new Error(`Riot API error: ${response.status}`);
         } catch (error) {
-            console.error('Error fetching summoner by PUUID:', error);
+            error('Error fetching summoner by PUUID:', error);
             return null;
         }
     }
@@ -193,7 +193,7 @@ class LoLTracker {
         try {
             const baseUrl = this.riotApiBaseUrls[region];
             const url = `${baseUrl}/lol/match/v5/matches/by-puuid/${puuid}/ids?start=0&count=1`;
-            console.log(url);
+            //log(url);
             const response = await fetch(url, {
                 headers: {
                     'X-Riot-Token': this.riotApiKey
@@ -207,7 +207,7 @@ class LoLTracker {
             const matchIds = await response.json();
             return matchIds.length > 0 ? matchIds[0] : null;
         } catch (error) {
-            console.error('Error fetching last game ID:', error);
+            error('Error fetching last game ID:', error);
             return null;
         }
     }
@@ -216,7 +216,7 @@ class LoLTracker {
         try {
             const baseUrl = this.riotApiBaseUrls[region];
             const url = `${baseUrl}/lol/match/v5/matches/${matchId}`;
-            console.log(url);
+            //log(url);
             const response = await fetch(url, {
                 headers: {
                     'X-Riot-Token': this.riotApiKey
@@ -229,7 +229,7 @@ class LoLTracker {
 
             return await response.json();
         } catch (error) {
-            console.error('Error fetching match data:', error);
+            error('Error fetching match data:', error);
             return null;
         }
     }
@@ -365,7 +365,7 @@ class LoLTracker {
 
             return true;
         } catch (error) {
-            console.error('Error adding player:', error);
+            error('Error adding player:', error);
             return false;
         }
     }
@@ -392,7 +392,7 @@ class LoLTracker {
 
             return true;
         } catch (error) {
-            console.error('Error removing player:', error);
+            error('Error removing player:', error);
             return false;
         }
     }
@@ -405,7 +405,7 @@ class LoLTracker {
         if (this.isRunning) return;
         
         this.isRunning = true;
-        console.log('🔄 Starting LoL Tracker...');
+        log('🔄 Starting LoL Tracker...');
         
         // Check every 2 minutes
         this.checkInterval = setInterval(async () => {
@@ -424,20 +424,20 @@ class LoLTracker {
             clearInterval(this.checkInterval);
             this.checkInterval = null;
         }
-        console.log('⏹️ Stopped LoL Tracker');
+        log('⏹️ Stopped LoL Tracker');
     }
 
     async checkForNewGames() {
         if (!this.isRunning) return;
 
-        console.log('🔍 Checking API for new games...');
+        //log('🔍 Checking API for new games...');
 
         // Group players by their new game IDs to consolidate embeds
         const gameGroups = new Map(); // gameId -> { matchData, players }
 
         for (const [key, player] of this.trackedPlayers) {
             try {
-                console.log(`📊 Checking API for ${player.summonerName} (${player.region})`);
+                //log(`📊 Checking API for ${player.summonerName} (${player.region})`);
                 const lastGameId = await this.getLastGameId(player.puuid, player.region);
                 
                 if (lastGameId && lastGameId !== player.lastGameId) {
@@ -457,7 +457,7 @@ class LoLTracker {
                     }
                 }
             } catch (error) {
-                console.error(`Error checking games for ${player.summonerName}:`, error);
+                error(`Error checking games for ${player.summonerName}:`, error);
             }
         }
 
@@ -487,19 +487,19 @@ class LoLTracker {
                 // Send consolidated match summary
                 await this.sendConsolidatedMatchSummary(gameData.matchData, gameData.players);
             } catch (error) {
-                console.error(`Error processing game group ${gameId}:`, error);
+                error(`Error processing game group ${gameId}:`, error);
             }
         }
     }
 
     async sendConsolidatedMatchSummary(matchData, players) {
         try {
-            console.log(`📊 New game with ${players.length} tracked players`);
+            //log(`📊 New game with ${players.length} tracked players`);
             
             // Get Discord client from global
             const client = global.discordClient;
             if (!client) {
-                console.error('Discord client not available');
+                error('Discord client not available');
                 return;
             }
 
@@ -520,11 +520,11 @@ class LoLTracker {
                 if (channel) {
                     await channel.send({ embeds: [embed] });
                 } else {
-                    console.error(`Channel ${channelId} not found`);
+                    error(`Channel ${channelId} not found`);
                 }
             }
         } catch (error) {
-            console.error('Error sending consolidated match summary:', error);
+            error('Error sending consolidated match summary:', error);
         }
     }
 

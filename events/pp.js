@@ -58,7 +58,7 @@ async function saveDailyStatsToDatabase(statsData) {
             { upsert: true }
         );
 
-        log(`📊 Daily gaming stats saved to database for ${dateString}`);
+        //log(`📊 Daily gaming stats saved to database for ${dateString}`);
     } catch (err) {
         error('Error saving daily gaming stats to database:', err);
     }
@@ -231,7 +231,7 @@ function updateGameStats(gameName, isStarting) {
         gameStats.sessions++;
         dailyGameStats.isTracking = true;
         
-        log(`🎮 Started tracking: ${gameName} (Session #${gameStats.sessions})`);
+        //log(`🎮 Started tracking: ${gameName} (Session #${gameStats.sessions})`);
     } else {
         // Ending a game session
         if (dailyGameStats.games.has(gameName)) {
@@ -242,7 +242,7 @@ function updateGameStats(gameName, isStarting) {
                 if (sessionDuration > 0) {
                     gameStats.totalDuration += sessionDuration;
                     const minutes = Math.floor(sessionDuration / (1000 * 60));
-                    log(`🎮 Stopped tracking: ${gameName} (Session duration: ${minutes}m, Total: ${Math.floor(gameStats.totalDuration / (1000 * 60))}m)`);
+                    //log(`🎮 Stopped tracking: ${gameName} (Session duration: ${minutes}m, Total: ${Math.floor(gameStats.totalDuration / (1000 * 60))}m)`);
                 }
                 gameStats.startTime = null; // Reset start time
             }
@@ -265,7 +265,7 @@ module.exports = {
                 // Check if the user's status has changed
                 if (newState.status !== oldState.status) {
                     const statusMessage = `${newState.user.tag} is now ${newState.status}`;
-                    console.log(statusMessage);
+                    //log(statusMessage);
                     
                     // Send the status update to the specified channel if it's different
                     if (userCache.status !== newState.status) {
@@ -287,13 +287,13 @@ module.exports = {
                     
                     // Debug logging
                     if (currentGames.length > 0 || previousGames.length > 0) {
-                        log(`🎮 Game activity change - Previous: [${previousGames.join(', ')}], Current: [${currentGames.join(', ')}]`);
+                        //log(`🎮 Game activity change - Previous: [${previousGames.join(', ')}], Current: [${currentGames.join(', ')}]`);
                     }
                     
                     // End sessions for games that are no longer being played
                     previousGames.forEach(gameName => {
                         if (!currentGames.includes(gameName)) {
-                            log(`🎮 Ending session for: ${gameName}`);
+                            //log(`🎮 Ending session for: ${gameName}`);
                             updateGameStats(gameName, false);
                         }
                     });
@@ -301,7 +301,7 @@ module.exports = {
                     // Start sessions for new games
                     currentGames.forEach(gameName => {
                         if (!previousGames.includes(gameName)) {
-                            log(`🎮 Starting session for: ${gameName}`);
+                            //log(`🎮 Starting session for: ${gameName}`);
                             updateGameStats(gameName, true);
                         }
                     });
