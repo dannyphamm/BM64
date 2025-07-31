@@ -63,7 +63,7 @@ class LoLTracker {
             await this.loadChampionNames();
             log('✅ LoL Tracker initialized');
             return true;
-        } catch (error) {
+        } catch (e) {
             error('❌ Error initializing LoL Tracker:', error);
             return false;
         }
@@ -81,7 +81,7 @@ class LoLTracker {
             }
             
             //log(`📋 Loaded ${this.trackedPlayers.size} tracked players`);
-        } catch (error) {
+        } catch (e) {
             error('Error loading tracked players:', error);
         }
     }
@@ -94,7 +94,7 @@ class LoLTracker {
             for (const [key, champion] of Object.entries(data.data)) {
                 this.championNames[parseInt(champion.key)] = champion.name;
             }
-        } catch (error) {
+        } catch (e) {
             error('Error loading champion names:', error);
         }
     }
@@ -136,7 +136,7 @@ class LoLTracker {
 
             if (response.status === 404) return null;
             throw new Error(`Riot API error: ${response.status}`);
-        } catch (error) {
+        } catch (e) {
             error('Error fetching summoner:', error);
             return null;
         }
@@ -160,7 +160,7 @@ class LoLTracker {
 
             if (response.status === 404) return null;
             throw new Error(`Riot API error: ${response.status}`);
-        } catch (error) {
+        } catch (e) {
             error('Error fetching account by Riot ID:', error);
             return null;
         }
@@ -183,7 +183,7 @@ class LoLTracker {
 
             if (response.status === 404) return null;
             throw new Error(`Riot API error: ${response.status}`);
-        } catch (error) {
+        } catch (e) {
             error('Error fetching summoner by PUUID:', error);
             return null;
         }
@@ -206,7 +206,7 @@ class LoLTracker {
 
             const matchIds = await response.json();
             return matchIds.length > 0 ? matchIds[0] : null;
-        } catch (error) {
+        } catch (e) {
             error('Error fetching last game ID:', error);
             return null;
         }
@@ -228,7 +228,7 @@ class LoLTracker {
             }
 
             return await response.json();
-        } catch (error) {
+        } catch (e) {
             error('Error fetching match data:', error);
             return null;
         }
@@ -364,7 +364,7 @@ class LoLTracker {
             this.trackedPlayers.set(key, playerData);
 
             return true;
-        } catch (error) {
+        } catch (e) {
             error('Error adding player:', error);
             return false;
         }
@@ -391,7 +391,7 @@ class LoLTracker {
             this.trackedPlayers.delete(key);
 
             return true;
-        } catch (error) {
+        } catch (e) {
             error('Error removing player:', error);
             return false;
         }
@@ -456,7 +456,7 @@ class LoLTracker {
                         gameGroups.get(lastGameId).players.push(player);
                     }
                 }
-            } catch (error) {
+            } catch (e) {
                 error(`Error checking games for ${player.summonerName}:`, error);
             }
         }
@@ -486,7 +486,7 @@ class LoLTracker {
 
                 // Send consolidated match summary
                 await this.sendConsolidatedMatchSummary(gameData.matchData, gameData.players);
-            } catch (error) {
+            } catch (e) {
                 error(`Error processing game group ${gameId}:`, error);
             }
         }
@@ -523,8 +523,8 @@ class LoLTracker {
                     error(`Channel ${channelId} not found`);
                 }
             }
-        } catch (error) {
-            error('Error sending consolidated match summary:', error);
+        } catch (e) {
+            error('Error sending consolidated match summary:', e);
         }
     }
 
