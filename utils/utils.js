@@ -42,7 +42,7 @@ async function imageAttachment(images, name) {
         ctx.drawImage(img, x, y, 400, 400);
     }
 
-    const attachment = await new AttachmentBuilder(canvas.toBuffer('image/png'), { name: name + '.png' });
+    const attachment = new AttachmentBuilder(canvas.toBuffer('image/png'), { name: name + '.png' });
     return attachment
 }
 

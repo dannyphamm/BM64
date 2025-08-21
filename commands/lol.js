@@ -254,7 +254,7 @@ module.exports = {
             }
 
             // Create and send embed
-            const embed = lolTracker.createMatchEmbed(matchData, summonerName, summonerData.puuid);
+            const embed = await lolTracker.createMatchEmbed(matchData, summonerName, summonerData.puuid);
             await interaction.editReply({
                 content: `📊 Latest game for **${summonerName}**:`,
                 embeds: [embed],

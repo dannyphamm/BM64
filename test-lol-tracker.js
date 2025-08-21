@@ -73,7 +73,7 @@ async function testLoLTracker() {
     console.log('\n--- Testing Utility Functions ---');
     console.log(`Game Mode 420: ${lolTracker.getGameMode(420)}`);
     console.log(`Duration 1800s: ${lolTracker.formatDuration(1800)}`);
-    console.log(`Champion 103: ${lolTracker.getChampionName(103)}`);
+    console.log(`Champion 103: ${await lolTracker.getChampionName(103)}`);
     
     console.log('\nTest completed!');
 }
@@ -98,7 +98,7 @@ async function testMatchData(summonerData, displayName) {
                 
                 // Test 6: Create embed
                 console.log('Testing embed creation...');
-                const embed = lolTracker.createMatchEmbed(matchData, displayName);
+                const embed = await lolTracker.createMatchEmbed(matchData, displayName);
                 console.log(`✓ Created embed: ${embed.title}`);
                 
             } else {

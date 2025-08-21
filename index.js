@@ -22,46 +22,76 @@ const client = new Client(
 global.discordClient = client;
 
 const connectToDB = async () => {
-    await MongoConnection.connect();
-    client.mongodb = MongoConnection;
-}
-connectToDB()
+    try {
+        await MongoConnection.connect();
+        client.mongodb = MongoConnection;
+        log('✅ Database connected successfully');
+    } catch (error) {
+        error('❌ Database connection failed:', error);
+        process.exit(1);
+    }
+};
+connectToDB();
 client.commands = new Collection();
 const eventPath = path.resolve(__dirname, 'events');
 
-fs.readdir(eventPath, (err, files) => {
-    if (err) throw err;
-    files.filter(file => file.endsWith('.js')).forEach(file => {
-        const filePath = path.join(eventPath, file);
-        const event = require(filePath);
-        log(`Loaded Event: ${event.name}`)
-        if (event.once) {
-            client.once(event.name, (...args) => event.execute(...args));
-        } else {
-            client.on(event.name, (...args) => event.execute(...args));
-        }
-    });
-});
-
-const commandsPath = path.join(__dirname, 'commands');
-
-const loadCommands = (dir) => {
-    const files = fs.readdirSync(dir);
-    for (const file of files) {
-        const filePath = path.join(dir, file);
-        const stat = fs.lstatSync(filePath);
-
-        if (stat.isDirectory()) {
-            loadCommands(filePath);
-        } else if (file.endsWith('.js')) {
-            const command = require(filePath);
-            log(`Loaded Command: ${command.data.name}`)
-            client.commands.set(command.data.name, command);
-        }
+const loadEvents = async () => {
+    try {
+        const files = await fs.promises.readdir(eventPath);
+        files.filter(file => file.endsWith('.js')).forEach(file => {
+            const filePath = path.join(eventPath, file);
+            const event = require(filePath);
+            log(`Loaded Event: ${event.name}`);
+            if (event.once) {
+                client.once(event.name, (...args) => event.execute(...args));
+            } else {
+                client.on(event.name, (...args) => event.execute(...args));
+            }
+        });
+    } catch (err) {
+        error('Error loading events:', err);
+        throw err;
     }
 };
 
-loadCommands(commandsPath);
+loadEvents();
+
+const commandsPath = path.join(__dirname, 'commands');
+
+const loadCommands = async (dir) => {
+    try {
+        const files = await fs.promises.readdir(dir, { withFileTypes: true });
+
+        for (const file of files) {
+            const filePath = path.join(dir, file.name);
+
+            if (file.isDirectory()) {
+                await loadCommands(filePath);
+            } else if (file.name.endsWith('.js')) {
+                try {
+                    const command = require(filePath);
+                    if (command.data && command.data.name) {
+                        log(`Loaded Command: ${command.data.name}`);
+                        client.commands.set(command.data.name, command);
+                    } else {
+                        error(`Command at ${filePath} is missing required 'data.name' property`);
+                    }
+                } catch (err) {
+                    error(`Error loading command ${file.name}:`, err);
+                }
+            }
+        }
+    } catch (err) {
+        error('Error reading commands directory:', err);
+        throw err;
+    }
+};
+
+// Load commands asynchronously
+loadCommands(commandsPath).catch(err => {
+    error('Failed to load commands:', err);
+    process.exit(1);
+});
 
 const distube = new DisTube(client, {
     plugins: [
@@ -117,4 +147,7 @@ lolTracker.init().then(success => {
 });
 
 // Login to Discord with your client's token
-client.login(token);
+client.login(token).catch(err => {
+    error('❌ Failed to login to Discord:', err);
+    process.exit(1);
+});

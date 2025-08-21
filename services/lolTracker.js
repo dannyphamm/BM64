@@ -48,7 +48,11 @@ class LoLTracker {
             1400: 'Ultimate Spellbook',
             1700: 'Arena'
         };
-        this.championNames = {}; // Will be populated when needed
+        this.championNames = {}; // Will be populated on-demand
+        this.championNamesPromise = null; // For lazy loading
+        this.apiCache = new Map(); // Cache for API responses
+        this.CACHE_TTL = 5 * 60 * 1000; // 5 minutes cache TTL
+        this.cacheCleanupInterval = null;
     }
 
     async init() {
@@ -60,11 +64,11 @@ class LoLTracker {
         try {
             await db.connect();
             await this.loadTrackedPlayers();
-            await this.loadChampionNames();
+            // Champion names will be loaded on-demand to improve startup time
             log('✅ LoL Tracker initialized');
             return true;
         } catch (e) {
-            error('❌ Error initializing LoL Tracker:', error);
+            error('❌ Error initializing LoL Tracker:', e);
             return false;
         }
     }
@@ -82,20 +86,36 @@ class LoLTracker {
             
             //log(`📋 Loaded ${this.trackedPlayers.size} tracked players`);
         } catch (e) {
-            error('Error loading tracked players:', error);
+            error('Error loading tracked players:', e);
         }
     }
 
     async loadChampionNames() {
+        if (this.championNamesPromise) {
+            return this.championNamesPromise;
+        }
+
+        this.championNamesPromise = this._loadChampionNamesInternal();
+        return this.championNamesPromise;
+    }
+
+    async _loadChampionNamesInternal() {
         try {
             const response = await fetch('https://ddragon.leagueoflegends.com/cdn/14.1.1/data/en_US/champion.json');
+            if (!response.ok) {
+                throw new Error(`Failed to fetch champion data: ${response.status}`);
+            }
+
             const data = await response.json();
-            
+
             for (const [key, champion] of Object.entries(data.data)) {
                 this.championNames[parseInt(champion.key)] = champion.name;
             }
+
+            log(`✅ Loaded ${Object.keys(this.championNames).length} champion names`);
         } catch (e) {
-            error('Error loading champion names:', error);
+            error('Error loading champion names:', e);
+            // Don't throw - we can still function without champion names
         }
     }
 
@@ -137,7 +157,7 @@ class LoLTracker {
             if (response.status === 404) return null;
             throw new Error(`Riot API error: ${response.status}`);
         } catch (e) {
-            error('Error fetching summoner:', error);
+            error('Error fetching summoner:', e);
             return null;
         }
     }
@@ -161,7 +181,7 @@ class LoLTracker {
             if (response.status === 404) return null;
             throw new Error(`Riot API error: ${response.status}`);
         } catch (e) {
-            error('Error fetching account by Riot ID:', error);
+            error('Error fetching account by Riot ID:', e);
             return null;
         }
     }
@@ -184,7 +204,7 @@ class LoLTracker {
             if (response.status === 404) return null;
             throw new Error(`Riot API error: ${response.status}`);
         } catch (e) {
-            error('Error fetching summoner by PUUID:', error);
+            error('Error fetching summoner by PUUID:', e);
             return null;
         }
     }
@@ -207,7 +227,7 @@ class LoLTracker {
             const matchIds = await response.json();
             return matchIds.length > 0 ? matchIds[0] : null;
         } catch (e) {
-            error('Error fetching last game ID:', error);
+            error('Error fetching last game ID:', e);
             return null;
         }
     }
@@ -229,7 +249,7 @@ class LoLTracker {
 
             return await response.json();
         } catch (e) {
-            error('Error fetching match data:', error);
+            error('Error fetching match data:', e);
             return null;
         }
     }
@@ -244,21 +264,53 @@ class LoLTracker {
         return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
     }
 
-    getChampionName(championId) {
+    async getChampionName(championId) {
+        // Ensure champion names are loaded
+        if (Object.keys(this.championNames).length === 0) {
+            await this.loadChampionNames();
+        }
+
         return this.championNames[championId] || `Champion ${championId}`;
     }
 
-    createMatchEmbed(matchData, summonerName, puuid = null) {
+    // Cache management methods
+    setCache(key, value, ttl = this.CACHE_TTL) {
+        const expiresAt = Date.now() + ttl;
+        this.apiCache.set(key, { value, expiresAt });
+    }
+
+    getCache(key) {
+        const cached = this.apiCache.get(key);
+        if (!cached) return null;
+
+        if (Date.now() > cached.expiresAt) {
+            this.apiCache.delete(key);
+            return null;
+        }
+
+        return cached.value;
+    }
+
+    cleanExpiredCache() {
+        const now = Date.now();
+        for (const [key, cached] of this.apiCache) {
+            if (now > cached.expiresAt) {
+                this.apiCache.delete(key);
+            }
+        }
+    }
+
+    async createMatchEmbed(matchData, summonerName, puuid = null) {
         const info = matchData.info;
         let trackedParticipant;
-        
+
         if (puuid) {
             // Find participant by PUUID
             trackedParticipant = info.participants.find(p => p.puuid === puuid);
         } else {
             // Fallback: try to find by summoner name or Riot ID
-            trackedParticipant = info.participants.find(p => 
-                p.riotIdGameName === summonerName || 
+            trackedParticipant = info.participants.find(p =>
+                p.riotIdGameName === summonerName ||
                 p.summonerName === summonerName ||
                 p.riotIdName === summonerName
             );
@@ -279,9 +331,9 @@ class LoLTracker {
         const team1 = info.participants.filter(p => p.teamId === 100);
         const team2 = info.participants.filter(p => p.teamId === 200);
 
-        // Create team fields
-        const team1Field = this.createTeamField(team1, 'Blue Team', [trackedParticipant.puuid]);
-        const team2Field = this.createTeamField(team2, 'Red Team', [trackedParticipant.puuid]);
+        // Create team fields with async champion name resolution
+        const team1Field = await this.createTeamField(team1, 'Blue Team', [trackedParticipant.puuid]);
+        const team2Field = await this.createTeamField(team2, 'Red Team', [trackedParticipant.puuid]);
 
         const embed = new EmbedBuilder()
             .setColor(color)
@@ -299,28 +351,28 @@ class LoLTracker {
         return embed;
     }
 
-    createTeamField(participants, teamName, trackedPlayerPuuids) {
+    async createTeamField(participants, teamName, trackedPlayerPuuids) {
         const sortedParticipants = participants.sort((a, b) => {
             // Sort by damage dealt to champions (descending)
             return b.totalDamageDealtToChampions - a.totalDamageDealtToChampions;
         });
 
-        const teamLines = sortedParticipants.map(p => {
+        const teamLines = await Promise.all(sortedParticipants.map(async (p) => {
             const playerName = p.riotIdGameName ? `${p.riotIdGameName}#${p.riotIdTagline}` : p.summonerName;
-            const champion = this.getChampionName(p.championId);
+            const champion = await this.getChampionName(p.championId);
             const kda = `${p.kills}/${p.deaths}/${p.assists}`;
             const damage = p.totalDamageDealtToChampions.toLocaleString();
-            
+
             // Handle both single PUUID (string) and multiple PUUIDs (array)
-            const isTrackedPlayer = Array.isArray(trackedPlayerPuuids) 
+            const isTrackedPlayer = Array.isArray(trackedPlayerPuuids)
                 ? trackedPlayerPuuids.includes(p.puuid)
                 : p.puuid === trackedPlayerPuuids;
-            
+
             // Add indicator for tracked player
             const indicator = isTrackedPlayer ? '👁️ ' : '';
-            
+
             return `${indicator}**${playerName}** (${champion})\n└ KDA: ${kda} | DMG: ${damage}`;
-        });
+        }));
 
         return {
             name: teamName,
@@ -365,7 +417,7 @@ class LoLTracker {
 
             return true;
         } catch (e) {
-            error('Error adding player:', error);
+            error('Error adding player:', e);
             return false;
         }
     }
@@ -392,7 +444,7 @@ class LoLTracker {
 
             return true;
         } catch (e) {
-            error('Error removing player:', error);
+            error('Error removing player:', e);
             return false;
         }
     }
@@ -403,27 +455,42 @@ class LoLTracker {
 
     async start() {
         if (this.isRunning) return;
-        
+
         this.isRunning = true;
         log('🔄 Starting LoL Tracker...');
-        
+
         // Check every 2 minutes
         this.checkInterval = setInterval(async () => {
             await this.checkForNewGames();
         }, 2 * 60 * 1000);
-        
+
+        // Clean cache every 10 minutes
+        this.cacheCleanupInterval = setInterval(() => {
+            this.cleanExpiredCache();
+        }, 10 * 60 * 1000);
+
         // Initial check
         await this.checkForNewGames();
     }
 
     async stop() {
         if (!this.isRunning) return;
-        
+
         this.isRunning = false;
+
         if (this.checkInterval) {
             clearInterval(this.checkInterval);
             this.checkInterval = null;
         }
+
+        if (this.cacheCleanupInterval) {
+            clearInterval(this.cacheCleanupInterval);
+            this.cacheCleanupInterval = null;
+        }
+
+        // Clear cache on shutdown
+        this.apiCache.clear();
+
         log('⏹️ Stopped LoL Tracker');
     }
 
@@ -457,7 +524,7 @@ class LoLTracker {
                     }
                 }
             } catch (e) {
-                error(`Error checking games for ${player.summonerName}:`, error);
+                error(`Error checking games for ${player.summonerName}:`, e);
             }
         }
 
@@ -487,7 +554,7 @@ class LoLTracker {
                 // Send consolidated match summary
                 await this.sendConsolidatedMatchSummary(gameData.matchData, gameData.players);
             } catch (e) {
-                error(`Error processing game group ${gameId}:`, error);
+                error(`Error processing game group ${gameId}:`, e);
             }
         }
     }
@@ -515,7 +582,7 @@ class LoLTracker {
 
             // Send consolidated embed to each channel
             for (const [channelId, channelPlayers] of channelGroups) {
-                const embed = this.createConsolidatedMatchEmbed(matchData, channelPlayers);
+                const embed = await this.createConsolidatedMatchEmbed(matchData, channelPlayers);
                 const channel = await client.channels.fetch(channelId);
                 if (channel) {
                     await channel.send({ embeds: [embed] });
@@ -528,9 +595,9 @@ class LoLTracker {
         }
     }
 
-    createConsolidatedMatchEmbed(matchData, players) {
+    async createConsolidatedMatchEmbed(matchData, players) {
         const info = matchData.info;
-        
+
         // Find all tracked participants
         const trackedParticipants = [];
         for (const player of players) {
@@ -554,7 +621,7 @@ class LoLTracker {
         const allSameTeam = trackedParticipants.every(tp => tp.participant.teamId === trackedParticipants[0].participant.teamId);
         const allWon = trackedParticipants.every(tp => tp.participant.win);
         const allLost = trackedParticipants.every(tp => !tp.participant.win);
-        
+
         let color, result;
         if (allSameTeam) {
             color = allWon ? 0x00FF00 : 0xFF0000;
@@ -568,18 +635,18 @@ class LoLTracker {
         const team1 = info.participants.filter(p => p.teamId === 100);
         const team2 = info.participants.filter(p => p.teamId === 200);
 
-        // Create team fields
-        const team1Field = this.createTeamField(team1, 'Blue Team', players.map(p => p.puuid));
-        const team2Field = this.createTeamField(team2, 'Red Team', players.map(p => p.puuid));
+        // Create team fields with async champion name resolution
+        const team1Field = await this.createTeamField(team1, 'Blue Team', players.map(p => p.puuid));
+        const team2Field = await this.createTeamField(team2, 'Red Team', players.map(p => p.puuid));
 
-        // Create tracked players summary
-        const trackedPlayersSummary = trackedParticipants.map(tp => {
+        // Create tracked players summary with async champion names
+        const trackedPlayersSummary = await Promise.all(trackedParticipants.map(async (tp) => {
             const displayName = tp.player.tag ? `${tp.player.summonerName}#${tp.player.tag}` : tp.player.summonerName;
-            const champion = this.getChampionName(tp.participant.championId);
+            const champion = await this.getChampionName(tp.participant.championId);
             const kda = `${tp.participant.kills}/${tp.participant.deaths}/${tp.participant.assists}`;
             const result = tp.participant.win ? '✅' : '❌';
             return `${result} **${displayName}** (${champion}) - ${kda}`;
-        }).join('\n');
+        }));
 
         const embed = new EmbedBuilder()
             .setColor(color)
@@ -589,7 +656,7 @@ class LoLTracker {
                 { name: 'Game Duration', value: this.formatDuration(info.gameDuration), inline: true },
                 { name: 'Game Mode', value: this.getGameMode(info.queueId), inline: true },
                 { name: '\u200b', value: '\u200b', inline: true }, // Empty field for spacing
-                { name: 'Tracked Players', value: trackedPlayersSummary, inline: false },
+                { name: 'Tracked Players', value: trackedPlayersSummary.join('\n'), inline: false },
                 team1Field,
                 team2Field
             )
