@@ -328,6 +328,17 @@ class SpotifyStatusService {
 
         const current = currentTrack.body.item;
         
+        // Set Discord activity for current song
+        if (current && current.name) {
+            const artistNames = current.artists?.map(artist => artist.name).join(', ') || 'Unknown Artist';
+            const activityText = `${current.name} by ${artistNames}`;
+            try {
+                await client.user.setActivity(activityText, { type: 'LISTENING' });
+            } catch (e) {
+                error('Failed to set Discord activity:', e);
+            }
+        }
+        
         // Get queue and recent tracks
         const [queueData, recentTracks] = await Promise.all([
             SocketWrapper.getQueue().catch(() => null),
@@ -355,6 +366,13 @@ class SpotifyStatusService {
         if (voiceChannel.type !== 2) return;
 
         log("Handling ad or paused state");
+        
+        // Clear Discord activity since ad is playing or music is paused
+        try {
+            await client.user.setActivity(null);
+        } catch (e) {
+            error('Failed to clear Discord activity:', e);
+        }
 
         // Get queue and recent tracks
         const [queueData, recentTracks, playLengthData] = await Promise.all([
@@ -400,6 +418,13 @@ class SpotifyStatusService {
         if (voiceChannel && voiceChannel.type === 2) {
             // Could implement clearing voice channel status here
             log("No track currently playing");
+        }
+        
+        // Clear Discord activity since no track is playing
+        try {
+            await client.user.setActivity(null);
+        } catch (e) {
+            error('Failed to clear Discord activity:', e);
         }
     }
 

@@ -12,11 +12,13 @@ const { socketIO } = require('../utils/socket');
 const { spotify, getAllPlaylistSongs } = require('../utils/spotify');
 const { misamoAutoImport } = require('../services/misamoAutoImport');
 const { uniqloStreamService } = require('../services/uniqlostream');
+const { ActivityType } = require('discord.js');
+const DiscordRPC = require('discord-rpc');
 
 module.exports = {
     name: 'clientReady',
     once: true,
-    execute(client) {
+    async execute(client) {
 
         if (config.mode !== 'DEV') {
             log("Vaccine: Scheduled job to run every 11PM")
@@ -137,8 +139,10 @@ module.exports = {
                 client.lolTracker.start();
                 log('LoL Tracker service started');
             }
+                
+
         }
-        
+
         log('Ready!');
     },
 };
