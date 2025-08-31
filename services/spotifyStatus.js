@@ -4,6 +4,7 @@ const { ButtonStyle } = require('discord.js');
 const { error, log } = require('../utils/utils');
 const { socketIO } = require('../utils/socket.js');
 const config = require('../config');
+const { ActivityType } = require('discord.js');
 
 // Constants
 const RETRY_DELAY = 3000;
@@ -333,7 +334,7 @@ class SpotifyStatusService {
             const artistNames = current.artists?.map(artist => artist.name).join(', ') || 'Unknown Artist';
             const activityText = `${current.name} by ${artistNames}`;
             try {
-                await client.user.setActivity(activityText, { type: 'LISTENING' });
+                await client.user.setActivity(activityText, { type: ActivityType.Listening });
             } catch (e) {
                 error('Failed to set Discord activity:', e);
             }

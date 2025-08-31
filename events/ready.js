@@ -9,11 +9,8 @@ const { kdramaTrackerService, kdramaCompleterService } = require('../services/kd
 const { trackUniqloItems, femaleSaleItems, maleSaleItems } = require('../services/uniqlo');
 const { loadSpotify } = require('../services/spotifyStatus');
 const { socketIO } = require('../utils/socket');
-const { spotify, getAllPlaylistSongs } = require('../utils/spotify');
 const { misamoAutoImport } = require('../services/misamoAutoImport');
 const { uniqloStreamService } = require('../services/uniqlostream');
-const { ActivityType } = require('discord.js');
-const DiscordRPC = require('discord-rpc');
 
 module.exports = {
     name: 'clientReady',
