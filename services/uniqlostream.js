@@ -60,7 +60,7 @@ async function uniqloStreamService(client) {
                         .setDescription(`**Base:** ${pricePrecision(item.prices.base.value)}\n**Promo:** ${pricePrecision(item.prices.promo?.value)}\n${colorSizeLines}`)
                         .setColor(0x0066cc) // Uniqlo blue
                         .setURL(`https://www.uniqlo.com/au/en/products/${item.productId}`)
-                        .setImage(item.images.main[0].url)
+                        .setImage(item.images.main[0].image)
                         .setTimestamp()
                         .setFooter({ text: `Uniqlo Men's Sale Updates | ID: ${item._id}` });
                     await channel.send({ embeds: [embed] });
