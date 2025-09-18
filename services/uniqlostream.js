@@ -60,7 +60,7 @@ async function uniqloStreamService(client) {
                         .setDescription(`**Base:** ${pricePrecision(item.prices.base.value)}\n**Promo:** ${pricePrecision(item.prices.promo?.value)}\n${colorSizeLines}`)
                         .setColor(0x0066cc) // Uniqlo blue
                         .setURL(`https://www.uniqlo.com/au/en/products/${item.productId}`)
-                        .setImage(item.images.main[0].image)
+                        .setImage(item.images && item.images.main ? Object.values(item.images.main)[0]?.image : null)
                         .setTimestamp()
                         .setFooter({ text: `Uniqlo Men's Sale Updates | ID: ${item._id}` });
                     await channel.send({ embeds: [embed] });
@@ -102,8 +102,11 @@ async function uniqloStreamService(client) {
                         .setURL(`https://www.uniqlo.com/au/en/products/${item.productId}`)
                         .setTimestamp()
                         .setFooter({ text: `Uniqlo Women's Sale Updates | ID: ${item._id}` });
-                    if (item.images?.main?.[0]?.url) {
-                        embed.setImage(item.images.main[0].image);
+                    if (item.images && item.images.main) {
+                        const firstImage = Object.values(item.images.main)[0];
+                        if (firstImage?.image) {
+                            embed.setImage(firstImage.image);
+                        }
                     }           
                     await channel.send({ embeds: [embed] });
                 }
@@ -238,8 +241,11 @@ async function preloadChannelItems(client, channelId, collection) {
                     .setURL(`https://www.uniqlo.com/au/en/products/${item.productId}`)
                     .setTimestamp()
                     .setFooter({ text: `Uniqlo ${channelId === config.maleCurrentChannelId ? "Men's" : "Women's"} Sale Updates | ID: ${itemId}` });
-                if (item.images?.main?.[0]?.url) {
-                    embed.setImage(item.images.main[0].image);
+                if (item.images && item.images.main) {
+                    const firstImage = Object.values(item.images.main)[0];
+                    if (firstImage?.image) {
+                        embed.setImage(firstImage.image);
+                    }
                 }
                 await channel.send({ embeds: [embed] }).catch(e => error(`Failed to create message: ${e}`));
                 loadCount++;

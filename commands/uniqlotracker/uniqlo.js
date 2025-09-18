@@ -121,7 +121,8 @@ module.exports = {
                 });
             }
 
-            const imageUrls = item.images.main.map(image => image.url);
+            // Handle new API structure where main is an object with color codes as keys
+            const imageUrls = Object.values(item.images.main).map(image => image.image);
             const image = await imageAttachment(imageUrls, 'combined-image.png');
 
             const confirmEmbed = new EmbedBuilder()
@@ -155,7 +156,10 @@ module.exports = {
             const collector = confirmMessage.createMessageComponentCollector({ filter, time: 15000 });
             collector.on('collect', async i => {
                 if (i.customId === 'confirm') {
-                    await insertPrice(client, item.productId, basePrice, promoPrice, item.name, item.images.main[0].image);
+                    // Handle new API structure where main is an object with color codes as keys
+                    const firstImage = Object.values(item.images.main)[0];
+                    const imageUrl = firstImage ? firstImage.image : null;
+                    await insertPrice(client, item.productId, basePrice, promoPrice, item.name, imageUrl);
 
                     i.update({ content: `Uniqlo item ${itemId} has been added to tracking.`, components: [] });
                 } else {
@@ -357,7 +361,10 @@ module.exports = {
                     existingItem.prices[existingItem.prices.length - 1].basePrice = basePrice;
                     existingItem.prices[existingItem.prices.length - 1].promoPrice = promoPrice;
                     // Save the new price to MongoDB
-                    await insertPrice(client, itemId, basePrice, promoPrice, item.name, item.images.main[0].image);
+                    // Handle new API structure where main is an object with color codes as keys
+                    const firstImage = Object.values(item.images.main)[0];
+                    const imageUrl = firstImage ? firstImage.image : null;
+                    await insertPrice(client, itemId, basePrice, promoPrice, item.name, imageUrl);
 
                     return interaction.reply('The price has changed.');
                 } else {
