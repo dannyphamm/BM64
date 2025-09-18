@@ -59,32 +59,63 @@ async function trackUniqloItems(client) {
 }
 async function fetchSaleItems(client, gender, discordId) {
     try {
-        // Fetch the current state of the sale items API
-        const url = await fetch(`${config.uniqloApiUrl}/products?path=${gender}&flagCodes=discount&limit=1000&offset=0`);
-        let response;
-        try {
-            response = await url.json();
-        } catch (e) {
-            const text = await url.text();
-            error('Failed to parse JSON. Response:', text, 'Error:', e);
-            throw new Error(`Invalid JSON response: ${e.message}`);
+        // Fetch all sale items with pagination (max 100 items per request)
+        let allItems = [];
+        let offset = 0;
+        const limit = 100;
+        let hasMoreItems = true;
+        
+        while (hasMoreItems) {
+            const url = await fetch(`${config.uniqloApiUrl}/products?path=${gender}&flagCodes=discount&limit=${limit}&offset=${offset}`);
+            let response;
+            try {
+                response = await url.json();
+            } catch (e) {
+                const text = await url.text();
+                error('Failed to parse JSON. Response:', text, 'Error:', e);
+                throw new Error(`Invalid JSON response: ${e.message}`);
+            }
+            
+            // If response is not ok, return error
+            if (response.status !== "ok") {
+                return error("Error fetching sale items", gender, `${config.uniqloApiUrl}/products?path=${gender}&flagCodes=discount&limit=${limit}&offset=${offset}`);
+            }
+            
+            // Add items from this page to the total collection
+            if (response.result.items && response.result.items.length > 0) {
+                allItems = allItems.concat(response.result.items);
+                
+                // Check if we have more items to fetch
+                const totalItems = response.result.pagination?.total || response.result.items.length;
+                hasMoreItems = (offset + limit) < totalItems && response.result.items.length === limit;
+                offset += limit;
+                
+                log(`Fetched ${response.result.items.length} items for ${gender}, total so far: ${allItems.length}`);
+            } else {
+                hasMoreItems = false;
+            }
         }
-        // If response is not 200 then return
-        if (response.status !== "ok" || response.result.items.length === 0) return (error("Error fetching sale items", gender, `${config.uniqloApiUrl}/products?path=${gender}&flagCodes=discount&limit=1000&offset=0`));
+        
+        // If no items found, return
+        if (allItems.length === 0) {
+            return error("No sale items found", gender);
+        }
+        
+        log(`Total items fetched for ${gender}: ${allItems.length}`);
         // Retrieve the previous state of the sale items from your database
         const collection = await client.mongodb.db.collection(`sale-items-${gender}`);
         const previousState = await collection.find().toArray();
         if (previousState.length === 0) {
-            log("Inserting data into database", response.result.items.length)
-            for (const item of response.result.items) {
+            log("Inserting data into database", allItems.length)
+            for (const item of allItems) {
                 await collection.updateOne({ id: item.productId }, { $set: item }, { upsert: true });
             }
             return;
         }
         // Compare the two states to find any differences
-        let addedItems = response.result.items.filter(item => !previousState.find(i => i.productId === item.productId))
-        let removedItems = previousState.filter(item => !response.result.items.find(i => i.productId === item.productId));
-        let changedItems = response.result.items.reduce((acc, item) => {
+        let addedItems = allItems.filter(item => !previousState.find(i => i.productId === item.productId))
+        let removedItems = previousState.filter(item => !allItems.find(i => i.productId === item.productId));
+        let changedItems = allItems.reduce((acc, item) => {
             const previousItem = previousState.find(i => i.productId === item.productId);
             if (previousItem && (previousItem.prices.base?.value !== item.prices.base?.value || previousItem.prices.promo?.value !== item.prices.promo?.value || (previousItem.prices.promo?.value !== null && item.prices.promo?.value === null))) {
                 acc.push([previousItem, item]);
