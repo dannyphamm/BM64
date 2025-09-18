@@ -62,6 +62,21 @@ module.exports = {
                         .setDescription('The ID of the Uniqlo item to track pricing for')
                         .setRequired(true)
                 )
+        ).addSubcommand(subcommand =>
+            subcommand
+                .setName('run')
+                .setDescription('Manually run Uniqlo tracking functions')
+                .addStringOption(option =>
+                    option.setName('function')
+                        .setDescription('Choose which function to run')
+                        .setRequired(true)
+                        .addChoices(
+                            { name: 'Track All Items', value: 'track_items' },
+                            { name: 'Male Sale Items', value: 'male_sale' },
+                            { name: 'Female Sale Items', value: 'female_sale' },
+                            { name: 'All Sale Items', value: 'all_sale' }
+                        )
+                )
         ),
 
     async execute(interaction) {
@@ -394,6 +409,39 @@ module.exports = {
                 .setTitle(`Price Tracking for Uniqlo Item ${itemId}`)
                 .setImage('attachment://price_chart.png');
             return interaction.editReply({ embeds: [embed], files: [attachment] });
+        } else if (subcommand === 'run') {
+            // Handle the run subcommand
+            const functionToRun = interaction.options.getString('function');
+            
+            // Defer reply since these functions might take some time
+            await interaction.deferReply();
+            
+            try {
+                switch (functionToRun) {
+                    case 'track_items':
+                        await trackUniqloItems(client);
+                        return interaction.editReply('✅ Successfully ran trackUniqloItems function. All tracked items have been updated.');
+                        
+                    case 'male_sale':
+                        await maleSaleItems(client);
+                        return interaction.editReply('✅ Successfully ran maleSaleItems function. Male sale items have been updated.');
+                        
+                    case 'female_sale':
+                        await femaleSaleItems(client);
+                        return interaction.editReply('✅ Successfully ran femaleSaleItems function. Female sale items have been updated.');
+                        
+                    case 'all_sale':
+                        await maleSaleItems(client);
+                        await femaleSaleItems(client);
+                        return interaction.editReply('✅ Successfully ran both sale item functions. All sale items have been updated.');
+                        
+                    default:
+                        return interaction.editReply('❌ Invalid function selected.');
+                }
+            } catch (error) {
+                console.error('Error running manual function:', error);
+                return interaction.editReply(`❌ Error running function: ${error.message}`);
+            }
         }
     }
 };

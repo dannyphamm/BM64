@@ -4,7 +4,11 @@ const config = require('../config');
 
 async function getUniqloItem(itemId) {
     log(`Fetching item ${itemId}`)
-    const url = await fetch(`${config.uniqloApiUrl}/products/${itemId}`);
+    const url = await fetch(`${config.uniqloApiUrl}/products/${itemId}`, {
+        headers: {
+            'x-fr-clientid': 'uq.au.web-spa'
+        }
+    });
     let response = null;
     try {
         response = await url.json();

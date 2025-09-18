@@ -66,7 +66,11 @@ async function fetchSaleItems(client, gender, discordId) {
         let hasMoreItems = true;
         
         while (hasMoreItems) {
-            const url = await fetch(`${config.uniqloApiUrl}/products?path=${gender}&flagCodes=discount&limit=${limit}&offset=${offset}`);
+            const url = await fetch(`${config.uniqloApiUrl}/products?path=${gender}&flagCodes=discount&limit=${limit}&offset=${offset}`, {
+                headers: {
+                    'x-fr-clientid': 'uq.au.web-spa'
+                }
+            });
             let response;
             try {
                 response = await url.json();
