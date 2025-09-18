@@ -155,7 +155,7 @@ module.exports = {
             const collector = confirmMessage.createMessageComponentCollector({ filter, time: 15000 });
             collector.on('collect', async i => {
                 if (i.customId === 'confirm') {
-                    await insertPrice(client, item.productId, basePrice, promoPrice, item.name, item.images.main[0].url);
+                    await insertPrice(client, item.productId, basePrice, promoPrice, item.name, item.images.main[0].image);
 
                     i.update({ content: `Uniqlo item ${itemId} has been added to tracking.`, components: [] });
                 } else {
@@ -322,7 +322,7 @@ module.exports = {
 
                 // Get the current price of the item
                 const item = await getUniqloItem(itemId);
-                if (item.length === 0) {
+                if (Array.isArray(item) && item.length === 0) {
                     return interaction.reply('This item no longer exists.');
                 }
                 const basePrice = item.prices.base.value;
@@ -357,7 +357,7 @@ module.exports = {
                     existingItem.prices[existingItem.prices.length - 1].basePrice = basePrice;
                     existingItem.prices[existingItem.prices.length - 1].promoPrice = promoPrice;
                     // Save the new price to MongoDB
-                    await insertPrice(client, itemId, basePrice, promoPrice, item.name, item.images.main[0].url);
+                    await insertPrice(client, itemId, basePrice, promoPrice, item.name, item.images.main[0].image);
 
                     return interaction.reply('The price has changed.');
                 } else {

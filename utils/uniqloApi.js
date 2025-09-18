@@ -21,16 +21,28 @@ async function getUniqloItem(itemId) {
         log("NOK", itemId)
         return []
     }
-    if(response.result.items.length === 0) {
-        log("0", itemId)
-        return []
+    
+    // Handle both array and direct object response structures
+    if(Array.isArray(response.result.items)) {
+        // Old API structure - items is an array
+        if(response.result.items.length === 0) {
+            log("0", itemId)
+            return []
+        }
+        return response.result.items[0];
+    } else {
+        // New API structure - items is a direct object
+        if(!response.result.items) {
+            log("No items found", itemId)
+            return []
+        }
+        return response.result.items;
     }
-    return response.result.items[0];
 }
 // getlatestprice
 async function getLatestPrices(itemId) {
     const item = await getUniqloItem(itemId);
-    if(item.length === 0) {
+    if(Array.isArray(item) && item.length === 0) {
         return {basePrice: null, promoPrice: null}
     }
     const basePrice = item.prices.base.value;

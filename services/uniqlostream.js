@@ -103,7 +103,7 @@ async function uniqloStreamService(client) {
                         .setTimestamp()
                         .setFooter({ text: `Uniqlo Women's Sale Updates | ID: ${item._id}` });
                     if (item.images?.main?.[0]?.url) {
-                        embed.setImage(item.images.main[0].url);
+                        embed.setImage(item.images.main[0].image);
                     }           
                     await channel.send({ embeds: [embed] });
                 }
@@ -239,7 +239,7 @@ async function preloadChannelItems(client, channelId, collection) {
                     .setTimestamp()
                     .setFooter({ text: `Uniqlo ${channelId === config.maleCurrentChannelId ? "Men's" : "Women's"} Sale Updates | ID: ${itemId}` });
                 if (item.images?.main?.[0]?.url) {
-                    embed.setImage(item.images.main[0].url);
+                    embed.setImage(item.images.main[0].image);
                 }
                 await channel.send({ embeds: [embed] }).catch(e => error(`Failed to create message: ${e}`));
                 loadCount++;

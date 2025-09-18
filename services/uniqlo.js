@@ -28,7 +28,7 @@ async function trackUniqloItems(client) {
         if (basePrice !== latestPrice.basePrice || promoPrice !== latestPrice.promoPrice) {
             // Save the new price to MongoDB
             const item = await getUniqloItem(itemId);
-            if(item.length === 0) {
+            if(Array.isArray(item) && item.length === 0) {
                 return error("FAIL: Item not found", itemId);
             }
             await insertPrice(client, itemId, basePrice, promoPrice, item.name, existingItem.imageURL);
@@ -131,7 +131,7 @@ async function fetchSaleItems(client, gender, discordId) {
 
         addedItems = await Promise.all(addedItems.map(async item => {
             const product = await getUniqloItem(item.productId)
-            if (product.length === 0) {
+            if (Array.isArray(product) && product.length === 0) {
                 available = []
             } else {
                 available = product.l2s.filter(item => item.prices.promo !== null && item.stock.quantity !== 0);
@@ -140,7 +140,7 @@ async function fetchSaleItems(client, gender, discordId) {
         }));
         removedItems = await Promise.all(removedItems.map(async item => {
             const product = await getUniqloItem(item.productId)
-            if (product.length === 0) {
+            if (Array.isArray(product) && product.length === 0) {
                 available = []
             } else {
                 available = product.l2s.filter(item => item.prices.promo !== null && item.stock.quantity !== 0);
@@ -150,7 +150,7 @@ async function fetchSaleItems(client, gender, discordId) {
         changedItems = await Promise.all(changedItems.map(async item => {
             const product = await getUniqloItem(item[1].productId)
             let available;
-            if (product.length === 0) {
+            if (Array.isArray(product) && product.length === 0) {
                 available = []
             } else {
                 available = product.l2s.filter(item => item.prices.promo !== null && item.stock.quantity !== 0);
@@ -165,7 +165,7 @@ async function fetchSaleItems(client, gender, discordId) {
         const batchSize = 4;
         for (let i = 0; i < addedItems.length; i += batchSize) {
             const batch = addedItems.slice(i, i + batchSize);
-            const addedItemsImageUrls = batch.map(item => item.images && item.images.main ? item.images.main[0].url : null);
+            const addedItemsImageUrls = batch.map(item => item.images && item.images.main ? item.images.main[0].image : null);
             const addedItemsImage = await imageAttachment(addedItemsImageUrls, "added-items");
             const addedItemsEmbed = {
                 color: 0x0099ff,
@@ -188,7 +188,7 @@ async function fetchSaleItems(client, gender, discordId) {
         }
         for (let i = 0; i < removedItems.length; i += batchSize) {
             const batch = removedItems.slice(i, i + batchSize);
-            const removedItemsImageUrls = batch.map(item => item.images && item.images.main ? item.images.main[0].url : null);
+            const removedItemsImageUrls = batch.map(item => item.images && item.images.main ? item.images.main[0].image : null);
             const removedItemsImage = await imageAttachment(removedItemsImageUrls, "removed-items");
             const removedItemsEmbed = new EmbedBuilder()
                 .setColor('#0099ff')
@@ -203,7 +203,7 @@ async function fetchSaleItems(client, gender, discordId) {
         }
         for (let i = 0; i < changedItems.length; i += batchSize) {
             const batch = changedItems.slice(i, i + batchSize);
-            const changedItemsImageUrls = batch.map(item => item[1].images && item[1].images.main ? item[1].images.main[0].url : null);
+            const changedItemsImageUrls = batch.map(item => item[1].images && item[1].images.main ? item[1].images.main[0].image : null);
             const changedItemsImage = await imageAttachment(changedItemsImageUrls, "changed-items");
             const changedItemsEmbed = new EmbedBuilder()
                 .setColor('#0099ff')
