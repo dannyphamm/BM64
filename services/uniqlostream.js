@@ -36,7 +36,6 @@ async function uniqloStreamService(client) {
             try {
                 const channel = await client.channels.cache.find(c => c.id === config.maleCurrentChannelId);
                 if (!channel) return;
-
                 if (change.operationType === 'delete') {
                     // For deletions, we only have the _id in change.documentKey
                     const itemId = change.documentKey._id;
@@ -46,14 +45,38 @@ async function uniqloStreamService(client) {
                     // Clean up old messages before sending new one
                     await cleanupOldMessages(channel, item._id);
                     
+                    // Skip if no l2s data available
+                    if (!item.l2s || item.l2s.length === 0) {
+                        log(`Skipping male item ${item.productId} - no l2s data available`);
+                        return;
+                    }
+                    
                     const colorSizes = item.l2s.reduce((acc, l2) => {
-                        if (!acc[l2.color.name]) {
-                            acc[l2.color.name] = [];
+                        // Handle both enhanced structure and fallback to display codes
+                        const colorName = l2.color.name || l2.color.displayCode || 'Unknown Color';
+                        const sizeName = l2.size.name || l2.size.displayCode || 'Unknown Size';
+                        const stockQuantity = l2.stock?.quantity || 0;
+                        const promoValue = l2.prices?.promo?.value || l2.prices?.base?.value || 0;
+                        
+                        // Skip items with 0 stock
+                        if (stockQuantity === 0) {
+                            return acc;
                         }
-                        acc[l2.color.name].push(`${l2.size.name} (${l2.stock.quantity}) (${pricePrecision(l2.prices.promo.value)})`);
+                        
+                        if (!acc[colorName]) {
+                            acc[colorName] = [];
+                        }
+                        acc[colorName].push(`${sizeName} (${stockQuantity}) (${pricePrecision(promoValue)})`);
                         return acc;
                     }, {});
-                    const colorSizeLines = Object.entries(colorSizes).map(([color, sizes]) => `${color}: ${sizes.join(', ')}`).join('\n');
+                    
+                    // Skip if no in-stock items to display
+                    if (Object.keys(colorSizes).length === 0) {
+                        log(`Skipping male item ${item.productId} - no in-stock items`);
+                        return;
+                    }
+                    
+                    const colorSizeLines = Object.entries(colorSizes).map(([color, sizes]) => `**${color}**: ${sizes.join(', ')}`).join('\n');
 
                     const embed = new EmbedBuilder()
                         .setTitle(item.name)
@@ -86,14 +109,38 @@ async function uniqloStreamService(client) {
                     // Clean up old messages before sending new one
                     await cleanupOldMessages(channel, item._id);
                     
+                    // Skip if no l2s data available
+                    if (!item.l2s || item.l2s.length === 0) {
+                        log(`Skipping female item ${item.productId} - no l2s data available`);
+                        return;
+                    }
+                    
                     const colorSizes = item.l2s.reduce((acc, l2) => {
-                        if (!acc[l2.color.name]) {
-                            acc[l2.color.name] = [];
+                        // Handle both enhanced structure and fallback to display codes
+                        const colorName = l2.color.name || l2.color.displayCode || 'Unknown Color';
+                        const sizeName = l2.size.name || l2.size.displayCode || 'Unknown Size';
+                        const stockQuantity = l2.stock?.quantity || 0;
+                        const promoValue = l2.prices?.promo?.value || l2.prices?.base?.value || 0;
+                        
+                        // Skip items with 0 stock
+                        if (stockQuantity === 0) {
+                            return acc;
                         }
-                        acc[l2.color.name].push(`${l2.size.name} (${l2.stock.quantity}) (${pricePrecision(l2.prices.promo.value)})`);
+                        
+                        if (!acc[colorName]) {
+                            acc[colorName] = [];
+                        }
+                        acc[colorName].push(`${sizeName} (${stockQuantity}) (${pricePrecision(promoValue)})`);
                         return acc;
                     }, {});
-                    const colorSizeLines = Object.entries(colorSizes).map(([color, sizes]) => `${color}: ${sizes.join(', ')}`).join('\n');
+                    
+                    // Skip if no in-stock items to display
+                    if (Object.keys(colorSizes).length === 0) {
+                        log(`Skipping female item ${item.productId} - no in-stock items`);
+                        return;
+                    }
+                    
+                    const colorSizeLines = Object.entries(colorSizes).map(([color, sizes]) => `**${color}**: ${sizes.join(', ')}`).join('\n');
 
                     const embed = new EmbedBuilder()
                         .setTitle(item.name)
@@ -225,14 +272,38 @@ async function preloadChannelItems(client, channelId, collection) {
             const itemId = item._id.toString();
             log(`Checking DB item: ${itemId}, Exists: ${existingIds.has(itemId)}`);
             if (!existingIds.has(itemId)) {
+                // Skip if no l2s data available
+                if (!item.l2s || item.l2s.length === 0) {
+                    log(`Skipping preload item ${item.productId} - no l2s data available`);
+                    continue;
+                }
+                
                 const colorSizes = item.l2s.reduce((acc, l2) => {
-                    if (!acc[l2.color.name]) {
-                        acc[l2.color.name] = [];
+                    // Handle both enhanced structure and fallback to display codes
+                    const colorName = l2.color.name || l2.color.displayCode || 'Unknown Color';
+                    const sizeName = l2.size.name || l2.size.displayCode || 'Unknown Size';
+                    const stockQuantity = l2.stock?.quantity || 0;
+                    const promoValue = l2.prices?.promo?.value || l2.prices?.base?.value || 0;
+                    
+                    // Skip items with 0 stock
+                    if (stockQuantity === 0) {
+                        return acc;
                     }
-                    acc[l2.color.name].push(`${l2.size.name} (${l2.stock.quantity}) (${pricePrecision(l2.prices.promo.value)})`);
+                    
+                    if (!acc[colorName]) {
+                        acc[colorName] = [];
+                    }
+                    acc[colorName].push(`${sizeName} (${stockQuantity}) (${pricePrecision(promoValue)})`);
                     return acc;
                 }, {});
-                const colorSizeLines = Object.entries(colorSizes).map(([color, sizes]) => `${color}: ${sizes.join(', ')}`).join('\n');
+                
+                // Skip if no in-stock items to display
+                if (Object.keys(colorSizes).length === 0) {
+                    log(`Skipping preload item ${item.productId} - no in-stock items`);
+                    continue;
+                }
+                
+                const colorSizeLines = Object.entries(colorSizes).map(([color, sizes]) => `**${color}**: ${sizes.join(', ')}`).join('\n');
 
                 const embed = new EmbedBuilder()
                     .setTitle(item.name)
@@ -243,6 +314,7 @@ async function preloadChannelItems(client, channelId, collection) {
                     .setFooter({ text: `Uniqlo ${channelId === config.maleCurrentChannelId ? "Men's" : "Women's"} Sale Updates | ID: ${itemId}` });
                 if (item.images && item.images.main) {
                     const firstImage = Object.values(item.images.main)[0];
+
                     if (firstImage?.image) {
                         embed.setImage(firstImage.image);
                     }

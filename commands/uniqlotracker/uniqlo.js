@@ -94,8 +94,25 @@ module.exports = {
 
             const item = await getUniqloItem(itemId);
             const itemUrl = `https://www.uniqlo.com/au/en/products/${itemId}`;
-            const basePrice = item.prices.base.value;
-            const promoPrice = item.prices.promo ? item.prices.promo.value : null;
+            
+            // New API structure: try overall prices first, then fall back to l2Id-specific prices
+            let basePrice, promoPrice;
+            
+            if (item.overallPrices && item.overallPrices.base && typeof item.overallPrices.base.value === 'number') {
+                // Use overall prices from details API (representative pricing)
+                basePrice = item.overallPrices.base.value;
+                promoPrice = item.overallPrices.promo ? item.overallPrices.promo.value : null;
+            } else {
+                // Fall back to l2Id-specific prices
+                const priceKeys = Object.keys(item.prices || {}).filter(key => key.match(/^\d+$/));
+                if (priceKeys.length === 0) {
+                    return interaction.reply('No pricing information available for this item.');
+                }
+                const firstPriceKey = priceKeys[0];
+                const priceData = item.prices[firstPriceKey];
+                basePrice = priceData.base.value;
+                promoPrice = priceData.promo ? priceData.promo.value : null;
+            }
 
             // create a JSON object with the item ID, URL, and price(s)
             const embed = {
@@ -159,7 +176,7 @@ module.exports = {
                     // Handle new API structure where main is an object with color codes as keys
                     const firstImage = Object.values(item.images.main)[0];
                     const imageUrl = firstImage ? firstImage.image : null;
-                    await insertPrice(client, item.productId, basePrice, promoPrice, item.name, imageUrl);
+                    await insertPrice(client, item.productId, basePrice, promoPrice, item.name, imageUrl, item.priceGroup);
 
                     i.update({ content: `Uniqlo item ${itemId} has been added to tracking.`, components: [] });
                 } else {
@@ -329,8 +346,24 @@ module.exports = {
                 if (Array.isArray(item) && item.length === 0) {
                     return interaction.reply('This item no longer exists.');
                 }
-                const basePrice = item.prices.base.value;
-                const promoPrice = item.prices.promo ? item.prices.promo.value : null;
+                // New API structure: try overall prices first, then fall back to l2Id-specific prices
+                let basePrice, promoPrice;
+                
+                if (item.overallPrices && item.overallPrices.base && typeof item.overallPrices.base.value === 'number') {
+                    // Use overall prices from details API (representative pricing)
+                    basePrice = item.overallPrices.base.value;
+                    promoPrice = item.overallPrices.promo ? item.overallPrices.promo.value : null;
+                } else {
+                    // Fall back to l2Id-specific prices
+                    const priceKeys = Object.keys(item.prices || {}).filter(key => key.match(/^\d+$/));
+                    if (priceKeys.length === 0) {
+                        return interaction.reply('No pricing information available for this item.');
+                    }
+                    const firstPriceKey = priceKeys[0];
+                    const priceData = item.prices[firstPriceKey];
+                    basePrice = priceData.base.value;
+                    promoPrice = priceData.promo ? priceData.promo.value : null;
+                }
                 console.log(existingItem.prices[existingItem.prices.length - 1].promoPrice, promoPrice)
                 // Check if the price has changed
                 if ((basePrice !== existingItem.prices[existingItem.prices.length - 1].basePrice)
@@ -364,7 +397,7 @@ module.exports = {
                     // Handle new API structure where main is an object with color codes as keys
                     const firstImage = Object.values(item.images.main)[0];
                     const imageUrl = firstImage ? firstImage.image : null;
-                    await insertPrice(client, itemId, basePrice, promoPrice, item.name, imageUrl);
+                    await insertPrice(client, itemId, basePrice, promoPrice, item.name, imageUrl, item.priceGroup);
 
                     return interaction.reply('The price has changed.');
                 } else {

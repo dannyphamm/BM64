@@ -18,7 +18,9 @@ async function trackUniqloItems(client) {
         }
         
         const latestPrice = existingItem.prices[existingItem.prices.length - 1];
-        let { basePrice, promoPrice } = await getLatestPrices(itemId);
+        // Get the priceGroup from existing item or fetch it
+        const priceGroup = existingItem.priceGroup || '01';
+        let { basePrice, promoPrice } = await getLatestPrices(itemId, priceGroup);
         if (basePrice === null && promoPrice === null) {
             const channel = client.channels.cache.get(config.discordChannelId);
             channel.send(`Item ${itemId} is no longer available on the Uniqlo website.`);
@@ -27,11 +29,11 @@ async function trackUniqloItems(client) {
         }
         if (basePrice !== latestPrice.basePrice || promoPrice !== latestPrice.promoPrice) {
             // Save the new price to MongoDB
-            const item = await getUniqloItem(itemId);
+            const item = await getUniqloItem(itemId, priceGroup);
             if(Array.isArray(item) && item.length === 0) {
                 return error("FAIL: Item not found", itemId);
             }
-            await insertPrice(client, itemId, basePrice, promoPrice, item.name, existingItem.imageURL);
+            await insertPrice(client, itemId, basePrice, promoPrice, item.name, existingItem.imageURL, priceGroup);
 
             // Send an alert to a Discord channel
 
@@ -111,18 +113,70 @@ async function fetchSaleItems(client, gender, discordId) {
         const previousState = await collection.find().toArray();
         if (previousState.length === 0) {
             log("Inserting data into database", allItems.length)
-            for (const item of allItems) {
-                await collection.updateOne({ id: item.productId }, { $set: item }, { upsert: true });
+            // Enhance all items with detailed product data before storing
+            const enhancedItems = await Promise.all(allItems.map(async item => {
+                const product = await getUniqloItem(item.productId, item.priceGroup)
+                if (Array.isArray(product) && product.length === 0) {
+                    available = []
+                } else if (product && product.l2s && product.prices && product.stocks) {
+                    // New API structure: include all l2s that have price data (regardless of promo/stock)
+                    available = product.l2s.filter(l2 => {
+                        const priceData = product.prices[l2.l2Id];
+                        const stockData = product.stocks[l2.l2Id];
+                        // Include if we have price data and stock data (even if quantity is 0)
+                        return priceData && stockData;
+                    }).map(l2 => {
+                        // Attach the actual price and stock data for easier access
+                        return {
+                            ...l2,
+                            prices: product.prices[l2.l2Id],
+                            stock: product.stocks[l2.l2Id]
+                        };
+                    });
+                } else {
+                    available = [];
+                }
+                // Merge sale item data with detailed product data
+                return { 
+                    ...item, 
+                    l2s: available, 
+                    images: product?.images || null,
+                    name: product?.name || item.name,
+                    // Keep the original sale item pricing for the main display
+                    prices: item.prices
+                };
+            }));
+            
+            for (const item of enhancedItems) {
+                await collection.updateOne({ id: item.productId, priceGroup: item.priceGroup }, { $set: item }, { upsert: true });
             }
             return;
         }
         // Compare the two states to find any differences
-        let addedItems = allItems.filter(item => !previousState.find(i => i.productId === item.productId))
-        let removedItems = previousState.filter(item => !allItems.find(i => i.productId === item.productId));
+        // Only compare items with the same productId AND priceGroup
+        let addedItems = allItems.filter(item => !previousState.find(i => i.productId === item.productId && i.priceGroup === item.priceGroup))
+        let removedItems = previousState.filter(item => !allItems.find(i => i.productId === item.productId && i.priceGroup === item.priceGroup));
         let changedItems = allItems.reduce((acc, item) => {
-            const previousItem = previousState.find(i => i.productId === item.productId);
-            if (previousItem && (previousItem.prices.base?.value !== item.prices.base?.value || previousItem.prices.promo?.value !== item.prices.promo?.value || (previousItem.prices.promo?.value !== null && item.prices.promo?.value === null))) {
-                acc.push([previousItem, item]);
+            // Find previous item with same productId AND priceGroup
+            const previousItem = previousState.find(i => i.productId === item.productId && i.priceGroup === item.priceGroup);
+            if (previousItem) {
+                // Compare prices for items with same productId and priceGroup
+                const oldBase = previousItem.prices.base?.value;
+                const newBase = item.prices.base?.value;
+                const oldPromo = previousItem.prices.promo?.value;
+                const newPromo = item.prices.promo?.value;
+                
+                const baseChanged = oldBase !== newBase;
+                const promoChanged = oldPromo !== newPromo;
+                const promoToNull = (oldPromo !== null && newPromo === null);
+                
+                if (baseChanged || promoChanged || promoToNull) {
+                    log(`Price change detected for ${item.productId} (priceGroup: ${item.priceGroup}):`, 
+                        `Base: ${oldBase} -> ${newBase} (${baseChanged})`,
+                        `Promo: ${oldPromo} -> ${newPromo} (${promoChanged})`,
+                        `PromoToNull: ${promoToNull}`);
+                    acc.push([previousItem, item]);
+                }
             }
             return acc;
         }, []);
@@ -130,33 +184,106 @@ async function fetchSaleItems(client, gender, discordId) {
         if (addedItems.length === 0 && removedItems.length === 0 && changedItems.length === 0) return;
 
         addedItems = await Promise.all(addedItems.map(async item => {
-            const product = await getUniqloItem(item.productId)
+            const product = await getUniqloItem(item.productId, item.priceGroup)
             if (Array.isArray(product) && product.length === 0) {
                 available = []
+            } else if (product && product.l2s && product.prices && product.stocks) {
+                // New API structure: include all l2s that have price data (regardless of promo/stock)
+                available = product.l2s.filter(l2 => {
+                    const priceData = product.prices[l2.l2Id];
+                    const stockData = product.stocks[l2.l2Id];
+                    // Include if we have price data and stock data (even if quantity is 0)
+                    return priceData && stockData;
+                }).map(l2 => {
+                    // Attach the actual price and stock data for easier access
+                    return {
+                        ...l2,
+                        prices: product.prices[l2.l2Id],
+                        stock: product.stocks[l2.l2Id]
+                    };
+                });
             } else {
-                available = product.l2s.filter(item => item.prices.promo !== null && item.stock.quantity !== 0);
+                available = [];
             }
-            return { ...item, l2s: available, images: product.images };
+            // Merge sale item data with detailed product data
+            const result = { 
+                ...item, 
+                l2s: available, 
+                images: product?.images || null,
+                name: product?.name || item.name,
+                // Keep the original sale item pricing for the main display
+                prices: item.prices
+            };
+            return result;
         }));
         removedItems = await Promise.all(removedItems.map(async item => {
-            const product = await getUniqloItem(item.productId)
+            const product = await getUniqloItem(item.productId, item.priceGroup)
             if (Array.isArray(product) && product.length === 0) {
                 available = []
+            } else if (product.l2s && product.prices && product.stocks) {
+                // New API structure: include all l2s that have price data (regardless of promo/stock)
+                available = product.l2s.filter(l2 => {
+                    const priceData = product.prices[l2.l2Id];
+                    const stockData = product.stocks[l2.l2Id];
+                    // Include if we have price data and stock data (even if quantity is 0)
+                    return priceData && stockData;
+                }).map(l2 => {
+                    // Attach the actual price and stock data for easier access
+                    return {
+                        ...l2,
+                        prices: product.prices[l2.l2Id],
+                        stock: product.stocks[l2.l2Id]
+                    };
+                });
             } else {
-                available = product.l2s.filter(item => item.prices.promo !== null && item.stock.quantity !== 0);
+                available = [];
             }
-            return { ...item, l2s: available, images: product.images };
+            // Merge sale item data with detailed product data
+            return { 
+                ...item, 
+                l2s: available, 
+                images: product.images,
+                name: product.name || item.name,
+                // Keep the original sale item pricing for the main display
+                prices: item.prices
+            };
         }));
         changedItems = await Promise.all(changedItems.map(async item => {
-            const product = await getUniqloItem(item[1].productId)
+            const product = await getUniqloItem(item[1].productId, item[1].priceGroup)
             let available;
             if (Array.isArray(product) && product.length === 0) {
                 available = []
+            } else if (product.l2s && product.prices && product.stocks) {
+                // New API structure: include all l2s that have price data (regardless of promo/stock)
+                available = product.l2s.filter(l2 => {
+                    const priceData = product.prices[l2.l2Id];
+                    const stockData = product.stocks[l2.l2Id];
+                    // Include if we have price data and stock data (even if quantity is 0)
+                    return priceData && stockData;
+                }).map(l2 => {
+                    // Attach the actual price and stock data for easier access
+                    return {
+                        ...l2,
+                        prices: product.prices[l2.l2Id],
+                        stock: product.stocks[l2.l2Id]
+                    };
+                });
             } else {
-                available = product.l2s.filter(item => item.prices.promo !== null && item.stock.quantity !== 0);
+                available = [];
             }
 
-            return [{ ...item[0], l2s: available, images: product.images }, { ...item[1], l2s: available, images: product.images }];
+            // For changed items, keep the old item as-is and enhance the new item
+            const enhancedItem0 = item[0]; // Keep old item unchanged
+            const enhancedItem1 = { 
+                ...item[1], 
+                l2s: available, 
+                images: product?.images || null,
+                name: product?.name || item[1].name,
+                // Keep the original sale item pricing for the main display
+                prices: item[1].prices
+            };
+
+            return [enhancedItem0, enhancedItem1];
         }));
 
         const addedItemsEmbeds = [];
@@ -180,13 +307,22 @@ async function fetchSaleItems(client, gender, discordId) {
                 description: batch.map(item => {
                     log("Added ITEM", item.name)
                     const colorSizes = item.l2s.reduce((acc, l2) => {
-                        if (!acc[l2.color.name]) {
-                            acc[l2.color.name] = [];
+                        // Skip items with 0 stock
+                        if (l2.stock.quantity === 0) {
+                            return acc;
                         }
-                        acc[l2.color.name].push(`${l2.size.name} (${l2.stock.quantity}) (${pricePrecision(l2.prices.promo.value)})`);
+                        
+                        // Use actual color name from details API
+                        const colorKey = l2.color.name || l2.color.displayCode;
+                        if (!acc[colorKey]) {
+                            acc[colorKey] = [];
+                        }
+                        const sizeName = l2.size.name || l2.size.displayCode;
+                        const promoValue = l2.prices.promo ? l2.prices.promo.value : l2.prices.base.value;
+                        acc[colorKey].push(`${sizeName} (${l2.stock.quantity}) (${pricePrecision(promoValue)})`);
                         return acc;
                     }, {});
-                    const colorSizeLines = Object.entries(colorSizes).map(([color, sizes]) => `${color}: ${sizes.join(', ')}`).join('\n');
+                    const colorSizeLines = Object.entries(colorSizes).map(([color, sizes]) => `**${color}**: ${sizes.join(', ')}`).join('\n');
                     return `**[${item.name}](https://www.uniqlo.com/au/en/products/${item.productId})**\nBase: ${pricePrecision(item.prices.base.value)}\nPromo: ${pricePrecision(item.prices.promo?.value)}\n${colorSizeLines}`;
                 }).join('\n\n') || 'None',
                 image: { url: `attachment://added-items.png` }
@@ -232,13 +368,17 @@ async function fetchSaleItems(client, gender, discordId) {
                 .setDescription(batch.map(item => {
                     log("Changed ITEM", item[1].name)
                     const colorSizes = item[1].l2s.reduce((acc, l2) => {
-                        if (!acc[l2.color.name]) {
-                            acc[l2.color.name] = [];
+                        // Use actual color name from details API
+                        const colorKey = l2.color.name || l2.color.displayCode;
+                        if (!acc[colorKey]) {
+                            acc[colorKey] = [];
                         }
-                        acc[l2.color.name].push(`${l2.size.name} (${l2.stock.quantity}) (${pricePrecision(l2.prices.promo.value)})`);
+                        const sizeName = l2.size.name || l2.size.displayCode;
+                        const promoValue = l2.prices.promo ? l2.prices.promo.value : l2.prices.base.value;
+                        acc[colorKey].push(`${sizeName} (${l2.stock.quantity}) (${pricePrecision(promoValue)})`);
                         return acc;
                     }, {});
-                    const colorSizeLines = Object.entries(colorSizes).map(([color, sizes]) => `${color}: ${sizes.join(', ')}`).join('\n');
+                    const colorSizeLines = Object.entries(colorSizes).map(([color, sizes]) => `**${color}**: ${sizes.join(', ')}`).join('\n');
                     return `**[${item[0].name}](https://www.uniqlo.com/au/en/products/${item[0].productId})**\n
                   **Base:** ${pricePrecision(item[0].prices.base?.value)}\t\t**New Base:** ${pricePrecision(item[1].prices.base?.value)} \t\t **Diff:** ${pricePrecision(parseInt(item[1].prices.base?.value) - parseInt(item[0].prices.base?.value))}\n
                   **Promo:** ${pricePrecision(item[0].prices.promo?.value)}\t\t**New Promo:** ${pricePrecision(item[1].prices.promo?.value)} **Diff:** ${pricePrecision(parseInt(item[1].prices.promo?.value) - parseInt(item[0].prices.promo?.value))}\n
@@ -258,15 +398,16 @@ async function fetchSaleItems(client, gender, discordId) {
             await client.channels.cache.get(discordId).send({ embeds: [data.changedItemsEmbed], files: [data.changedItemsImage] });
         }
 
-        //Update the database with the new state
+        //Update the database with the new state (enhanced items with detailed l2s data)
         for (const item of addedItems) {
-            await collection.updateOne({ id: item.productId }, { $set: item }, { upsert: true });
+            await collection.updateOne({ id: item.productId, priceGroup: item.priceGroup }, { $set: item }, { upsert: true });
         }
         for (const item of removedItems) {
-            await collection.deleteOne({ id: item.productId });
+            await collection.deleteOne({ id: item.productId, priceGroup: item.priceGroup });
         }
         changedItems.map(async item => {
-            await collection.updateOne({ id: item[0].productId }, { $set: item[1] }, { upsert: true });
+            // Store the enhanced version (item[1]) which has the detailed l2s data
+            await collection.updateOne({ id: item[1].productId, priceGroup: item[1].priceGroup }, { $set: item[1] }, { upsert: true });
         })
 
     } catch (e) {
