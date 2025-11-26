@@ -485,26 +485,7 @@ module.exports = {
         }
     }
 };
-async function fetchAndLogAllEmbedsUsingRegex(client) {
-    const channel = client.channels.cache.get('1133373625672679464');
-    const messages = await channel.messages.fetch({ limit: 100 });
 
-    for (const message of messages.values()) {
-        for (const embed of message.embeds) {
-            if (embed.title && embed.title.startsWith('Added items')) {
-                const description = embed.description;
-                const regex = /\*\*\[(.*?)\]\((.*?)\)\*\*\s*Base:\s*\$(\d+\.\d+)\s*Promo:\s*\$(\d+\.\d+)/g;
-                let match;
-                while ((match = regex.exec(description)) !== null) {
-                    console.log(`Item Name: ${match[1]}`);
-                    console.log(`Item URL: ${match[2]}`);
-                    console.log(`Base Price: ${match[3]}`);
-                    console.log(`Promo Price: ${match[4]}`);
-                }
-            }
-        }
-    }
-}
 async function trackItemPricing(client, itemId) {
     const channel = client.channels.cache.get(config.maleSaleDiscordId);
     const messages = await fetchMessagesWithCriteria(channel, itemId);

@@ -137,9 +137,8 @@ module.exports = {
                 log('LoL Tracker service started');
             }
                 
-
+    
         }
-
         log('Ready!');
     },
 };

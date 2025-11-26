@@ -3,6 +3,37 @@ const { getUniqloItem, getLatestPrices, insertPrice } = require('../utils/uniqlo
 const config = require('../config');
 
 const { log, error, imageAttachment, pricePrecision } = require('../utils/utils');
+
+// Helper function to process items in batches with rate limiting
+async function processItemsInBatches(items, batchSize, delayMs, processor) {
+    const results = [];
+    for (let i = 0; i < items.length; i += batchSize) {
+        const batch = items.slice(i, i + batchSize);
+        log(`Processing batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(items.length / batchSize)} (${batch.length} items)`);
+        
+        const batchResults = await Promise.allSettled(
+            batch.map(item => processor(item))
+        );
+        
+        // Extract successful results and log failures
+        batchResults.forEach((result, idx) => {
+            if (result.status === 'fulfilled') {
+                results.push(result.value);
+            } else {
+                error(`Failed to process item ${batch[idx].productId}:`, result.reason);
+                // Push a fallback result to maintain array structure
+                results.push(null);
+            }
+        });
+        
+        // Rate limiting: delay between batches (except for the last batch)
+        if (i + batchSize < items.length) {
+            await new Promise(resolve => setTimeout(resolve, delayMs));
+        }
+    }
+    return results.filter(r => r !== null); // Filter out failed items
+}
+
 async function trackUniqloItems(client) {
     const uniqloCollection = await client.mongodb.db.collection(config.mongodbDBUniqlo);
     const itemIds = await uniqloCollection.distinct('itemId');
@@ -16,7 +47,7 @@ async function trackUniqloItems(client) {
         if (!existingItem) {
             continue;
         }
-        
+
         const latestPrice = existingItem.prices[existingItem.prices.length - 1];
         // Get the priceGroup from existing item or fetch it
         const priceGroup = existingItem.priceGroup || '01';
@@ -30,7 +61,7 @@ async function trackUniqloItems(client) {
         if (basePrice !== latestPrice.basePrice || promoPrice !== latestPrice.promoPrice) {
             // Save the new price to MongoDB
             const item = await getUniqloItem(itemId, priceGroup);
-            if(Array.isArray(item) && item.length === 0) {
+            if (Array.isArray(item) && item.length === 0) {
                 return error("FAIL: Item not found", itemId);
             }
             await insertPrice(client, itemId, basePrice, promoPrice, item.name, existingItem.imageURL, priceGroup);
@@ -66,7 +97,7 @@ async function fetchSaleItems(client, gender, discordId) {
         let offset = 0;
         const limit = 100;
         let hasMoreItems = true;
-        
+
         while (hasMoreItems) {
             const url = await fetch(`${config.uniqloApiUrl}/products?path=${gender}&flagCodes=discount&limit=${limit}&offset=${offset}`, {
                 headers: {
@@ -81,72 +112,78 @@ async function fetchSaleItems(client, gender, discordId) {
                 error('Failed to parse JSON. Response:', text, 'Error:', e);
                 throw new Error(`Invalid JSON response: ${e.message}`);
             }
-            
+
             // If response is not ok, return error
             if (response.status !== "ok") {
                 return error("Error fetching sale items", gender, `${config.uniqloApiUrl}/products?path=${gender}&flagCodes=discount&limit=${limit}&offset=${offset}`);
             }
-            
+
             // Add items from this page to the total collection
             if (response.result.items && response.result.items.length > 0) {
                 allItems = allItems.concat(response.result.items);
-                
+
                 // Check if we have more items to fetch
                 const totalItems = response.result.pagination?.total || response.result.items.length;
                 hasMoreItems = (offset + limit) < totalItems && response.result.items.length === limit;
                 offset += limit;
-                
+
                 log(`Fetched ${response.result.items.length} items for ${gender}, total so far: ${allItems.length}`);
             } else {
                 hasMoreItems = false;
             }
         }
-        
+
         // If no items found, return
         if (allItems.length === 0) {
             return error("No sale items found", gender);
         }
-        
+
         log(`Total items fetched for ${gender}: ${allItems.length}`);
         // Retrieve the previous state of the sale items from your database
         const collection = await client.mongodb.db.collection(`sale-items-${gender}`);
         const previousState = await collection.find().toArray();
         if (previousState.length === 0) {
             log("Inserting data into database", allItems.length)
-            // Enhance all items with detailed product data before storing
-            const enhancedItems = await Promise.all(allItems.map(async item => {
-                const product = await getUniqloItem(item.productId, item.priceGroup)
-                if (Array.isArray(product) && product.length === 0) {
-                    available = []
-                } else if (product && product.l2s && product.prices && product.stocks) {
-                    // New API structure: include all l2s that have price data (regardless of promo/stock)
-                    available = product.l2s.filter(l2 => {
-                        const priceData = product.prices[l2.l2Id];
-                        const stockData = product.stocks[l2.l2Id];
-                        // Include if we have price data and stock data (even if quantity is 0)
-                        return priceData && stockData;
-                    }).map(l2 => {
-                        // Attach the actual price and stock data for easier access
-                        return {
-                            ...l2,
-                            prices: product.prices[l2.l2Id],
-                            stock: product.stocks[l2.l2Id]
-                        };
-                    });
-                } else {
-                    available = [];
+            // Enhance all items with detailed product data before storing (in batches to avoid rate limiting)
+            const enhancedItems = await processItemsInBatches(
+                allItems,
+                5, // Process 5 items at a time
+                500, // 500ms delay between batches
+                async (item) => {
+                    const product = await getUniqloItem(item.productId, item.priceGroup)
+                    let available;
+                    if (Array.isArray(product) && product.length === 0) {
+                        available = []
+                    } else if (product && product.l2s && product.prices && product.stocks) {
+                        // New API structure: include all l2s that have price data (regardless of promo/stock)
+                        available = product.l2s.filter(l2 => {
+                            const priceData = product.prices[l2.l2Id];
+                            const stockData = product.stocks[l2.l2Id];
+                            // Include if we have price data and stock data (even if quantity is 0)
+                            return priceData && stockData;
+                        }).map(l2 => {
+                            // Attach the actual price and stock data for easier access
+                            return {
+                                ...l2,
+                                prices: product.prices[l2.l2Id],
+                                stock: product.stocks[l2.l2Id]
+                            };
+                        });
+                    } else {
+                        available = [];
+                    }
+                    // Merge sale item data with detailed product data
+                    return {
+                        ...item,
+                        l2s: available,
+                        images: product?.images || null,
+                        name: product?.name || item.name,
+                        // Keep the original sale item pricing for the main display
+                        prices: item.prices
+                    };
                 }
-                // Merge sale item data with detailed product data
-                return { 
-                    ...item, 
-                    l2s: available, 
-                    images: product?.images || null,
-                    name: product?.name || item.name,
-                    // Keep the original sale item pricing for the main display
-                    prices: item.prices
-                };
-            }));
-            
+            );
+
             for (const item of enhancedItems) {
                 await collection.updateOne({ id: item.productId, priceGroup: item.priceGroup }, { $set: item }, { upsert: true });
             }
@@ -165,13 +202,13 @@ async function fetchSaleItems(client, gender, discordId) {
                 const newBase = item.prices.base?.value;
                 const oldPromo = previousItem.prices.promo?.value;
                 const newPromo = item.prices.promo?.value;
-                
+
                 const baseChanged = oldBase !== newBase;
                 const promoChanged = oldPromo !== newPromo;
                 const promoToNull = (oldPromo !== null && newPromo === null);
-                
+
                 if (baseChanged || promoChanged || promoToNull) {
-                    log(`Price change detected for ${item.productId} (priceGroup: ${item.priceGroup}):`, 
+                    log(`Price change detected for ${item.productId} (priceGroup: ${item.priceGroup}):`,
                         `Base: ${oldBase} -> ${newBase} (${baseChanged})`,
                         `Promo: ${oldPromo} -> ${newPromo} (${promoChanged})`,
                         `PromoToNull: ${promoToNull}`);
@@ -183,7 +220,11 @@ async function fetchSaleItems(client, gender, discordId) {
 
         if (addedItems.length === 0 && removedItems.length === 0 && changedItems.length === 0) return;
 
-        addedItems = await Promise.all(addedItems.map(async item => {
+        addedItems = await processItemsInBatches(
+            addedItems,
+            5, // Process 5 items at a time
+            500, // 500ms delay between batches
+            async (item) => {
             const product = await getUniqloItem(item.productId, item.priceGroup)
             if (Array.isArray(product) && product.length === 0) {
                 available = []
@@ -206,17 +247,22 @@ async function fetchSaleItems(client, gender, discordId) {
                 available = [];
             }
             // Merge sale item data with detailed product data
-            const result = { 
-                ...item, 
-                l2s: available, 
+            const result = {
+                ...item,
+                l2s: available,
                 images: product?.images || null,
                 name: product?.name || item.name,
                 // Keep the original sale item pricing for the main display
                 prices: item.prices
             };
             return result;
-        }));
-        removedItems = await Promise.all(removedItems.map(async item => {
+            }
+        );
+        removedItems = await processItemsInBatches(
+            removedItems,
+            5, // Process 5 items at a time
+            500, // 500ms delay between batches
+            async (item) => {
             const product = await getUniqloItem(item.productId, item.priceGroup)
             if (Array.isArray(product) && product.length === 0) {
                 available = []
@@ -239,16 +285,21 @@ async function fetchSaleItems(client, gender, discordId) {
                 available = [];
             }
             // Merge sale item data with detailed product data
-            return { 
-                ...item, 
-                l2s: available, 
+            return {
+                ...item,
+                l2s: available,
                 images: product.images,
                 name: product.name || item.name,
                 // Keep the original sale item pricing for the main display
                 prices: item.prices
             };
-        }));
-        changedItems = await Promise.all(changedItems.map(async item => {
+            }
+        );
+        changedItems = await processItemsInBatches(
+            changedItems,
+            5, // Process 5 items at a time
+            500, // 500ms delay between batches
+            async (item) => {
             const product = await getUniqloItem(item[1].productId, item[1].priceGroup)
             let available;
             if (Array.isArray(product) && product.length === 0) {
@@ -274,9 +325,9 @@ async function fetchSaleItems(client, gender, discordId) {
 
             // For changed items, keep the old item as-is and enhance the new item
             const enhancedItem0 = item[0]; // Keep old item unchanged
-            const enhancedItem1 = { 
-                ...item[1], 
-                l2s: available, 
+            const enhancedItem1 = {
+                ...item[1],
+                l2s: available,
                 images: product?.images || null,
                 name: product?.name || item[1].name,
                 // Keep the original sale item pricing for the main display
@@ -284,7 +335,8 @@ async function fetchSaleItems(client, gender, discordId) {
             };
 
             return [enhancedItem0, enhancedItem1];
-        }));
+            }
+        );
 
         const addedItemsEmbeds = [];
         const removedItemsEmbeds = [];
@@ -311,7 +363,7 @@ async function fetchSaleItems(client, gender, discordId) {
                         if (l2.stock.quantity === 0) {
                             return acc;
                         }
-                        
+
                         // Use actual color name from details API
                         const colorKey = l2.color.name || l2.color.displayCode;
                         if (!acc[colorKey]) {
@@ -387,29 +439,30 @@ async function fetchSaleItems(client, gender, discordId) {
                 .setImage(`attachment://changed-items.png`)
             changedItemsEmbeds.push({ changedItemsEmbed, changedItemsImage });
         }
+        // not dev move
+        if (config.mode !== 'DEV') {
+            for (const data of addedItemsEmbeds) {
+                await client.channels.cache.get(discordId).send({ embeds: [data.addedItemsEmbed], files: [data.addedItemsImage] });
+            }
+            for (const data of removedItemsEmbeds) {
+                await client.channels.cache.get(discordId).send({ embeds: [data.removedItemsEmbed], files: [data.removedItemsImage] });
+            }
+            for (const data of changedItemsEmbeds) {
+                await client.channels.cache.get(discordId).send({ embeds: [data.changedItemsEmbed], files: [data.changedItemsImage] });
+            }
 
-        for (const data of addedItemsEmbeds) {
-            await client.channels.cache.get(discordId).send({ embeds: [data.addedItemsEmbed], files: [data.addedItemsImage] });
+            //Update the database with the new state (enhanced items with detailed l2s data)
+            for (const item of addedItems) {
+                await collection.updateOne({ id: item.productId, priceGroup: item.priceGroup }, { $set: item }, { upsert: true });
+            }
+            for (const item of removedItems) {
+                await collection.deleteOne({ id: item.productId, priceGroup: item.priceGroup });
+            }
+            changedItems.map(async item => {
+                // Store the enhanced version (item[1]) which has the detailed l2s data
+                await collection.updateOne({ id: item[1].productId, priceGroup: item[1].priceGroup }, { $set: item[1] }, { upsert: true });
+            })
         }
-        for (const data of removedItemsEmbeds) {
-            await client.channels.cache.get(discordId).send({ embeds: [data.removedItemsEmbed], files: [data.removedItemsImage] });
-        }
-        for (const data of changedItemsEmbeds) {
-            await client.channels.cache.get(discordId).send({ embeds: [data.changedItemsEmbed], files: [data.changedItemsImage] });
-        }
-
-        //Update the database with the new state (enhanced items with detailed l2s data)
-        for (const item of addedItems) {
-            await collection.updateOne({ id: item.productId, priceGroup: item.priceGroup }, { $set: item }, { upsert: true });
-        }
-        for (const item of removedItems) {
-            await collection.deleteOne({ id: item.productId, priceGroup: item.priceGroup });
-        }
-        changedItems.map(async item => {
-            // Store the enhanced version (item[1]) which has the detailed l2s data
-            await collection.updateOne({ id: item[1].productId, priceGroup: item[1].priceGroup }, { $set: item[1] }, { upsert: true });
-        })
-
     } catch (e) {
         error(e, "FETCH SALE ITEMS", gender);
     }
