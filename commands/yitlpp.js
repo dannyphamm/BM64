@@ -5,6 +5,21 @@ const db = require('../utils/db');
 const config = require('../config.json');
 const { error } = require('../utils/utils');
 
+// Same as events/pp.js: list of { userId, channelId, username } from config
+function getTrackedUsers() {
+    if (Array.isArray(config.ppTracking) && config.ppTracking.length > 0) {
+        return config.ppTracking.map(t => ({
+            userId: String(t.userId),
+            channelId: String(t.channelId),
+            username: t.username || t.userId,
+        }));
+    }
+    if (config.devilshinxID && config.pptracking) {
+        return [{ userId: String(config.devilshinxID), channelId: String(config.pptracking), username: 'devilshinx' }];
+    }
+    return [];
+}
+
 // Cell size and layout for the year grid (GitHub-style: 53 weeks × 7 days)
 const CELL_SIZE = 14;
 const CELL_GAP = 3;
@@ -919,12 +934,28 @@ function buildCombinedGraph(data) {
     return canvas;
 }
 
-module.exports = {
-    data: new SlashCommandBuilder()
+function buildYitlppCommand() {
+    const builder = new SlashCommandBuilder()
         .setName('yitlpp')
-        .setDescription('PP tracking: Year in a Life + all stat graphs in one image'),
+        .setDescription('PP tracking: Year in a Life + all stat graphs in one image');
+    const tracked = getTrackedUsers();
+    if (tracked.length > 1) {
+        builder.addStringOption(opt => opt
+            .setName('user')
+            .setDescription('Which tracked user\'s stats to show')
+            .setRequired(false)
+            .addChoices(...tracked.map(u => ({ name: u.username, value: u.userId }))));
+    }
+    return builder;
+}
+
+module.exports = {
+    data: buildYitlppCommand(),
     async execute(interaction) {
-        const userId = config.ppTrackingUserId || config.devilshinxID;
+        const tracked = getTrackedUsers();
+        const chosenId = interaction.options.getString('user');
+        const userId = chosenId || (tracked[0] && tracked[0].userId) || config.ppTrackingUserId || config.devilshinxID;
+        const userLabel = (tracked.find(u => u.userId === userId) || {}).username || userId;
         await interaction.deferReply();
 
         try {
@@ -936,7 +967,7 @@ module.exports = {
             const totalHours = (data.totalMs / (1000 * 60 * 60)).toFixed(1);
             const embed = new EmbedBuilder()
                 .setColor(0x238636)
-                .setTitle('Year in the life of PP — (all stats)')
+                .setTitle(`Year in the life of PP — ${userLabel} (all stats)`)
                 .setDescription(`**${totalHours}** hours in the past 365 days. All graphs in one image below.`)
                 .setImage('attachment://yitlpp.png')
                 .setFooter({ text: 'Year grid | Monthly | Top games | Weekday | Days played | Weekly | Distribution | Last 30 | Cumulative | Games/month | Share | All games (word cloud)' });
