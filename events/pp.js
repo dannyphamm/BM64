@@ -40,7 +40,26 @@ function getDailyGameStats(userId) {
     return dailyGameStats.get(userId);
 }
 
-// Schedule daily summary at 12 AM (all tracked users)
+// Persist current in-memory stats to DB (no Discord message). Run periodically so DB is updated during the day.
+async function flushDailyStatsToDatabase() {
+    if (config.mode === 'DEV') return;
+    for (const u of getTrackedUsers()) {
+        const stats = getDailyGameStats(u.userId);
+        const gamesArray = Array.from(stats.games.entries()).map(([gameName, s]) => ({
+            name: gameName,
+            totalDuration: s.totalDuration,
+            sessions: s.sessions
+        }));
+        await saveDailyStatsToDatabase(gamesArray, u.userId, u.username);
+    }
+}
+
+// Every 15 minutes: save current daily stats to DB so YITLPP and history stay up to date
+const flushStatsJob = schedule.scheduleJob('*/15 * * * *', async () => {
+    await flushDailyStatsToDatabase();
+});
+
+// Schedule daily summary at 12 AM (all tracked users) — send message, save, then reset
 const dailySummaryJob = schedule.scheduleJob('0 0 * * *', async () => {
     await global.sendDailyGameSummary();
     for (const u of getTrackedUsers()) {
