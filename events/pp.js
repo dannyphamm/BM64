@@ -3,41 +3,67 @@ const config = require('../config.json')
 const schedule = require('node-schedule')
 const db = require('../utils/db')
 
-// Cache to store the last known status and activities
-const userCache = {
-    status: null,
-    activities: null,
-};
+// Normalized list: [{ userId, channelId, username }]. Supports legacy single config.
+function getTrackedUsers() {
+    if (Array.isArray(config.ppTracking) && config.ppTracking.length > 0) {
+        return config.ppTracking.map(t => ({
+            userId: String(t.userId),
+            channelId: String(t.channelId),
+            username: t.username || t.userId,
+        }));
+    }
+    if (config.devilshinxID && config.pptracking) {
+        return [{ userId: String(config.devilshinxID), channelId: String(config.pptracking), username: 'devilshinx' }];
+    }
+    return [];
+}
 
-// Daily game tracking
-const dailyGameStats = {
-    games: new Map(), // Map to store game name -> { startTime, totalDuration, sessions }
-    lastActivityTime: null,
-    isTracking: false
-};
+// Per-user cache: last known status and activities (keyed by userId)
+const userCache = new Map();
 
-// Schedule daily summary at 12 AM
+function getUserCache(userId) {
+    if (!userCache.has(userId)) userCache.set(userId, { status: null, activities: null });
+    return userCache.get(userId);
+}
+
+// Per-user daily game tracking (keyed by userId)
+const dailyGameStats = new Map();
+
+function getDailyGameStats(userId) {
+    if (!dailyGameStats.has(userId)) {
+        dailyGameStats.set(userId, {
+            games: new Map(),
+            lastActivityTime: null,
+            isTracking: false,
+        });
+    }
+    return dailyGameStats.get(userId);
+}
+
+// Schedule daily summary at 12 AM (all tracked users)
 const dailySummaryJob = schedule.scheduleJob('0 0 * * *', async () => {
     await global.sendDailyGameSummary();
-    // Reset daily stats
-    dailyGameStats.games.clear();
-    dailyGameStats.lastActivityTime = null;
-    dailyGameStats.isTracking = false;
+    for (const u of getTrackedUsers()) {
+        const stats = getDailyGameStats(u.userId);
+        stats.games.clear();
+        stats.lastActivityTime = null;
+        stats.isTracking = false;
+    }
 });
 
-// Function to save daily stats to database
-async function saveDailyStatsToDatabase(statsData) {
+// Function to save daily stats to database (per user)
+async function saveDailyStatsToDatabase(statsData, userId, username) {
     try {
         await db.connect();
         const collection = db.db.collection('daily_gaming_stats');
-        
+        const uid = String(userId);
         const today = new Date();
         const dateString = today.toISOString().split('T')[0]; // YYYY-MM-DD format
-        
+
         const document = {
             date: dateString,
-            userId: config.devilshinxID,
-            username: 'devilshinx', // You can make this dynamic if needed
+            userId: uid,
+            username: username || uid,
             totalGames: statsData.length,
             totalPlayTime: statsData.reduce((total, game) => total + game.totalDuration, 0),
             games: statsData.map(game => ({
@@ -51,14 +77,11 @@ async function saveDailyStatsToDatabase(statsData) {
             updatedAt: new Date()
         };
 
-        // Use upsert to either insert new record or update existing one for the same date
         await collection.updateOne(
-            { date: dateString, userId: config.devilshinxID },
+            { date: dateString, userId: uid },
             { $set: document },
             { upsert: true }
         );
-
-        //log(`📊 Daily gaming stats saved to database for ${dateString}`);
     } catch (err) {
         error('Error saving daily gaming stats to database:', err);
     }
@@ -67,108 +90,99 @@ async function saveDailyStatsToDatabase(statsData) {
 // Make the function globally available for the command
 global.sendDailyGameSummary = async function() {
     if (config.mode === 'DEV') return;
-    
+
     try {
-        // We need to access the client from the module context
-        // This will be set when the bot starts up
         if (!global.discordClient) {
             error('Discord client not available for daily summary');
             return;
         }
-        
-        const channel = await global.discordClient.channels.cache.find(c => c.id === config.pptracking);
-        if (!channel) return;
 
-        if (dailyGameStats.games.size === 0) {
-            await channel.send('📊 **Daily Gaming Summary**\nNo games were played today.');
-            // Still save empty stats to database for record keeping
-            await saveDailyStatsToDatabase([]);
-            return;
+        for (const u of getTrackedUsers()) {
+            const channel = global.discordClient.channels.cache.get(u.channelId);
+            if (!channel) continue;
+
+            const stats = getDailyGameStats(u.userId);
+
+            if (stats.games.size === 0) {
+                await channel.send('📊 **Daily Gaming Summary**\nNo games were played today.');
+                await saveDailyStatsToDatabase([], u.userId, u.username);
+                continue;
+            }
+
+            const gamesArray = Array.from(stats.games.entries()).map(([gameName, s]) => ({
+                name: gameName,
+                totalDuration: s.totalDuration,
+                sessions: s.sessions
+            })).sort((a, b) => b.totalDuration - a.totalDuration);
+
+            const totalPlayTime = gamesArray.reduce((total, game) => total + game.totalDuration, 0);
+            const totalHours = Math.floor(totalPlayTime / (1000 * 60 * 60));
+            const totalMinutes = Math.floor((totalPlayTime % (1000 * 60 * 60)) / (1000 * 60));
+
+            let summaryMessage = '📊 **Daily Gaming Summary**\n\n';
+            summaryMessage += `📅 **Date:** ${new Date().toLocaleDateString()}\n`;
+            summaryMessage += `⏱️ **Total Play Time:** ${totalHours > 0 ? `${totalHours}h ${totalMinutes}m` : `${totalMinutes}m`}\n`;
+            summaryMessage += `🎮 **Games Played:** ${gamesArray.length}\n\n`;
+
+            for (const game of gamesArray) {
+                const hours = Math.floor(game.totalDuration / (1000 * 60 * 60));
+                const minutes = Math.floor((game.totalDuration % (1000 * 60 * 60)) / (1000 * 60));
+                const timeStr = hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
+                summaryMessage += `🎮 **${game.name}**\n`;
+                summaryMessage += `⏱️ Total time: ${timeStr}\n`;
+                summaryMessage += `📈 Sessions: ${game.sessions}\n\n`;
+            }
+
+            await channel.send(summaryMessage);
+            await saveDailyStatsToDatabase(gamesArray, u.userId, u.username);
         }
-
-        let summaryMessage = '📊 **Daily Gaming Summary**\n\n';
-        
-        // Convert games map to array and sort by total duration
-        const gamesArray = Array.from(dailyGameStats.games.entries()).map(([gameName, stats]) => ({
-            name: gameName,
-            totalDuration: stats.totalDuration,
-            sessions: stats.sessions
-        })).sort((a, b) => b.totalDuration - a.totalDuration);
-
-        // Calculate total play time for the day
-        const totalPlayTime = gamesArray.reduce((total, game) => total + game.totalDuration, 0);
-        const totalHours = Math.floor(totalPlayTime / (1000 * 60 * 60));
-        const totalMinutes = Math.floor((totalPlayTime % (1000 * 60 * 60)) / (1000 * 60));
-
-        summaryMessage += `📅 **Date:** ${new Date().toLocaleDateString()}\n`;
-        summaryMessage += `⏱️ **Total Play Time:** ${totalHours > 0 ? `${totalHours}h ${totalMinutes}m` : `${totalMinutes}m`}\n`;
-        summaryMessage += `🎮 **Games Played:** ${gamesArray.length}\n\n`;
-
-        for (const game of gamesArray) {
-            const hours = Math.floor(game.totalDuration / (1000 * 60 * 60));
-            const minutes = Math.floor((game.totalDuration % (1000 * 60 * 60)) / (1000 * 60));
-            const timeStr = hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
-            
-            summaryMessage += `🎮 **${game.name}**\n`;
-            summaryMessage += `⏱️ Total time: ${timeStr}\n`;
-            summaryMessage += `📈 Sessions: ${game.sessions}\n\n`;
-        }
-
-        await channel.send(summaryMessage);
-        
-        // Save stats to database after sending the message
-        await saveDailyStatsToDatabase(gamesArray);
-        
     } catch (err) {
         error('Error sending daily game summary:', err);
     }
 }
 
-// Function to get current stats without sending message
-global.getCurrentGameStats = function() {
-    if (dailyGameStats.games.size === 0) {
+// Function to get current stats without sending message (userId optional: first tracked user if omitted)
+global.getCurrentGameStats = function(userId) {
+    const uid = userId ? String(userId) : (getTrackedUsers()[0] && getTrackedUsers()[0].userId);
+    if (!uid) return '📊 **Current Gaming Stats**\nNo tracked users configured.';
+    const stats = getDailyGameStats(uid);
+    if (stats.games.size === 0) {
         return '📊 **Current Gaming Stats**\nNo games have been played today.';
     }
 
     let summaryMessage = '📊 **Current Gaming Stats**\n\n';
-    
-    // Convert games map to array and sort by total duration
-    const gamesArray = Array.from(dailyGameStats.games.entries()).map(([gameName, stats]) => ({
+    const gamesArray = Array.from(stats.games.entries()).map(([gameName, s]) => ({
         name: gameName,
-        totalDuration: stats.totalDuration,
-        sessions: stats.sessions,
-        isCurrentlyPlaying: stats.startTime !== null
+        totalDuration: s.totalDuration,
+        sessions: s.sessions,
+        isCurrentlyPlaying: s.startTime !== null
     })).sort((a, b) => b.totalDuration - a.totalDuration);
 
     for (const game of gamesArray) {
         const hours = Math.floor(game.totalDuration / (1000 * 60 * 60));
         const minutes = Math.floor((game.totalDuration % (1000 * 60 * 60)) / (1000 * 60));
         const timeStr = hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
-        
         summaryMessage += `🎮 **${game.name}**`;
-        if (game.isCurrentlyPlaying) {
-            summaryMessage += ` 🔴 (Currently Playing)`;
-        }
-        summaryMessage += `\n`;
-        summaryMessage += `⏱️ Total time: ${timeStr}\n`;
-        summaryMessage += `📈 Sessions: ${game.sessions}\n\n`;
+        if (game.isCurrentlyPlaying) summaryMessage += ` 🔴 (Currently Playing)`;
+        summaryMessage += `\n⏱️ Total time: ${timeStr}\n📈 Sessions: ${game.sessions}\n\n`;
     }
-
     return summaryMessage;
 }
 
-// Function to get historical stats from database
-global.getHistoricalGameStats = async function(days = 7) {
+// Function to get historical stats from database (userId optional: first tracked user if omitted)
+global.getHistoricalGameStats = async function(days = 7, userId) {
     try {
         await db.connect();
         const collection = db.db.collection('daily_gaming_stats');
-        
+        const uid = userId ? String(userId) : (getTrackedUsers()[0] && getTrackedUsers()[0].userId);
+        if (!uid) return '📊 **Historical Gaming Stats**\nNo tracked users configured.';
+
         const endDate = new Date();
         const startDate = new Date();
         startDate.setDate(startDate.getDate() - days);
-        
+
         const stats = await collection.find({
-            userId: config.devilshinxID,
+            userId: uid,
             date: {
                 $gte: startDate.toISOString().split('T')[0],
                 $lte: endDate.toISOString().split('T')[0]
@@ -208,132 +222,86 @@ global.getHistoricalGameStats = async function(days = 7) {
     }
 }
 
-function updateGameStats(gameName, isStarting) {
+function updateGameStats(gameName, isStarting, userId) {
     if (!gameName || typeof gameName !== 'string') {
         error('Invalid game name provided to updateGameStats:', gameName);
         return;
     }
-    
+    if (!userId) return;
+    const stats = getDailyGameStats(String(userId));
     const now = Date.now();
-    
+
     if (isStarting) {
-        // Starting a new game session
-        if (!dailyGameStats.games.has(gameName)) {
-            dailyGameStats.games.set(gameName, {
-                startTime: now,
-                totalDuration: 0,
-                sessions: 0
-            });
+        if (!stats.games.has(gameName)) {
+            stats.games.set(gameName, { startTime: now, totalDuration: 0, sessions: 0 });
         }
-        
-        const gameStats = dailyGameStats.games.get(gameName);
+        const gameStats = stats.games.get(gameName);
         gameStats.startTime = now;
         gameStats.sessions++;
-        dailyGameStats.isTracking = true;
-        
-        //log(`🎮 Started tracking: ${gameName} (Session #${gameStats.sessions})`);
+        stats.isTracking = true;
     } else {
-        // Ending a game session
-        if (dailyGameStats.games.has(gameName)) {
-            const gameStats = dailyGameStats.games.get(gameName);
+        if (stats.games.has(gameName)) {
+            const gameStats = stats.games.get(gameName);
             if (gameStats.startTime) {
                 const sessionDuration = now - gameStats.startTime;
-                // Only add positive duration (in case of clock issues)
-                if (sessionDuration > 0) {
-                    gameStats.totalDuration += sessionDuration;
-                    const minutes = Math.floor(sessionDuration / (1000 * 60));
-                    //log(`🎮 Stopped tracking: ${gameName} (Session duration: ${minutes}m, Total: ${Math.floor(gameStats.totalDuration / (1000 * 60))}m)`);
-                }
-                gameStats.startTime = null; // Reset start time
+                if (sessionDuration > 0) gameStats.totalDuration += sessionDuration;
+                gameStats.startTime = null;
             }
         }
     }
-    
-    dailyGameStats.lastActivityTime = now;
+    stats.lastActivityTime = now;
 }
 
 module.exports = {
     name: 'presenceUpdate',
     async execute(oldState, newState) {
-        if (config.mode !== 'DEV') {
-            if (!oldState || !newState) return;
-            const userId = newState.userId; // Get the user ID from the new state
-            // Fetch the channel
-            if (userId === config.devilshinxID) {
-                const channel = await newState.client.channels.cache.find(c => c.id === config.pptracking);
-                
-                // Check if the user's status has changed
-                if (newState.status !== oldState.status) {
-                    const statusMessage = `${newState.user.tag} is now ${newState.status}`;
-                    //log(statusMessage);
-                    
-                    // Send the status update to the specified channel if it's different
-                    if (userCache.status !== newState.status) {
-                        if (channel) {
-                            channel.send(statusMessage).catch(err => error(err));
-                        }
-                        userCache.status = newState.status; // Update the cached status
-                    }
-                }
+        if (config.mode === 'DEV') return;
+        if (!oldState || !newState) return;
 
-                // Check if the activity has changed
-                if (JSON.stringify(oldState.activities) !== JSON.stringify(newState.activities)) {
-                    const activities = newState.activities.filter(activity => activity.name !== 'Custom Status');
-                    const oldActivities = oldState.activities ? oldState.activities.filter(activity => activity.name !== 'Custom Status') : [];
-                    
-                    // Get current and previous games
-                    const currentGames = activities.filter(activity => activity.type === 0).map(activity => activity.name);
-                    const previousGames = oldActivities.filter(activity => activity.type === 0).map(activity => activity.name);
-                    
-                    // Debug logging
-                    if (currentGames.length > 0 || previousGames.length > 0) {
-                        //log(`🎮 Game activity change - Previous: [${previousGames.join(', ')}], Current: [${currentGames.join(', ')}]`);
-                    }
-                    
-                    // End sessions for games that are no longer being played
-                    previousGames.forEach(gameName => {
-                        if (!currentGames.includes(gameName)) {
-                            //log(`🎮 Ending session for: ${gameName}`);
-                            updateGameStats(gameName, false);
-                        }
-                    });
-                    
-                    // Start sessions for new games
-                    currentGames.forEach(gameName => {
-                        if (!previousGames.includes(gameName)) {
-                            //log(`🎮 Starting session for: ${gameName}`);
-                            updateGameStats(gameName, true);
-                        }
-                    });
-                    
-                    let activityMessage;
+        const userId = newState.userId;
+        const tracked = getTrackedUsers().find(u => u.userId === String(userId));
+        if (!tracked) return;
 
-                    if (activities.length > 0) {
-                        activityMessage = activities.map(activity => {
-                            if (activity.type === 2) {
-                                return `${newState.user.tag} is listening to ${activity.name} + ${activity.details} + ${activity.state}`;
-                            } else if (activity.type === 0) {
-                                return `${newState.user.tag} is playing ${activity.name} + ${activity.details} + ${activity.state}`;
-                            } else if (activity.type === 1) {
-                                return `${newState.user.tag} is streaming ${activity.name} + ${activity.details} + ${activity.state}`;
-                            } else if (activity.type === 3) {
-                                return `${newState.user.tag} is watching ${activity.name} + ${activity.details} + ${activity.state}`;
-                            } else {
-                                return `${newState.user.tag} is now ${activity.type} + ${activity.details} + ${activity.state}`;
-                            }
-                        }).join('\n');
-                    } else {
-                        activityMessage = `${newState.user.tag} is not currently active`;
-                    }
+        const channel = newState.client.channels.cache.get(tracked.channelId);
+        const cache = getUserCache(tracked.userId);
 
-                    // Send the activity update to the specified channel if it's different
-                    if (userCache.activities !== activityMessage) {
-                        if (channel) {
-                            channel.send(activityMessage).catch(err => error(err));
-                        }
-                        userCache.activities = activityMessage; // Update the cached activities
-                    }
-                }
+        if (newState.status !== oldState.status) {
+            const statusMessage = `${newState.user.tag} is now ${newState.status}`;
+            if (cache.status !== newState.status) {
+                if (channel) channel.send(statusMessage).catch(err => error(err));
+                cache.status = newState.status;
+            }
+        }
+
+        if (JSON.stringify(oldState.activities) !== JSON.stringify(newState.activities)) {
+            const activities = newState.activities.filter(activity => activity.name !== 'Custom Status');
+            const oldActivities = oldState.activities ? oldState.activities.filter(activity => activity.name !== 'Custom Status') : [];
+            const currentGames = activities.filter(activity => activity.type === 0).map(activity => activity.name);
+            const previousGames = oldActivities.filter(activity => activity.type === 0).map(activity => activity.name);
+
+            previousGames.forEach(gameName => {
+                if (!currentGames.includes(gameName)) updateGameStats(gameName, false, tracked.userId);
+            });
+            currentGames.forEach(gameName => {
+                if (!previousGames.includes(gameName)) updateGameStats(gameName, true, tracked.userId);
+            });
+
+            let activityMessage;
+            if (activities.length > 0) {
+                activityMessage = activities.map(activity => {
+                    if (activity.type === 2) return `${newState.user.tag} is listening to ${activity.name} + ${activity.details} + ${activity.state}`;
+                    if (activity.type === 0) return `${newState.user.tag} is playing ${activity.name} + ${activity.details} + ${activity.state}`;
+                    if (activity.type === 1) return `${newState.user.tag} is streaming ${activity.name} + ${activity.details} + ${activity.state}`;
+                    if (activity.type === 3) return `${newState.user.tag} is watching ${activity.name} + ${activity.details} + ${activity.state}`;
+                    return `${newState.user.tag} is now ${activity.type} + ${activity.details} + ${activity.state}`;
+                }).join('\n');
+            } else {
+                activityMessage = `${newState.user.tag} is not currently active`;
+            }
+
+            if (cache.activities !== activityMessage) {
+                if (channel) channel.send(activityMessage).catch(err => error(err));
+                cache.activities = activityMessage;
             }
         }
     },
