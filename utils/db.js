@@ -17,15 +17,28 @@ class MongoConnection {
   }
 
   async connect() {
+    if (this.client) {
+      return;
+    }
     try {
       this.client = new MongoClient(MONGODB_URI);
-
       await this.client.connect();
       this.db = this.client.db(MONGODB_DB_NAME);
       log('Connected to MongoDB');
-      
     } catch (err) {
+      this.client = null;
+      this.db = null;
       error('Error connecting to MongoDB:', err);
+      throw err;
+    }
+  }
+
+  async close() {
+    if (this.client) {
+      await this.client.close();
+      this.client = null;
+      this.db = null;
+      log('MongoDB connection closed');
     }
   }
 }

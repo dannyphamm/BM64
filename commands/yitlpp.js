@@ -939,7 +939,7 @@ function buildYitlppCommand() {
         .setName('yitlpp')
         .setDescription('PP tracking: Year in a Life + all stat graphs in one image');
     const tracked = getTrackedUsers();
-    if (tracked.length > 1) {
+    if (tracked.length >= 1) {
         builder.addStringOption(opt => opt
             .setName('user')
             .setDescription('Which tracked user\'s stats to show')
