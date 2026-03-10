@@ -1,5 +1,5 @@
 const { SlashCommandBuilder } = require('@discordjs/builders');
-const { misamoAutoImport } = require('../../services/misamoAutoImport.js');
+const { misamoAutoImport } = require('../../services/misamoAutoImport');
 
 module.exports = {
     data: new SlashCommandBuilder()

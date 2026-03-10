@@ -5,7 +5,7 @@ const { log } = require('../utils/utils.js');
 const { socketIO } = require('../utils/socket.js');
 const { spotify, addAllTracksToPlaylist, getAllPlaylistSongs, removeAllTracksFromPlaylist } = require('../utils/spotify.js_deprecate');
 const { loadSpotify } = require('../services/spotifyStatus.js');
-const { misamoAutoImport } = require('../services/misamoAutoImport.js');
+const { misamoAutoImport } = require('../services/misamoAutoImport');
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('spotify').addSubcommand(subcommand =>
