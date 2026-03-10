@@ -17,20 +17,25 @@ class MongoConnection {
   }
 
   async connect() {
-    if (this.client) {
+    if (this._connectPromise) {
+      await this._connectPromise;
       return;
     }
-    try {
-      this.client = new MongoClient(MONGODB_URI);
-      await this.client.connect();
-      this.db = this.client.db(MONGODB_DB_NAME);
-      log('Connected to MongoDB');
-    } catch (err) {
-      this.client = null;
-      this.db = null;
-      error('Error connecting to MongoDB:', err);
-      throw err;
-    }
+    this._connectPromise = (async () => {
+      try {
+        this.client = new MongoClient(MONGODB_URI);
+        await this.client.connect();
+        this.db = this.client.db(MONGODB_DB_NAME);
+        log('Connected to MongoDB');
+      } catch (err) {
+        this.client = null;
+        this.db = null;
+        this._connectPromise = null;
+        error('Error connecting to MongoDB:', err);
+        throw err;
+      }
+    })();
+    await this._connectPromise;
   }
 
   async close() {
@@ -38,6 +43,7 @@ class MongoConnection {
       await this.client.close();
       this.client = null;
       this.db = null;
+      this._connectPromise = null;
       log('MongoDB connection closed');
     }
   }
