@@ -1,5 +1,5 @@
 const config = require("../config.json");
-const { spotify, getAllPlaylistSongs } = require('../utils/spotify.js_deprecate');
+//const { spotify, getAllPlaylistSongs } = require('../utils/spotify.js_deprecate');
 const { error, log } = require('../utils/utils');
 
 const { ButtonBuilder, ButtonStyle, ActionRowBuilder } = require('discord.js');

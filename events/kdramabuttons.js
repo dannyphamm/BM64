@@ -1,7 +1,5 @@
 const { InteractionType } = require("discord-api-types/v10");
 const { log, error } = require('../utils/utils.js');
-const { socketIO } = require("../utils/socket.js");
-const { spotify } = require("../utils/spotify.js");
 const config = require('../config.json');
 const { ButtonBuilder, ButtonStyle, ActionRowBuilder } = require('discord.js');
 

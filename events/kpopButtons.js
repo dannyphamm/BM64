@@ -1,7 +1,7 @@
 const { InteractionType } = require("discord-api-types/v10");
 const { log, error } = require('../utils/utils');
 const { socketIO } = require("../utils/socket");
-const { spotify } = require("../utils/spotify.js");
+//const { spotify } = require("../utils/spotify.js");
 const { loadSpotify } = require("../services/spotifyStatus");
 const config = require('../config.json');
 const { ButtonBuilder, ButtonStyle, ActionRowBuilder } = require('discord.js');
@@ -20,8 +20,8 @@ module.exports = {
                 const song = JSON.parse(songData)
                 log('DELETE', song.uri)
                 let misamo = client.mongodb.db.collection(config.mongodbDBMiSaMo)
-                let spotifyApi = await spotify();
-                await spotifyApi.removeTracksFromPlaylist(config.spotifyPlaylist, [{ uri: song.uri}]);
+                //let spotifyApi = await spotify();
+                // await spotifyApi.removeTracksFromPlaylist(config.spotifyPlaylist, [{ uri: song.uri}]);
                 await misamo.updateOne({ uri: song.uri }, { $set: { status: "Auto: removed" } });
                 const button = new ButtonBuilder()
                 .setCustomId(`autodelete:${songData}`)
@@ -51,14 +51,14 @@ module.exports = {
             if (interaction.customId === 'remove') {
                 await interaction.reply({content:'Running...', ephemeral: true });
                 
-                const spotifyApi = await spotify();
-                const currentSong = await spotifyApi.getMyCurrentPlayingTrack();
+                //const spotifyApi = await spotify();
+                //const currentSong = await spotifyApi.getMyCurrentPlayingTrack();
                 if (currentSong.body.currently_playing_type !== 'track') return await interaction.editReply({ content: 'Cannot remove. An ad is playing!', ephemeral: true });
                 const playlist = currentSong.body.context.uri.split(':')[2];
                 log('REMOVE', `spotify:track:${currentSong.body.item.id}`)
-                await spotifyApi.removeTracksFromPlaylist(
-                    playlist,
-                    [{ uri: `spotify:track:${currentSong.body.item.id}` }])
+                // await spotifyApi.removeTracksFromPlaylist(
+                //     playlist,
+                //     [{ uri: `spotify:track:${currentSong.body.item.id}` }])
                 const misamo = client.mongodb.db.collection(config.mongodbDBMiSaMo);
                 await misamo.updateOne({ uri: `spotify:track:${currentSong.body.item.id}` }, { $set: { status: "Auto: removed" } });
                 await socketIO().then((socket) => {

@@ -1,5 +1,5 @@
 const config = require('../config.json');
-const { spotify, getAllPlaylistSongs } = require('../utils/spotify.js');
+//const { spotify, getAllPlaylistSongs } = require('../utils/spotify.js');
 const { error, log } = require('../utils/utils');
 
 module.exports = {
