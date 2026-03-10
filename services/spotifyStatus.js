@@ -292,11 +292,11 @@ class SpotifyStatusService {
                 await SocketWrapper.skipMusic();
             }
 
-            if (currentTrack.body) {
-                await this.handleTrackPlaying(client, voiceChannel, spotifyApi, currentTrack);
-            } else {
-                await this.handleNoTrackPlaying(client, voiceChannel);
-            }
+            // if (currentTrack.body) {
+            //     await this.handleTrackPlaying(client, voiceChannel, spotifyApi, currentTrack);
+            // } else {
+            //     await this.handleNoTrackPlaying(client, voiceChannel);
+            // }
 
         } catch (e) {
             error('Error in loadSpotify:', e);
