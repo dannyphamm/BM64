@@ -275,7 +275,7 @@ class SpotifyStatusService {
         }
 
         try {
-            const spotifyApi = await spotify();
+            //const spotifyApi = await spotify();
             const voiceChannel = await this.getVoiceChannel(client);
             
             if (!voiceChannel) {
