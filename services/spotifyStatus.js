@@ -1,4 +1,4 @@
-const { spotify } = require('../utils/spotify.js');
+//const { spotify } = require('../utils/spotify.js_deprecate');
 const { ActionRowBuilder, ButtonBuilder } = require('@discordjs/builders');
 const { ButtonStyle } = require('discord.js');
 const { error, log } = require('../utils/utils');
@@ -284,7 +284,7 @@ class SpotifyStatusService {
                 return this.loadSpotify(client, true);
             }
 
-            const currentTrack = await SpotifyAPIWrapper.getCurrentTrack(spotifyApi);
+            //const currentTrack = await SpotifyAPIWrapper.getCurrentTrack(spotifyApi);
             
             // Check for stuck state
             if (this.manager.durationMs === this.manager.progressMs && this.manager.remainingMs === 1000) {
@@ -343,7 +343,7 @@ class SpotifyStatusService {
         // Get queue and recent tracks
         const [queueData, recentTracks] = await Promise.all([
             SocketWrapper.getQueue().catch(() => null),
-            SpotifyAPIWrapper.getRecentTracks(spotifyApi).catch(() => null)
+            //SpotifyAPIWrapper.getRecentTracks(spotifyApi).catch(() => null)
         ]);
 
         const queue = DataProcessor.processQueueData(queueData);
@@ -378,7 +378,7 @@ class SpotifyStatusService {
         // Get queue and recent tracks
         const [queueData, recentTracks, playLengthData] = await Promise.all([
             SocketWrapper.getQueue().catch(() => null),
-            SpotifyAPIWrapper.getRecentTracks(spotifyApi).catch(() => null),
+            //SpotifyAPIWrapper.getRecentTracks(spotifyApi).catch(() => null),
             SocketWrapper.getPlayLength().catch(() => null)
         ]);
 

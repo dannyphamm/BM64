@@ -9,7 +9,7 @@ const { kdramaTrackerService, kdramaCompleterService } = require('../services/kd
 const { trackUniqloItems, femaleSaleItems, maleSaleItems } = require('../services/uniqlo');
 const { loadSpotify } = require('../services/spotifyStatus');
 const { socketIO } = require('../utils/socket');
-const { misamoAutoImport } = require('../services/misamoAutoImport');
+//const { misamoAutoImport } = require('../services/misamoAutoImport');
 const { uniqloStreamService } = require('../services/uniqlostream');
 
 module.exports = {
@@ -96,7 +96,7 @@ module.exports = {
                             loadSpotify(client, true)
                         }
                     }
-                    misamoAutoImport(client);
+                    //misamoAutoImport(client);
                 } catch (e) {
                     error(e, "Refresh Spotify");
                 }
@@ -111,16 +111,16 @@ module.exports = {
                     error(e, "TRY UNIQLO");
                 }
             });
-            log("Health check for spotify. 1 minute")
-            schedule.scheduleJob('0 * * * * *', async () => {
-                try {
-                    await socketIO().then(async (socket) => {
-                        const result = await socket.timeout(10000).emitWithAck('playMusic');
-                    })
-                } catch (e) {
-                    error(e, "TRY spotify health");
-                }
-            });
+            // log("Health check for spotify. 1 minute")
+            // schedule.scheduleJob('0 * * * * *', async () => {
+            //     try {
+            //         await socketIO().then(async (socket) => {
+            //             const result = await socket.timeout(10000).emitWithAck('playMusic');
+            //         })
+            //     } catch (e) {
+            //         error(e, "TRY spotify health");
+            //     }
+            // });
             socketIO();
             log("Socket.io listening on port 3000")
             const delay = async () => {

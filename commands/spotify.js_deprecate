@@ -1,9 +1,9 @@
 const { SlashCommandBuilder } = require('@discordjs/builders');
 const SpotifyWebApi = require('spotify-web-api-node');
 const config = require('../config.json');
-const { log } = require('../utils/utils');
+const { log } = require('../utils/utils.js');
 const { socketIO } = require('../utils/socket.js');
-const { spotify, addAllTracksToPlaylist, getAllPlaylistSongs, removeAllTracksFromPlaylist } = require('../utils/spotify.js');
+const { spotify, addAllTracksToPlaylist, getAllPlaylistSongs, removeAllTracksFromPlaylist } = require('../utils/spotify.js_deprecate');
 const { loadSpotify } = require('../services/spotifyStatus.js');
 const { misamoAutoImport } = require('../services/misamoAutoImport.js');
 module.exports = {
