@@ -205,8 +205,9 @@ class EmbedBuilder {
             color: EMBED_COLOR,
             title: 'Previously Played',
             fields: tracks.map((track, index) => ({
-                name: truncateText(`${index + 1}. ${track.name}${track.artist ? ` - ${track.artist}` : track.artists ? ` - ${track.artists}` : ''}`),
+                name: truncateText(`${index + 1}. ${track.name}`),
                 //value: truncateText(track.album || '—'),
+                value: `${track.artist ? ` - ${track.artist}` : track.artists ? ` - ${track.artists}` : ''}`,
             })),
             timestamp: new Date().toISOString(),
         };
