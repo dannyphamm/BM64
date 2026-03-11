@@ -206,7 +206,7 @@ class EmbedBuilder {
             title: 'Previously Played',
             fields: tracks.map((track, index) => ({
                 name: truncateText(`${index + 1}. ${track.name}${track.artist ? ` - ${track.artist}` : track.artists ? ` - ${track.artists}` : ''}`),
-                value: truncateText(track.album || '—'),
+                //value: truncateText(track.album || '—'),
             })),
             timestamp: new Date().toISOString(),
         };
