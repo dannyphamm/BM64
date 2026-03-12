@@ -49,29 +49,43 @@ module.exports = {
             }
 
             if (interaction.customId === 'remove') {
-                await interaction.reply({content:'Running...', ephemeral: true });
-                
-                //const spotifyApi = await spotify();
-                //const currentSong = await spotifyApi.getMyCurrentPlayingTrack();
-                if (currentSong.body.currently_playing_type !== 'track') return await interaction.editReply({ content: 'Cannot remove. An ad is playing!', ephemeral: true });
-                const playlist = currentSong.body.context.uri.split(':')[2];
-                log('REMOVE', `spotify:track:${currentSong.body.item.id}`)
-                // await spotifyApi.removeTracksFromPlaylist(
-                //     playlist,
-                //     [{ uri: `spotify:track:${currentSong.body.item.id}` }])
-                const misamo = client.mongodb.db.collection(config.mongodbDBMiSaMo);
-                await misamo.updateOne({ uri: `spotify:track:${currentSong.body.item.id}` }, { $set: { status: "Auto: removed" } });
-                await socketIO().then((socket) => {
-                    const play = socket.timeout(10000).emitWithAck('skipMusic');
-                    if (play) {
-                        loadSpotify(client, true)
+                await interaction.reply({ content: 'Running...', ephemeral: true });
+                try {
+                    const currentSongRaw = await socketIO().then((socket) =>
+                        socket.timeout(5000).emitWithAck('getCurrentSong')
+                    );
+                    const currentSong = currentSongRaw?.[0] ?? currentSongRaw;
+                    if (!currentSong?.name) {
+                        await interaction.editReply({ content: 'Cannot remove: no track playing or ad is playing.', ephemeral: true });
+                        return;
                     }
-                })
-                // delay and add loadSpotify
-
-
-
-                await interaction.editReply({ content: 'Deleted!', ephemeral: true });
+                    const result = await socketIO().then((socket) =>
+                        socket.timeout(10000).emitWithAck('removeCurrentSongFromPlaylist')
+                    );
+                    const resolved = result?.[0] ?? result;
+                    if (resolved) {
+                        const misamo = client.mongodb.db.collection(config.mongodbDBMiSaMo);
+                        const updateResult = await misamo.updateOne(
+                            { name: currentSong.name, artists: currentSong.artist },
+                            { $set: { status: 'Auto: removed' } }
+                        );
+                        if (updateResult.matchedCount === 0) {
+                            await misamo.updateOne(
+                                { name: currentSong.name, artists: { $regex: currentSong.artist.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), $options: 'i' } },
+                                { $set: { status: 'Auto: removed' } }
+                            );
+                        }
+                        log('REMOVE', currentSong.name, currentSong.artist);
+                        await socketIO().then((socket) => socket.timeout(10000).emitWithAck('skipMusic'));
+                        loadSpotify(client, true);
+                        await interaction.editReply({ content: 'Removed from playlist and skipped!', ephemeral: true });
+                    } else {
+                        await interaction.editReply({ content: 'Could not remove (e.g. not playing a track from playlist).', ephemeral: true });
+                    }
+                } catch (e) {
+                    error(e);
+                    await interaction.editReply({ content: 'Remove failed.', ephemeral: true }).catch(() => {});
+                }
             }
 
             if (interaction.customId === 'reset') {
