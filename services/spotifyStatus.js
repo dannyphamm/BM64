@@ -290,14 +290,15 @@ class SpotifyStatusService {
             }
 
             const currentSongRaw = await SocketWrapper.getCurrentSong().catch(() => null);
-            const previousSongRaw = await SocketWrapper.getPrevious().catch(() => null);
+            const previousRaw = await SocketWrapper.getPrevious().catch(() => null);
             const currentSong = currentSongRaw?.[0] ?? currentSongRaw;
-            const previousSong = previousSongRaw?.[0] ?? previousSongRaw;
+            // getPrevious returns an array of { name, artist } (up to 10); ack may wrap as [array]
+            const previousTracks = Array.isArray(previousRaw?.[0]) ? previousRaw[0] : Array.isArray(previousRaw) ? previousRaw : previousRaw ? [previousRaw] : [];
 
             if (currentSong && currentSong.name) {
-                await this.handleActiveTrack(client, voiceChannel, currentSong, previousSong);
+                await this.handleActiveTrack(client, voiceChannel, currentSong, previousTracks);
             } else {
-                await this.handleAdOrPaused(client, voiceChannel, previousSong);
+                await this.handleAdOrPaused(client, voiceChannel, previousTracks);
             }
         } catch (e) {
             error('Error in loadSpotify:', e);
@@ -315,7 +316,7 @@ class SpotifyStatusService {
         }
     }
 
-    async handleActiveTrack(client, voiceChannel, currentSong, previousSong) {
+    async handleActiveTrack(client, voiceChannel, currentSong, previousTracks) {
         if (voiceChannel.type !== 2) return;
 
         const { name, artist, progress_ms, duration_ms } = currentSong;
@@ -332,7 +333,6 @@ class SpotifyStatusService {
 
         const queueData = await SocketWrapper.getQueue().catch(() => null);
         const queue = DataProcessor.processQueueData(queueData);
-        const previousTracks = previousSong ? [previousSong] : [];
 
         const embeds = [
             EmbedBuilder.createNextUpEmbed(queue),
@@ -345,7 +345,7 @@ class SpotifyStatusService {
         this.scheduleNextUpdate(progress_ms, duration_ms);
     }
 
-    async handleAdOrPaused(client, voiceChannel, previousSong) {
+    async handleAdOrPaused(client, voiceChannel, previousTracks) {
         if (voiceChannel.type !== 2) return;
 
         log("Handling ad or paused state");
@@ -373,7 +373,6 @@ class SpotifyStatusService {
             );
         }
 
-        const previousTracks = previousSong ? [previousSong] : [];
         const embeds = [
             EmbedBuilder.createNextUpEmbed(queue),
             EmbedBuilder.createCurrentEmbed(
