@@ -15,6 +15,8 @@ const QUEUE_LIMIT = 5;
 const EMBED_COLOR = 0x0099ff;
 const SOCKET_TIMEOUT = 10000;
 const SHORT_SOCKET_TIMEOUT = 3000;
+/** Discord voice channel status max length (undocumented; keep conservative). */
+const VOICE_CHANNEL_STATUS_MAX = 500;
 
 // State management
 class SpotifyStatusManager {
@@ -76,6 +78,39 @@ const truncateText = (text, maxLength = 256) => {
     if (!text || text.length <= maxLength) return text;
     return text.substring(0, maxLength - 3) + '...';
 };
+
+/**
+ * Undocumented API — see https://gist.github.com/EchterTimo/9c5333c8a6272883510c38dd0cff5f60
+ * and discord-api-docs PRs around voice-status.
+ */
+async function updateVoiceChannelStatus(statusText) {
+    const channelId = config.misamoVoiceChannel;
+    const token = config.token;
+    if (!channelId || !token) return;
+
+    const status = statusText != null && statusText !== ''
+        ? truncateText(String(statusText), VOICE_CHANNEL_STATUS_MAX)
+        : '';
+
+    const url = `https://discord.com/api/v9/channels/${channelId}/voice-status`;
+    try {
+        const res = await fetch(url, {
+            method: 'PUT',
+            headers: {
+                Authorization: `Bot ${token}`,
+                'Content-Type': 'application/json',
+                'User-Agent': 'DiscordBot',
+            },
+            body: JSON.stringify({ status }),
+        });
+        if (!res.ok) {
+            const body = await res.text().catch(() => '');
+            error(`Voice channel status failed: ${res.status} ${body}`);
+        }
+    } catch (e) {
+        error('Failed to update voice channel status:', e);
+    }
+}
 
 const formatDuration = (ms) => {
     const minutes = Math.floor(ms / (1000 * 60));
@@ -329,6 +364,7 @@ class SpotifyStatusService {
             } catch (e) {
                 error('Failed to set Discord activity:', e);
             }
+            await updateVoiceChannelStatus(activityText);
         }
 
         const queueData = await SocketWrapper.getQueue().catch(() => null);
@@ -355,6 +391,7 @@ class SpotifyStatusService {
         } catch (e) {
             error('Failed to clear Discord activity:', e);
         }
+        await updateVoiceChannelStatus('');
 
         const [queueData, playLengthData] = await Promise.all([
             SocketWrapper.getQueue().catch(() => null),
