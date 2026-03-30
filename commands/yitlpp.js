@@ -1,6 +1,6 @@
 const { SlashCommandBuilder } = require('@discordjs/builders');
 const { AttachmentBuilder, EmbedBuilder } = require('discord.js');
-const { createCanvas } = require('@napi-rs/canvas');
+const { createCanvas, loadImage } = require('@napi-rs/canvas');
 const db = require('../utils/db');
 const config = require('../config.json');
 const { error } = require('../utils/utils');
@@ -20,22 +20,39 @@ function getTrackedUsers() {
     return [];
 }
 
-// Cell size and layout for the year grid (GitHub-style: 53 weeks × 7 days)
-const CELL_SIZE = 14;
-const CELL_GAP = 3;
-const COLS = 53;
-const ROWS = 7;
-const PADDING = 40;
-const LEGEND_HEIGHT = 80;
-const HEADER_HEIGHT = 50;
+// Global scale for crisp output (2× = HD — larger canvas + fonts; Discord embed scales down)
+const HD_SCALE = 2;
+
+// Cell size and layout for the year grid: column-major (oldest top→bottom, columns left→right), 14 rows high
+const CELL_SIZE = Math.round(14 * HD_SCALE);
+const CELL_GAP = Math.round(3 * HD_SCALE);
+const ROWS = 14;
+const COLS = Math.ceil(365 / ROWS);
+const PADDING = Math.round(40 * HD_SCALE);
+const LEGEND_HEIGHT = Math.round(88 * HD_SCALE);
+const HEADER_HEIGHT = Math.round(88 * HD_SCALE);
+const MONTH_LABEL_H = Math.round(22 * HD_SCALE);
+
+// Theme: deep slate base + emerald/teal accents (readable on dark)
+const THEME = {
+    bg: '#0f172a',
+    bgGrid: '#1e293b',
+    text: '#f1f5f9',
+    textMuted: '#94a3b8',
+    axis: '#64748b',
+    accent: '#22c55e',
+    accentMuted: '#16a34a',
+    barEmpty: '#334155',
+    heatEmpty: '#1e293b',
+};
 
 function getColorForMinutes(minutes) {
-    if (minutes === 0) return '#ebedf0'; // no data
-    if (minutes < 30) return '#9be9a8';
-    if (minutes < 60) return '#40c463';
-    if (minutes < 120) return '#30a14e';
-    if (minutes < 180) return '#216e39'; // 2h–3h
-    return '#125a1e'; // 3h+
+    if (minutes === 0) return THEME.heatEmpty;
+    if (minutes < 30) return '#6ee7b7';
+    if (minutes < 60) return '#34d399';
+    if (minutes < 120) return '#10b981';
+    if (minutes < 180) return '#059669';
+    return '#047857';
 }
 
 async function fetchYearData(userId) {
@@ -91,7 +108,8 @@ async function fetchYearData(userId) {
         const cumulative = new Array(365).fill(0);
         const gamesPerMonth = monthly.map(m => ({ ...m, count: 0 }));
         const allGames = [];
-        return { days: new Array(365).fill(0), totalMs: 0, topGames: [], monthly, weekday, daysPlayedPerMonth, weekly, dailyDistribution, last30Days, cumulative, gamesPerMonth, allGames };
+        const endDateStrEmpty = new Date().toISOString().split('T')[0];
+        return { days: new Array(365).fill(0), totalMs: 0, topGames: [], monthly, weekday, daysPlayedPerMonth, weekly, dailyDistribution, last30Days, cumulative, gamesPerMonth, allGames, endDateStr: endDateStrEmpty };
     }
 
     // Build 365 days ending on the most recent date we have
@@ -201,7 +219,7 @@ async function fetchYearData(userId) {
         .sort((a, b) => b[1] - a[1])
         .map(([name, ms]) => ({ name, ms }));
 
-    return { days, totalMs, topGames, monthly, weekday, daysPlayedPerMonth, weekly: weekly.length ? weekly : Array.from({ length: 26 }, (_, i) => ({ label: `Wk ${i + 1}`, ms: 0 })), dailyDistribution: distBuckets, last30Days, cumulative, gamesPerMonth, allGames };
+    return { days, totalMs, topGames, monthly, weekday, daysPlayedPerMonth, weekly: weekly.length ? weekly : Array.from({ length: 26 }, (_, i) => ({ label: `Wk ${i + 1}`, ms: 0 })), dailyDistribution: distBuckets, last30Days, cumulative, gamesPerMonth, allGames, endDateStr: lastDate };
 }
 
 function formatDuration(ms) {
@@ -211,96 +229,210 @@ function formatDuration(ms) {
     return `${minutes}m`;
 }
 
-function drawYearInALifeGraph(data) {
-    const { days, totalMs, topGames } = data;
+function dateForGridDay(dayIdx, endDateStr) {
+    const end = new Date((endDateStr || new Date().toISOString().split('T')[0]) + 'T12:00:00Z');
+    const d = new Date(end);
+    d.setUTCDate(d.getUTCDate() - (364 - dayIdx));
+    return d;
+}
+
+/** Title for year heatmap; `verticalScale` scales fonts/positions when compositing onto combined canvas. */
+function drawYearInALifeTitle(ctx, width, userLabel, offsetY, verticalScale) {
+    const name = String(userLabel || 'PP').trim() || 'PP';
+    const maxTitleW = width - Math.round(48 * HD_SCALE);
+    const vs = verticalScale;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillStyle = THEME.text;
+
+    const subtitlePx = Math.round(19 * HD_SCALE * vs);
+    const line1Baseline = offsetY + Math.round(38 * HD_SCALE * vs);
+    ctx.font = `600 ${subtitlePx}px sans-serif`;
+    ctx.fillText('Year in the life of', width / 2, line1Baseline);
+
+    let namePx = Math.round(34 * HD_SCALE * vs);
+    ctx.font = `bold ${namePx}px sans-serif`;
+    let nameText = name;
+    while (ctx.measureText(nameText).width > maxTitleW && namePx > Math.round(14 * HD_SCALE * vs)) {
+        namePx -= Math.max(1, Math.round(2 * vs));
+        ctx.font = `bold ${namePx}px sans-serif`;
+    }
+    if (ctx.measureText(nameText).width > maxTitleW) {
+        while (nameText.length > 1 && ctx.measureText(`${nameText}…`).width > maxTitleW) {
+            nameText = nameText.slice(0, -1);
+        }
+        nameText = `${nameText}…`;
+    }
+    const line2Baseline = line1Baseline + Math.round(subtitlePx * 1.28) + Math.round(6 * HD_SCALE * vs);
+    ctx.fillText(nameText, width / 2, line2Baseline);
+}
+
+function drawYearInALifeGraph(data, userLabel = 'PP', options = {}) {
+    const { omitTitle = false } = options;
+    const { days, totalMs, topGames, endDateStr } = data;
+    // Combined export uses omitTitle: title lives in COMBINED_HEADER_H; skip the in-canvas title band so the grid sits higher.
+    const headerBandH = omitTitle ? 0 : HEADER_HEIGHT;
+    const gridBlockH = ROWS * (CELL_SIZE + CELL_GAP) - CELL_GAP;
     const width = PADDING * 2 + COLS * (CELL_SIZE + CELL_GAP) - CELL_GAP;
-    const height = HEADER_HEIGHT + PADDING * 2 + ROWS * (CELL_SIZE + CELL_GAP) - CELL_GAP + LEGEND_HEIGHT;
+    const naturalHeight =
+        headerBandH + MONTH_LABEL_H + PADDING * 2 + gridBlockH + LEGEND_HEIGHT;
+    let height = naturalHeight;
+    let legendGap = 0;
+    if (omitTitle) {
+        const row0Aspect = COMBINED_CELL_W / COMBINED_CELL_H_TOP;
+        const targetH = Math.ceil(width / row0Aspect);
+        if (targetH > naturalHeight) {
+            height = targetH;
+            legendGap = targetH - naturalHeight;
+        }
+    }
     const canvas = createCanvas(width, height);
     const ctx = canvas.getContext('2d');
 
-    // Background
-    ctx.fillStyle = '#0d1117';
+    ctx.fillStyle = THEME.bg;
     ctx.fillRect(0, 0, width, height);
 
-    // Title
-    ctx.fillStyle = '#e6edf3';
-    ctx.font = 'bold 22px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('Year in the life of PP', width / 2, 32);
-
-    const gridLeft = PADDING;
-    const gridTop = HEADER_HEIGHT + PADDING;
-
-    // Grid: 365 days, column-major (week 0 day 0, week 0 day 1, ...)
-    for (let i = 0; i < 365; i++) {
-        const col = Math.floor(i / 7);
-        const row = i % 7;
-        const ms = days[i];
-        const minutes = Math.floor(ms / (1000 * 60));
-        const color = getColorForMinutes(minutes);
-
-        const x = gridLeft + col * (CELL_SIZE + CELL_GAP);
-        const y = gridTop + row * (CELL_SIZE + CELL_GAP);
-
-        ctx.fillStyle = color;
-        ctx.fillRect(x, y, CELL_SIZE, CELL_SIZE);
+    if (!omitTitle) {
+        drawYearInALifeTitle(ctx, width, userLabel, 0, 1);
     }
 
-    // Legend
-    const legendY = gridTop + ROWS * (CELL_SIZE + CELL_GAP) + 20;
-    ctx.fillStyle = '#8b949e';
-    ctx.font = '12px sans-serif';
+    const gridLeft = PADDING;
+    const gridTop = headerBandH + MONTH_LABEL_H + PADDING;
+
+    const monthShort = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    ctx.font = `${Math.round(11 * HD_SCALE)}px sans-serif`;
+    ctx.fillStyle = THEME.textMuted;
+    ctx.textAlign = 'center';
+    let prevMonth = -1;
+    for (let col = 0; col < COLS; col++) {
+        const dayIdx = col * ROWS;
+        if (dayIdx >= 365) break;
+        const d = dateForGridDay(dayIdx, endDateStr);
+        const m = d.getUTCMonth();
+        if (col === 0 || m !== prevMonth) {
+            const x = gridLeft + col * (CELL_SIZE + CELL_GAP) + CELL_SIZE / 2;
+            const y = headerBandH + PADDING - Math.round(4 * HD_SCALE);
+            ctx.fillText(monthShort[m], x, y);
+            prevMonth = m;
+        }
+    }
+
+    for (let col = 0; col < COLS; col++) {
+        for (let row = 0; row < ROWS; row++) {
+            const dayIdx = col * ROWS + row;
+            const ms = dayIdx < 365 ? days[dayIdx] : 0;
+            const minutes = Math.floor(ms / (1000 * 60));
+            const color = getColorForMinutes(minutes);
+
+            const x = gridLeft + col * (CELL_SIZE + CELL_GAP);
+            const y = gridTop + row * (CELL_SIZE + CELL_GAP);
+
+            ctx.fillStyle = color;
+            ctx.fillRect(x, y, CELL_SIZE, CELL_SIZE);
+            ctx.strokeStyle = THEME.bgGrid;
+            ctx.lineWidth = Math.max(1, HD_SCALE);
+            ctx.strokeRect(x + 0.5, y + 0.5, CELL_SIZE - 1, CELL_SIZE - 1);
+        }
+    }
+
+    const legendY = gridTop + gridBlockH + Math.round(22 * HD_SCALE) + legendGap;
+    ctx.fillStyle = THEME.textMuted;
+    ctx.font = `${Math.round(12 * HD_SCALE)}px sans-serif`;
     ctx.textAlign = 'left';
     ctx.fillText('Less', gridLeft, legendY);
     const levels = [
-        { label: '0', color: '#ebedf0' },
-        { label: '<30m', color: '#9be9a8' },
-        { label: '30m+', color: '#40c463' },
-        { label: '1h+', color: '#30a14e' },
-        { label: '2h+', color: '#216e39' },
-        { label: '3h+', color: '#125a1e' },
+        { label: '0', color: THEME.heatEmpty },
+        { label: '<30m', color: '#6ee7b7' },
+        { label: '30m–1h', color: '#34d399' },
+        { label: '1h–2h', color: '#10b981' },
+        { label: '2h–3h', color: '#059669' },
+        { label: '3h+', color: '#047857' },
     ];
-    let lx = gridLeft + 40;
+    const sw = Math.round(12 * HD_SCALE);
+    const gap = Math.round(52 * HD_SCALE);
+    let lx = gridLeft + Math.round(40 * HD_SCALE);
     for (const level of levels) {
         ctx.fillStyle = level.color;
-        ctx.fillRect(lx, legendY - 10, 12, 12);
-        ctx.fillStyle = '#8b949e';
-        ctx.fillText(level.label, lx + 16, legendY);
-        lx += 52;
+        ctx.fillRect(lx, legendY - sw + 2, sw, sw);
+        ctx.strokeStyle = THEME.bgGrid;
+        ctx.lineWidth = 1;
+        ctx.strokeRect(lx + 0.5, legendY - sw + 2.5, sw - 1, sw - 1);
+        ctx.fillStyle = THEME.textMuted;
+        ctx.fillText(level.label, lx + sw + Math.round(6 * HD_SCALE), legendY);
+        lx += gap;
     }
 
-    // Stats text
-    ctx.fillStyle = '#e6edf3';
-    ctx.font = '14px sans-serif';
+    ctx.fillStyle = THEME.text;
+    ctx.font = `${Math.round(14 * HD_SCALE)}px sans-serif`;
     ctx.textAlign = 'left';
     const totalHours = (totalMs / (1000 * 60 * 60)).toFixed(1);
-    ctx.fillText(`Total: ${totalHours} hours in the past year`, gridLeft, legendY + 28);
+    const daysPlayed = days.filter(ms => ms > 0).length;
+    const avgMin = daysPlayed > 0 ? ((totalMs / daysPlayed) / (1000 * 60)).toFixed(0) : '0';
+    ctx.fillText(`Total: ${totalHours} h · ${daysPlayed} active days · ~${avgMin} min/day (when active)`, gridLeft, legendY + Math.round(28 * HD_SCALE));
     if (topGames.length > 0) {
-        const topLine = `Top: ${topGames.map(g => g.name).slice(0, 3).join(', ')}`;
-        ctx.fillStyle = '#8b949e';
-        ctx.font = '12px sans-serif';
-        ctx.fillText(topLine, gridLeft, legendY + 48);
+        const topLine = `Top: ${topGames.map(g => g.name).slice(0, 3).join(' · ')}`;
+        ctx.fillStyle = THEME.textMuted;
+        ctx.font = `${Math.round(12 * HD_SCALE)}px sans-serif`;
+        ctx.fillText(topLine, gridLeft, legendY + Math.round(50 * HD_SCALE));
     }
 
     return canvas;
 }
 
-const CHART_WIDTH = 800;
-const CHART_HEIGHT = 420;
-const CHART_PADDING = { top: 50, right: 40, bottom: 60, left: 70 };
+// Wider plot area so labels read less cramped; keep in sync with COMBINED_CELL_* aspect (see below).
+const CHART_WIDTH = 960 * HD_SCALE;
+const CHART_HEIGHT = 420 * HD_SCALE;
+// Combined grid: column width from chart aspect; row 0 uses COMBINED_CELL_H_TOP.
+const COMBINED_CELL_H = 350 * HD_SCALE;
+const COMBINED_CELL_H_TOP = 430 * HD_SCALE;
+const COMBINED_CELL_W = Math.round(COMBINED_CELL_H * (CHART_WIDTH / CHART_HEIGHT));
+const CHART_PADDING = {
+    top: 50 * HD_SCALE,
+    right: 44 * HD_SCALE,
+    bottom: 72 * HD_SCALE,
+    left: 88 * HD_SCALE,
+};
+
+const BAR_PALETTE = ['#22c55e', '#14b8a6', '#38bdf8', '#a78bfa', '#f472b6', '#fbbf24', '#fb923c', '#34d399', '#2dd4bf', '#4ade80', '#818cf8', '#f87171'];
+
+function cf(px) {
+    return `${Math.round(px * HD_SCALE)}px sans-serif`;
+}
+
+function drawYAxisLabels(ctx, chartLeft, chartTop, chartBottom, chartRight, maxVal, formatTick, tickCount = 5) {
+    ctx.strokeStyle = THEME.axis;
+    ctx.lineWidth = Math.max(1, HD_SCALE);
+    ctx.setLineDash([Math.round(4 * HD_SCALE), Math.round(6 * HD_SCALE)]);
+    ctx.globalAlpha = 0.45;
+    ctx.fillStyle = THEME.textMuted;
+    ctx.font = cf(11);
+    ctx.textAlign = 'right';
+    for (let t = 0; t <= tickCount; t++) {
+        const frac = t / tickCount;
+        const val = maxVal * frac;
+        const y = chartBottom - frac * (chartBottom - chartTop);
+        ctx.beginPath();
+        ctx.moveTo(chartLeft, y);
+        ctx.lineTo(chartRight, y);
+        ctx.stroke();
+        ctx.fillText(formatTick(val), chartLeft - Math.round(8 * HD_SCALE), y + Math.round(4 * HD_SCALE));
+    }
+    ctx.setLineDash([]);
+    ctx.globalAlpha = 1;
+}
 
 function drawMonthlyChart(data) {
     const { monthly } = data;
     const canvas = createCanvas(CHART_WIDTH, CHART_HEIGHT);
     const ctx = canvas.getContext('2d');
 
-    ctx.fillStyle = '#0d1117';
+    ctx.fillStyle = THEME.bg;
     ctx.fillRect(0, 0, CHART_WIDTH, CHART_HEIGHT);
 
-    ctx.fillStyle = '#e6edf3';
-    ctx.font = 'bold 20px sans-serif';
+    ctx.fillStyle = THEME.text;
+    ctx.font = `bold ${Math.round(20 * HD_SCALE)}px sans-serif`;
     ctx.textAlign = 'center';
-    ctx.fillText('Monthly most played (last 12 months)', CHART_WIDTH / 2, 32);
+    ctx.fillText('Monthly most played (last 12 months)', CHART_WIDTH / 2, Math.round(32 * HD_SCALE));
 
     const chartLeft = CHART_PADDING.left;
     const chartRight = CHART_WIDTH - CHART_PADDING.right;
@@ -310,7 +442,10 @@ function drawMonthlyChart(data) {
     const chartHeight = chartBottom - chartTop;
 
     const maxMs = Math.max(...monthly.map(m => m.ms), 1);
-    const barGap = 4;
+    const maxHours = maxMs / (1000 * 60 * 60);
+    drawYAxisLabels(ctx, chartLeft, chartTop, chartBottom, chartRight, maxHours, v => `${v.toFixed(v >= 10 ? 0 : 1)}h`);
+
+    const barGap = 4 * HD_SCALE;
     const barWidth = (chartWidth - barGap * (monthly.length - 1)) / monthly.length;
 
     for (let i = 0; i < monthly.length; i++) {
@@ -320,38 +455,42 @@ function drawMonthlyChart(data) {
         const x = chartLeft + i * (barWidth + barGap);
         const y = chartBottom - barH;
 
-        ctx.fillStyle = barH > 0 ? '#238636' : '#30363d';
+        ctx.fillStyle = barH > 0 ? BAR_PALETTE[i % BAR_PALETTE.length] : THEME.barEmpty;
         ctx.fillRect(x, y, barWidth, barH);
 
-        ctx.fillStyle = '#8b949e';
-        ctx.font = '11px sans-serif';
+        ctx.fillStyle = THEME.textMuted;
+        ctx.font = cf(11);
         ctx.textAlign = 'center';
         ctx.save();
-        ctx.translate(x + barWidth / 2, chartBottom + 14);
-        ctx.rotate(-0.4);
+        ctx.translate(x + barWidth / 2, chartBottom + Math.round(14 * HD_SCALE));
+        ctx.rotate(-0.35);
         ctx.fillText(m.label, 0, 0);
         ctx.restore();
 
-        if (barH > 18) {
-            ctx.fillStyle = '#e6edf3';
-            ctx.font = '10px sans-serif';
-            ctx.textAlign = 'center';
-            ctx.fillText(`${hours.toFixed(1)}h`, x + barWidth / 2, y + barH / 2 + 4);
+        const label = `${hours.toFixed(1)}h`;
+        ctx.font = cf(10);
+        ctx.textAlign = 'center';
+        if (barH > Math.round(20 * HD_SCALE)) {
+            ctx.fillStyle = THEME.text;
+            ctx.fillText(label, x + barWidth / 2, y + barH / 2 + Math.round(4 * HD_SCALE));
+        } else {
+            ctx.fillStyle = THEME.textMuted;
+            ctx.fillText(label, x + barWidth / 2, y - Math.round(6 * HD_SCALE));
         }
     }
 
-    ctx.strokeStyle = '#484f58';
-    ctx.lineWidth = 1;
+    ctx.strokeStyle = THEME.axis;
+    ctx.lineWidth = HD_SCALE;
     ctx.beginPath();
     ctx.moveTo(chartLeft, chartTop);
     ctx.lineTo(chartLeft, chartBottom);
     ctx.lineTo(chartRight, chartBottom);
     ctx.stroke();
 
-    ctx.fillStyle = '#8b949e';
-    ctx.font = '12px sans-serif';
+    ctx.fillStyle = THEME.textMuted;
+    ctx.font = cf(12);
     ctx.textAlign = 'center';
-    ctx.fillText('Hours', CHART_WIDTH / 2, CHART_HEIGHT - 8);
+    ctx.fillText('Hours (bar height)', CHART_WIDTH / 2, CHART_HEIGHT - Math.round(10 * HD_SCALE));
 
     return canvas;
 }
@@ -361,13 +500,13 @@ function drawTopGamesChart(data) {
     const canvas = createCanvas(CHART_WIDTH, CHART_HEIGHT);
     const ctx = canvas.getContext('2d');
 
-    ctx.fillStyle = '#0d1117';
+    ctx.fillStyle = THEME.bg;
     ctx.fillRect(0, 0, CHART_WIDTH, CHART_HEIGHT);
 
-    ctx.fillStyle = '#e6edf3';
-    ctx.font = 'bold 20px sans-serif';
+    ctx.fillStyle = THEME.text;
+    ctx.font = `bold ${Math.round(20 * HD_SCALE)}px sans-serif`;
     ctx.textAlign = 'center';
-    ctx.fillText('Most played games (year)', CHART_WIDTH / 2, 32);
+    ctx.fillText('Most played games (year)', CHART_WIDTH / 2, Math.round(32 * HD_SCALE));
 
     const chartLeft = CHART_PADDING.left;
     const chartRight = CHART_WIDTH - CHART_PADDING.right;
@@ -378,37 +517,49 @@ function drawTopGamesChart(data) {
 
     const list = topGames.slice(0, 10);
     if (list.length === 0) {
-        ctx.fillStyle = '#8b949e';
-        ctx.font = '16px sans-serif';
+        ctx.fillStyle = THEME.textMuted;
+        ctx.font = cf(16);
         ctx.textAlign = 'center';
         ctx.fillText('No game data for the past year', CHART_WIDTH / 2, CHART_HEIGHT / 2);
         return canvas;
     }
 
+    const totalListMs = list.reduce((a, g) => a + g.ms, 0);
     const maxMs = Math.max(...list.map(g => g.ms), 1);
     const rowHeight = chartHeight / list.length;
-    const labelMaxW = 200;
+    const labelMaxW = 220 * HD_SCALE;
+    const barH = Math.max(Math.round(18 * HD_SCALE), rowHeight * 0.55);
 
     for (let i = 0; i < list.length; i++) {
         const g = list[i];
-        const barW = maxMs > 0 ? (g.ms / maxMs) * (chartWidth - labelMaxW - 20) : 0;
-        const y = chartTop + i * rowHeight + rowHeight / 2 - 10;
+        const barW = maxMs > 0 ? (g.ms / maxMs) * (chartWidth - labelMaxW - Math.round(28 * HD_SCALE)) : 0;
+        const y = chartTop + i * rowHeight + rowHeight / 2 - barH / 2;
 
         const name = g.name.length > 28 ? g.name.slice(0, 25) + '...' : g.name;
-        ctx.fillStyle = '#e6edf3';
-        ctx.font = '12px sans-serif';
+        ctx.fillStyle = THEME.text;
+        ctx.font = cf(12);
         ctx.textAlign = 'left';
-        ctx.fillText(name, chartLeft, y + 12);
+        ctx.fillText(`${i + 1}. ${name}`, chartLeft, y + barH * 0.72);
 
-        ctx.fillStyle = '#238636';
-        ctx.fillRect(chartLeft + labelMaxW, y, barW, 20);
+        const fill = BAR_PALETTE[i % BAR_PALETTE.length];
+        ctx.fillStyle = fill;
+        ctx.fillRect(chartLeft + labelMaxW, y, barW, barH);
+        ctx.strokeStyle = THEME.bgGrid;
+        ctx.lineWidth = 1;
+        ctx.strokeRect(chartLeft + labelMaxW + 0.5, y + 0.5, barW - 1, barH - 1);
 
         const hours = (g.ms / (1000 * 60 * 60)).toFixed(1);
-        ctx.fillStyle = '#8b949e';
-        ctx.font = '11px sans-serif';
+        const pct = totalListMs > 0 ? ((g.ms / totalListMs) * 100).toFixed(0) : '0';
+        ctx.fillStyle = THEME.textMuted;
+        ctx.font = cf(11);
         ctx.textAlign = 'right';
-        ctx.fillText(`${hours}h`, chartRight, y + 14);
+        ctx.fillText(`${hours}h (${pct}% of top 10)`, chartRight, y + barH * 0.72);
     }
+
+    ctx.fillStyle = THEME.textMuted;
+    ctx.font = cf(10);
+    ctx.textAlign = 'center';
+    ctx.fillText('Right: hours and share of top-10 play time', CHART_WIDTH / 2, CHART_HEIGHT - Math.round(12 * HD_SCALE));
 
     return canvas;
 }
@@ -418,13 +569,13 @@ function drawWeekdayChart(data) {
     const canvas = createCanvas(CHART_WIDTH, CHART_HEIGHT);
     const ctx = canvas.getContext('2d');
 
-    ctx.fillStyle = '#0d1117';
+    ctx.fillStyle = THEME.bg;
     ctx.fillRect(0, 0, CHART_WIDTH, CHART_HEIGHT);
 
-    ctx.fillStyle = '#e6edf3';
-    ctx.font = 'bold 20px sans-serif';
+    ctx.fillStyle = THEME.text;
+    ctx.font = `bold ${Math.round(20 * HD_SCALE)}px sans-serif`;
     ctx.textAlign = 'center';
-    ctx.fillText('Play time by day of week (past year)', CHART_WIDTH / 2, 32);
+    ctx.fillText('Play time by day of week (past year)', CHART_WIDTH / 2, Math.round(32 * HD_SCALE));
 
     const chartLeft = CHART_PADDING.left;
     const chartRight = CHART_WIDTH - CHART_PADDING.right;
@@ -434,8 +585,12 @@ function drawWeekdayChart(data) {
     const chartHeight = chartBottom - chartTop;
 
     const maxMs = Math.max(...weekday.map(w => w.ms), 1);
-    const barGap = 8;
+    const maxHours = maxMs / (1000 * 60 * 60);
+    drawYAxisLabels(ctx, chartLeft, chartTop, chartBottom, chartRight, maxHours, v => `${v.toFixed(v >= 10 ? 0 : 1)}h`);
+
+    const barGap = 8 * HD_SCALE;
     const barWidth = (chartWidth - barGap * (weekday.length - 1)) / weekday.length;
+    const totalWeekMs = weekday.reduce((a, w) => a + w.ms, 0);
 
     for (let i = 0; i < weekday.length; i++) {
         const w = weekday[i];
@@ -444,28 +599,38 @@ function drawWeekdayChart(data) {
         const x = chartLeft + i * (barWidth + barGap);
         const y = chartBottom - barH;
 
-        ctx.fillStyle = barH > 0 ? '#238636' : '#30363d';
+        ctx.fillStyle = barH > 0 ? BAR_PALETTE[i % BAR_PALETTE.length] : THEME.barEmpty;
         ctx.fillRect(x, y, barWidth, barH);
 
-        ctx.fillStyle = '#8b949e';
-        ctx.font = '12px sans-serif';
+        ctx.fillStyle = THEME.textMuted;
+        ctx.font = cf(12);
         ctx.textAlign = 'center';
-        ctx.fillText(w.label, x + barWidth / 2, chartBottom + 20);
+        ctx.fillText(w.label, x + barWidth / 2, chartBottom + Math.round(22 * HD_SCALE));
 
-        if (barH > 18) {
-            ctx.fillStyle = '#e6edf3';
-            ctx.font = '10px sans-serif';
-            ctx.fillText(`${hours.toFixed(1)}h`, x + barWidth / 2, y + barH / 2 + 4);
+        const pct = totalWeekMs > 0 ? ((w.ms / totalWeekMs) * 100).toFixed(0) : '0';
+        const label = `${hours.toFixed(1)}h · ${pct}%`;
+        ctx.font = cf(10);
+        if (barH > Math.round(22 * HD_SCALE)) {
+            ctx.fillStyle = THEME.text;
+            ctx.fillText(label, x + barWidth / 2, y + barH / 2 + Math.round(4 * HD_SCALE));
+        } else {
+            ctx.fillStyle = THEME.textMuted;
+            ctx.fillText(label, x + barWidth / 2, y - Math.round(6 * HD_SCALE));
         }
     }
 
-    ctx.strokeStyle = '#484f58';
-    ctx.lineWidth = 1;
+    ctx.strokeStyle = THEME.axis;
+    ctx.lineWidth = HD_SCALE;
     ctx.beginPath();
     ctx.moveTo(chartLeft, chartTop);
     ctx.lineTo(chartLeft, chartBottom);
     ctx.lineTo(chartRight, chartBottom);
     ctx.stroke();
+
+    ctx.fillStyle = THEME.textMuted;
+    ctx.font = cf(11);
+    ctx.textAlign = 'center';
+    ctx.fillText('Hours · % of weekly total', CHART_WIDTH / 2, CHART_HEIGHT - Math.round(14 * HD_SCALE));
 
     return canvas;
 }
@@ -475,13 +640,13 @@ function drawDaysPlayedChart(data) {
     const canvas = createCanvas(CHART_WIDTH, CHART_HEIGHT);
     const ctx = canvas.getContext('2d');
 
-    ctx.fillStyle = '#0d1117';
+    ctx.fillStyle = THEME.bg;
     ctx.fillRect(0, 0, CHART_WIDTH, CHART_HEIGHT);
 
-    ctx.fillStyle = '#e6edf3';
-    ctx.font = 'bold 20px sans-serif';
+    ctx.fillStyle = THEME.text;
+    ctx.font = `bold ${Math.round(20 * HD_SCALE)}px sans-serif`;
     ctx.textAlign = 'center';
-    ctx.fillText('Days played per month (last 12 months)', CHART_WIDTH / 2, 32);
+    ctx.fillText('Days played per month (last 12 months)', CHART_WIDTH / 2, Math.round(32 * HD_SCALE));
 
     const chartLeft = CHART_PADDING.left;
     const chartRight = CHART_WIDTH - CHART_PADDING.right;
@@ -491,7 +656,9 @@ function drawDaysPlayedChart(data) {
     const chartHeight = chartBottom - chartTop;
 
     const maxCount = Math.max(...daysPlayedPerMonth.map(m => m.count), 1);
-    const barGap = 4;
+    drawYAxisLabels(ctx, chartLeft, chartTop, chartBottom, chartRight, maxCount, v => String(Math.round(v)));
+
+    const barGap = 4 * HD_SCALE;
     const barWidth = (chartWidth - barGap * (daysPlayedPerMonth.length - 1)) / daysPlayedPerMonth.length;
 
     for (let i = 0; i < daysPlayedPerMonth.length; i++) {
@@ -500,37 +667,53 @@ function drawDaysPlayedChart(data) {
         const x = chartLeft + i * (barWidth + barGap);
         const y = chartBottom - barH;
 
-        ctx.fillStyle = barH > 0 ? '#238636' : '#30363d';
+        ctx.fillStyle = barH > 0 ? BAR_PALETTE[i % BAR_PALETTE.length] : THEME.barEmpty;
         ctx.fillRect(x, y, barWidth, barH);
 
-        ctx.fillStyle = '#8b949e';
-        ctx.font = '11px sans-serif';
+        ctx.fillStyle = THEME.textMuted;
+        ctx.font = cf(11);
         ctx.textAlign = 'center';
         ctx.save();
-        ctx.translate(x + barWidth / 2, chartBottom + 14);
-        ctx.rotate(-0.4);
+        ctx.translate(x + barWidth / 2, chartBottom + Math.round(14 * HD_SCALE));
+        ctx.rotate(-0.35);
         ctx.fillText(m.label, 0, 0);
         ctx.restore();
 
-        if (barH > 14) {
-            ctx.fillStyle = '#e6edf3';
-            ctx.font = '10px sans-serif';
-            ctx.fillText(`${m.count}/${m.daysInMonth}`, x + barWidth / 2, y + barH / 2 + 4);
+        const pct = m.daysInMonth > 0 ? ((m.count / m.daysInMonth) * 100).toFixed(0) : '0';
+        const line1 = `${m.count}/${m.daysInMonth}`;
+        const line2 = `${pct}%`;
+        const lineSpacing = Math.round(5 * HD_SCALE);
+        const cx = x + barWidth / 2;
+        ctx.font = cf(10);
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        const twoLineMinBarH = Math.round(26 * HD_SCALE);
+        if (barH > twoLineMinBarH) {
+            const cy = y + barH / 2;
+            ctx.fillStyle = THEME.text;
+            ctx.fillText(line1, cx, cy - lineSpacing);
+            ctx.fillText(line2, cx, cy + lineSpacing);
+        } else {
+            ctx.fillStyle = THEME.textMuted;
+            const cy = y - Math.round(12 * HD_SCALE);
+            ctx.fillText(line1, cx, cy - lineSpacing);
+            ctx.fillText(line2, cx, cy + lineSpacing);
         }
     }
 
-    ctx.strokeStyle = '#484f58';
-    ctx.lineWidth = 1;
+    ctx.strokeStyle = THEME.axis;
+    ctx.lineWidth = HD_SCALE;
     ctx.beginPath();
     ctx.moveTo(chartLeft, chartTop);
     ctx.lineTo(chartLeft, chartBottom);
     ctx.lineTo(chartRight, chartBottom);
     ctx.stroke();
 
-    ctx.fillStyle = '#8b949e';
-    ctx.font = '12px sans-serif';
+    ctx.fillStyle = THEME.textMuted;
+    ctx.font = cf(12);
     ctx.textAlign = 'center';
-    ctx.fillText('Days with play', CHART_WIDTH / 2, CHART_HEIGHT - 8);
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillText('Days with play · % of month', CHART_WIDTH / 2, CHART_HEIGHT - Math.round(10 * HD_SCALE));
 
     return canvas;
 }
@@ -540,12 +723,12 @@ function drawWeeklyChart(data) {
     const canvas = createCanvas(CHART_WIDTH, CHART_HEIGHT);
     const ctx = canvas.getContext('2d');
 
-    ctx.fillStyle = '#0d1117';
+    ctx.fillStyle = THEME.bg;
     ctx.fillRect(0, 0, CHART_WIDTH, CHART_HEIGHT);
-    ctx.fillStyle = '#e6edf3';
-    ctx.font = 'bold 20px sans-serif';
+    ctx.fillStyle = THEME.text;
+    ctx.font = `bold ${Math.round(20 * HD_SCALE)}px sans-serif`;
     ctx.textAlign = 'center';
-    ctx.fillText('Play time per week (last 26 weeks)', CHART_WIDTH / 2, 32);
+    ctx.fillText('Play time per week (last 26 weeks)', CHART_WIDTH / 2, Math.round(32 * HD_SCALE));
 
     const chartLeft = CHART_PADDING.left;
     const chartRight = CHART_WIDTH - CHART_PADDING.right;
@@ -555,7 +738,10 @@ function drawWeeklyChart(data) {
     const chartHeight = chartBottom - chartTop;
     const list = weekly.slice(0, 26);
     const maxMs = Math.max(...list.map(w => w.ms), 1);
-    const barGap = 2;
+    const maxHours = maxMs / (1000 * 60 * 60);
+    drawYAxisLabels(ctx, chartLeft, chartTop, chartBottom, chartRight, maxHours, v => `${v.toFixed(v >= 10 ? 0 : 1)}h`);
+
+    const barGap = 2 * HD_SCALE;
     const barWidth = (chartWidth - barGap * (list.length - 1)) / list.length;
 
     for (let i = 0; i < list.length; i++) {
@@ -563,19 +749,32 @@ function drawWeeklyChart(data) {
         const barH = maxMs > 0 ? (w.ms / maxMs) * chartHeight : 0;
         const x = chartLeft + i * (barWidth + barGap);
         const y = chartBottom - barH;
-        ctx.fillStyle = barH > 0 ? '#238636' : '#30363d';
+        ctx.fillStyle = barH > 0 ? BAR_PALETTE[i % BAR_PALETTE.length] : THEME.barEmpty;
         ctx.fillRect(x, y, barWidth, barH);
+        const hrs = w.ms / (1000 * 60 * 60);
+        const hStr = hrs >= 10 ? `${hrs.toFixed(0)}h` : `${hrs.toFixed(1)}h`;
+        ctx.font = cf(7);
+        ctx.textAlign = 'center';
+        if (barH > Math.round(14 * HD_SCALE)) {
+            ctx.fillStyle = THEME.text;
+            ctx.fillText(hStr, x + barWidth / 2, y + barH / 2 + Math.round(3 * HD_SCALE));
+        } else if (hrs > 0) {
+            ctx.fillStyle = THEME.textMuted;
+            const ly = y - Math.round(3 * HD_SCALE);
+            ctx.fillText(hStr, x + barWidth / 2, ly < chartTop + Math.round(10 * HD_SCALE) ? y + barH + Math.round(10 * HD_SCALE) : ly);
+        }
     }
-    ctx.strokeStyle = '#484f58';
-    ctx.lineWidth = 1;
+    ctx.strokeStyle = THEME.axis;
+    ctx.lineWidth = HD_SCALE;
     ctx.beginPath();
-    ctx.moveTo(chartLeft, chartBottom);
+    ctx.moveTo(chartLeft, chartTop);
+    ctx.lineTo(chartLeft, chartBottom);
     ctx.lineTo(chartRight, chartBottom);
     ctx.stroke();
-    ctx.fillStyle = '#8b949e';
-    ctx.font = '11px sans-serif';
+    ctx.fillStyle = THEME.textMuted;
+    ctx.font = cf(11);
     ctx.textAlign = 'center';
-    ctx.fillText('Most recent →', CHART_WIDTH / 2, CHART_HEIGHT - 10);
+    ctx.fillText('Oldest weeks ← … → Most recent (right) · hours on/above bars', CHART_WIDTH / 2, CHART_HEIGHT - Math.round(14 * HD_SCALE));
     return canvas;
 }
 
@@ -584,12 +783,12 @@ function drawDailyDistributionChart(data) {
     const canvas = createCanvas(CHART_WIDTH, CHART_HEIGHT);
     const ctx = canvas.getContext('2d');
 
-    ctx.fillStyle = '#0d1117';
+    ctx.fillStyle = THEME.bg;
     ctx.fillRect(0, 0, CHART_WIDTH, CHART_HEIGHT);
-    ctx.fillStyle = '#e6edf3';
-    ctx.font = 'bold 20px sans-serif';
+    ctx.fillStyle = THEME.text;
+    ctx.font = `bold ${Math.round(20 * HD_SCALE)}px sans-serif`;
     ctx.textAlign = 'center';
-    ctx.fillText('How many days in each play-time bucket (year)', CHART_WIDTH / 2, 32);
+    ctx.fillText('How many days in each play-time bucket (year)', CHART_WIDTH / 2, Math.round(32 * HD_SCALE));
 
     const chartLeft = CHART_PADDING.left;
     const chartRight = CHART_WIDTH - CHART_PADDING.right;
@@ -598,9 +797,12 @@ function drawDailyDistributionChart(data) {
     const chartWidth = chartRight - chartLeft;
     const chartHeight = chartBottom - chartTop;
     const maxCount = Math.max(...dailyDistribution.map(d => d.count), 1);
-    const barGap = 12;
+    drawYAxisLabels(ctx, chartLeft, chartTop, chartBottom, chartRight, maxCount, v => String(Math.round(v)));
+
+    const barGap = 12 * HD_SCALE;
     const barWidth = (chartWidth - barGap * (dailyDistribution.length - 1)) / dailyDistribution.length;
-    const colors = ['#484f58', '#9be9a8', '#40c463', '#30a14e', '#216e39'];
+    const colors = [THEME.barEmpty, '#6ee7b7', '#34d399', '#10b981', '#047857'];
+    const totalDays = dailyDistribution.reduce((a, d) => a + d.count, 0);
 
     for (let i = 0; i < dailyDistribution.length; i++) {
         const d = dailyDistribution[i];
@@ -609,23 +811,35 @@ function drawDailyDistributionChart(data) {
         const y = chartBottom - barH;
         ctx.fillStyle = colors[i];
         ctx.fillRect(x, y, barWidth, barH);
-        ctx.fillStyle = '#8b949e';
-        ctx.font = '12px sans-serif';
+        ctx.strokeStyle = THEME.bgGrid;
+        ctx.lineWidth = 1;
+        ctx.strokeRect(x + 0.5, y + 0.5, barWidth - 1, barH - 1);
+        ctx.fillStyle = THEME.textMuted;
+        ctx.font = cf(12);
         ctx.textAlign = 'center';
-        ctx.fillText(d.label, x + barWidth / 2, chartBottom + 20);
-        if (barH > 14) {
-            ctx.fillStyle = '#e6edf3';
-            ctx.font = '11px sans-serif';
-            ctx.fillText(String(d.count), x + barWidth / 2, y + barH / 2 + 4);
+        ctx.fillText(d.label, x + barWidth / 2, chartBottom + Math.round(22 * HD_SCALE));
+        const pct = totalDays > 0 ? ((d.count / totalDays) * 100).toFixed(0) : '0';
+        const label = `${d.count} d (${pct}%)`;
+        ctx.font = cf(11);
+        if (barH > Math.round(22 * HD_SCALE)) {
+            ctx.fillStyle = THEME.text;
+            ctx.fillText(label, x + barWidth / 2, y + barH / 2 + Math.round(4 * HD_SCALE));
+        } else {
+            ctx.fillStyle = THEME.textMuted;
+            ctx.fillText(label, x + barWidth / 2, y - Math.round(6 * HD_SCALE));
         }
     }
-    ctx.strokeStyle = '#484f58';
-    ctx.lineWidth = 1;
+    ctx.strokeStyle = THEME.axis;
+    ctx.lineWidth = HD_SCALE;
     ctx.beginPath();
     ctx.moveTo(chartLeft, chartTop);
     ctx.lineTo(chartLeft, chartBottom);
     ctx.lineTo(chartRight, chartBottom);
     ctx.stroke();
+    ctx.fillStyle = THEME.textMuted;
+    ctx.font = cf(11);
+    ctx.textAlign = 'center';
+    ctx.fillText('Day count · % of year', CHART_WIDTH / 2, CHART_HEIGHT - Math.round(12 * HD_SCALE));
     return canvas;
 }
 
@@ -634,12 +848,12 @@ function drawLast30Chart(data) {
     const canvas = createCanvas(CHART_WIDTH, CHART_HEIGHT);
     const ctx = canvas.getContext('2d');
 
-    ctx.fillStyle = '#0d1117';
+    ctx.fillStyle = THEME.bg;
     ctx.fillRect(0, 0, CHART_WIDTH, CHART_HEIGHT);
-    ctx.fillStyle = '#e6edf3';
-    ctx.font = 'bold 20px sans-serif';
+    ctx.fillStyle = THEME.text;
+    ctx.font = `bold ${Math.round(20 * HD_SCALE)}px sans-serif`;
     ctx.textAlign = 'center';
-    ctx.fillText('Last 30 days — play time per day', CHART_WIDTH / 2, 32);
+    ctx.fillText('Last 30 days — play time per day', CHART_WIDTH / 2, Math.round(32 * HD_SCALE));
 
     const chartLeft = CHART_PADDING.left;
     const chartRight = CHART_WIDTH - CHART_PADDING.right;
@@ -648,7 +862,10 @@ function drawLast30Chart(data) {
     const chartWidth = chartRight - chartLeft;
     const chartHeight = chartBottom - chartTop;
     const maxMs = Math.max(...last30Days, 1);
-    const barGap = 2;
+    const maxHours = maxMs / (1000 * 60 * 60);
+    drawYAxisLabels(ctx, chartLeft, chartTop, chartBottom, chartRight, maxHours, v => `${v.toFixed(v >= 10 ? 0 : 1)}h`);
+
+    const barGap = 2 * HD_SCALE;
     const barWidth = (chartWidth - barGap * (last30Days.length - 1)) / last30Days.length;
 
     for (let i = 0; i < last30Days.length; i++) {
@@ -656,19 +873,45 @@ function drawLast30Chart(data) {
         const barH = maxMs > 0 ? (ms / maxMs) * chartHeight : 0;
         const x = chartLeft + i * (barWidth + barGap);
         const y = chartBottom - barH;
-        ctx.fillStyle = barH > 0 ? '#238636' : '#30363d';
+        ctx.fillStyle = barH > 0 ? BAR_PALETTE[i % BAR_PALETTE.length] : THEME.barEmpty;
         ctx.fillRect(x, y, barWidth, barH);
+        const hrs = ms / (1000 * 60 * 60);
+        const hStr = hrs >= 1 ? `${hrs.toFixed(1)}h` : ms > 0 ? `${Math.round(ms / 60000)}m` : '';
+        if (hStr) {
+            ctx.font = cf(7);
+            ctx.textAlign = 'center';
+            if (barH > Math.round(16 * HD_SCALE)) {
+                ctx.fillStyle = THEME.text;
+                ctx.fillText(hStr, x + barWidth / 2, y + barH / 2 + Math.round(3 * HD_SCALE));
+            } else {
+                ctx.fillStyle = THEME.textMuted;
+                const ly = y - Math.round(2 * HD_SCALE);
+                ctx.fillText(hStr, x + barWidth / 2, ly < chartTop + Math.round(8 * HD_SCALE) ? y + barH + Math.round(9 * HD_SCALE) : ly);
+            }
+        }
     }
-    ctx.strokeStyle = '#484f58';
-    ctx.lineWidth = 1;
+    ctx.strokeStyle = THEME.axis;
+    ctx.lineWidth = HD_SCALE;
     ctx.beginPath();
-    ctx.moveTo(chartLeft, chartBottom);
+    ctx.moveTo(chartLeft, chartTop);
+    ctx.lineTo(chartLeft, chartBottom);
     ctx.lineTo(chartRight, chartBottom);
     ctx.stroke();
-    ctx.fillStyle = '#8b949e';
-    ctx.font = '11px sans-serif';
+
+    ctx.fillStyle = THEME.textMuted;
+    ctx.font = cf(9);
     ctx.textAlign = 'center';
-    ctx.fillText('30 days ago → today', CHART_WIDTH / 2, CHART_HEIGHT - 10);
+    for (let i = 0; i < last30Days.length; i += 5) {
+        const x = chartLeft + i * (barWidth + barGap) + barWidth / 2;
+        const daysAgo = 30 - i;
+        const lab = daysAgo <= 0 ? 'today' : daysAgo === 1 ? 'yesterday' : `−${daysAgo}d`;
+        ctx.fillText(lab, x, chartBottom + Math.round(20 * HD_SCALE));
+    }
+    const lastI = last30Days.length - 1;
+    const lastX = chartLeft + lastI * (barWidth + barGap) + barWidth / 2;
+    ctx.fillText('today', lastX, chartBottom + Math.round(32 * HD_SCALE));
+    ctx.font = cf(11);
+    ctx.fillText('30 days ago → today (right)', CHART_WIDTH / 2, CHART_HEIGHT - Math.round(12 * HD_SCALE));
     return canvas;
 }
 
@@ -677,12 +920,12 @@ function drawCumulativeChart(data) {
     const canvas = createCanvas(CHART_WIDTH, CHART_HEIGHT);
     const ctx = canvas.getContext('2d');
 
-    ctx.fillStyle = '#0d1117';
+    ctx.fillStyle = THEME.bg;
     ctx.fillRect(0, 0, CHART_WIDTH, CHART_HEIGHT);
-    ctx.fillStyle = '#e6edf3';
-    ctx.font = 'bold 20px sans-serif';
+    ctx.fillStyle = THEME.text;
+    ctx.font = `bold ${Math.round(20 * HD_SCALE)}px sans-serif`;
     ctx.textAlign = 'center';
-    ctx.fillText('Cumulative play time over the year', CHART_WIDTH / 2, 32);
+    ctx.fillText('Cumulative play time over the year', CHART_WIDTH / 2, Math.round(32 * HD_SCALE));
 
     const chartLeft = CHART_PADDING.left;
     const chartRight = CHART_WIDTH - CHART_PADDING.right;
@@ -691,9 +934,26 @@ function drawCumulativeChart(data) {
     const chartWidth = chartRight - chartLeft;
     const chartHeight = chartBottom - chartTop;
     const maxCum = Math.max(...cumulative, 1);
+    const maxHours = maxCum / (1000 * 60 * 60);
+    drawYAxisLabels(ctx, chartLeft, chartTop, chartBottom, chartRight, maxHours, v => `${Math.round(v)}h`);
 
-    ctx.strokeStyle = '#238636';
-    ctx.lineWidth = 2;
+    const grad = ctx.createLinearGradient(chartLeft, chartTop, chartLeft, chartBottom);
+    grad.addColorStop(0, 'rgba(34, 197, 94, 0.35)');
+    grad.addColorStop(1, 'rgba(34, 197, 94, 0.02)');
+    ctx.beginPath();
+    ctx.moveTo(chartLeft, chartBottom);
+    for (let i = 0; i < cumulative.length; i++) {
+        const x = chartLeft + (i / (cumulative.length - 1 || 1)) * chartWidth;
+        const y = chartBottom - (cumulative[i] / maxCum) * chartHeight;
+        ctx.lineTo(x, y);
+    }
+    ctx.lineTo(chartRight, chartBottom);
+    ctx.closePath();
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    ctx.strokeStyle = THEME.accent;
+    ctx.lineWidth = Math.round(2 * HD_SCALE);
     ctx.beginPath();
     for (let i = 0; i < cumulative.length; i++) {
         const x = chartLeft + (i / (cumulative.length - 1 || 1)) * chartWidth;
@@ -702,18 +962,18 @@ function drawCumulativeChart(data) {
         else ctx.lineTo(x, y);
     }
     ctx.stroke();
-    ctx.strokeStyle = '#484f58';
-    ctx.lineWidth = 1;
+    ctx.strokeStyle = THEME.axis;
+    ctx.lineWidth = HD_SCALE;
     ctx.beginPath();
     ctx.moveTo(chartLeft, chartTop);
     ctx.lineTo(chartLeft, chartBottom);
     ctx.lineTo(chartRight, chartBottom);
     ctx.stroke();
-    ctx.fillStyle = '#8b949e';
-    ctx.font = '12px sans-serif';
+    ctx.fillStyle = THEME.textMuted;
+    ctx.font = cf(12);
     ctx.textAlign = 'center';
-    const totalH = (cumulative[cumulative.length - 1] / (1000 * 60 * 60)).toFixed(0);
-    ctx.fillText(`Total: ${totalH} hours by end of period`, CHART_WIDTH / 2, CHART_HEIGHT - 10);
+    const totalH = (cumulative[cumulative.length - 1] / (1000 * 60 * 60)).toFixed(1);
+    ctx.fillText(`End total: ${totalH} h · Y-axis: cumulative hours`, CHART_WIDTH / 2, CHART_HEIGHT - Math.round(12 * HD_SCALE));
     return canvas;
 }
 
@@ -722,12 +982,12 @@ function drawGamesPerMonthChart(data) {
     const canvas = createCanvas(CHART_WIDTH, CHART_HEIGHT);
     const ctx = canvas.getContext('2d');
 
-    ctx.fillStyle = '#0d1117';
+    ctx.fillStyle = THEME.bg;
     ctx.fillRect(0, 0, CHART_WIDTH, CHART_HEIGHT);
-    ctx.fillStyle = '#e6edf3';
-    ctx.font = 'bold 20px sans-serif';
+    ctx.fillStyle = THEME.text;
+    ctx.font = `bold ${Math.round(20 * HD_SCALE)}px sans-serif`;
     ctx.textAlign = 'center';
-    ctx.fillText('Unique games played per month (last 12 months)', CHART_WIDTH / 2, 32);
+    ctx.fillText('Unique games played per month (last 12 months)', CHART_WIDTH / 2, Math.round(32 * HD_SCALE));
 
     const chartLeft = CHART_PADDING.left;
     const chartRight = CHART_WIDTH - CHART_PADDING.right;
@@ -736,7 +996,9 @@ function drawGamesPerMonthChart(data) {
     const chartWidth = chartRight - chartLeft;
     const chartHeight = chartBottom - chartTop;
     const maxCount = Math.max(...gamesPerMonth.map(m => m.count), 1);
-    const barGap = 4;
+    drawYAxisLabels(ctx, chartLeft, chartTop, chartBottom, chartRight, maxCount, v => String(Math.round(v)));
+
+    const barGap = 4 * HD_SCALE;
     const barWidth = (chartWidth - barGap * (gamesPerMonth.length - 1)) / gamesPerMonth.length;
 
     for (let i = 0; i < gamesPerMonth.length; i++) {
@@ -744,29 +1006,38 @@ function drawGamesPerMonthChart(data) {
         const barH = maxCount > 0 ? (m.count / maxCount) * chartHeight : 0;
         const x = chartLeft + i * (barWidth + barGap);
         const y = chartBottom - barH;
-        ctx.fillStyle = barH > 0 ? '#238636' : '#30363d';
+        ctx.fillStyle = barH > 0 ? BAR_PALETTE[(i + 3) % BAR_PALETTE.length] : THEME.barEmpty;
         ctx.fillRect(x, y, barWidth, barH);
-        ctx.fillStyle = '#8b949e';
-        ctx.font = '11px sans-serif';
+        ctx.fillStyle = THEME.textMuted;
+        ctx.font = cf(11);
         ctx.textAlign = 'center';
         ctx.save();
-        ctx.translate(x + barWidth / 2, chartBottom + 14);
-        ctx.rotate(-0.4);
+        ctx.translate(x + barWidth / 2, chartBottom + Math.round(14 * HD_SCALE));
+        ctx.rotate(-0.35);
         ctx.fillText(m.label, 0, 0);
         ctx.restore();
-        if (barH > 14) {
-            ctx.fillStyle = '#e6edf3';
-            ctx.font = '10px sans-serif';
-            ctx.fillText(String(m.count), x + barWidth / 2, y + barH / 2 + 4);
+        const label = `${m.count} games`;
+        ctx.font = cf(10);
+        ctx.textAlign = 'center';
+        if (barH > Math.round(16 * HD_SCALE)) {
+            ctx.fillStyle = THEME.text;
+            ctx.fillText(label, x + barWidth / 2, y + barH / 2 + Math.round(4 * HD_SCALE));
+        } else {
+            ctx.fillStyle = THEME.textMuted;
+            ctx.fillText(label, x + barWidth / 2, y - Math.round(6 * HD_SCALE));
         }
     }
-    ctx.strokeStyle = '#484f58';
-    ctx.lineWidth = 1;
+    ctx.strokeStyle = THEME.axis;
+    ctx.lineWidth = HD_SCALE;
     ctx.beginPath();
     ctx.moveTo(chartLeft, chartTop);
     ctx.lineTo(chartLeft, chartBottom);
     ctx.lineTo(chartRight, chartBottom);
     ctx.stroke();
+    ctx.fillStyle = THEME.textMuted;
+    ctx.font = cf(11);
+    ctx.textAlign = 'center';
+    ctx.fillText('Distinct titles that month', CHART_WIDTH / 2, CHART_HEIGHT - Math.round(12 * HD_SCALE));
     return canvas;
 }
 
@@ -775,17 +1046,18 @@ function drawTopGamesPieChart(data) {
     const canvas = createCanvas(CHART_WIDTH, CHART_HEIGHT);
     const ctx = canvas.getContext('2d');
 
-    ctx.fillStyle = '#0d1117';
+    ctx.fillStyle = THEME.bg;
     ctx.fillRect(0, 0, CHART_WIDTH, CHART_HEIGHT);
-    ctx.fillStyle = '#e6edf3';
-    ctx.font = 'bold 20px sans-serif';
+    ctx.fillStyle = THEME.text;
+    ctx.font = `bold ${Math.round(20 * HD_SCALE)}px sans-serif`;
     ctx.textAlign = 'center';
-    ctx.fillText('Play time share — top 6 games (year)', CHART_WIDTH / 2, 32);
+    ctx.fillText('Play time share — top 6 games (year)', CHART_WIDTH / 2, Math.round(32 * HD_SCALE));
 
     const list = topGames.slice(0, 6);
     if (list.length === 0) {
-        ctx.fillStyle = '#8b949e';
-        ctx.font = '16px sans-serif';
+        ctx.fillStyle = THEME.textMuted;
+        ctx.font = cf(16);
+        ctx.textAlign = 'center';
         ctx.fillText('No game data for the past year', CHART_WIDTH / 2, CHART_HEIGHT / 2);
         return canvas;
     }
@@ -793,9 +1065,9 @@ function drawTopGamesPieChart(data) {
     if (totalMs === 0) return canvas;
 
     const cx = CHART_WIDTH / 2;
-    const cy = 80 + (CHART_HEIGHT - 120) / 2;
-    const radius = Math.min(180, (CHART_HEIGHT - 120) / 2 - 20);
-    const colors = ['#238636', '#2ea043', '#56d364', '#7ee787', '#9be9a8', '#40c463'];
+    const cy = Math.round(80 * HD_SCALE) + (CHART_HEIGHT - Math.round(120 * HD_SCALE)) / 2;
+    const radius = Math.min(Math.round(180 * HD_SCALE), (CHART_HEIGHT - Math.round(120 * HD_SCALE)) / 2 - Math.round(20 * HD_SCALE));
+    const colors = BAR_PALETTE.slice(0, 6);
     let startAngle = -Math.PI / 2;
 
     for (let i = 0; i < list.length; i++) {
@@ -807,108 +1079,206 @@ function drawTopGamesPieChart(data) {
         ctx.arc(cx, cy, radius, startAngle, startAngle + slice);
         ctx.closePath();
         ctx.fill();
-        ctx.strokeStyle = '#0d1117';
-        ctx.lineWidth = 2;
+        ctx.strokeStyle = THEME.bg;
+        ctx.lineWidth = Math.round(2 * HD_SCALE);
         ctx.stroke();
+        const mid = startAngle + slice / 2;
+        const lr = radius * 0.62;
+        const lx = cx + Math.cos(mid) * lr;
+        const ly = cy + Math.sin(mid) * lr;
+        const pct = totalMs > 0 ? ((g.ms / totalMs) * 100).toFixed(0) : 0;
+        ctx.fillStyle = THEME.text;
+        ctx.font = cf(12);
+        ctx.textAlign = 'center';
+        ctx.fillText(`${pct}%`, lx, ly + Math.round(4 * HD_SCALE));
         startAngle += slice;
     }
 
-    const legendY = 60;
-    const lineH = 22;
+    const legendY = Math.round(60 * HD_SCALE);
+    const lineH = Math.round(24 * HD_SCALE);
     for (let i = 0; i < list.length; i++) {
         const g = list[i];
         const pct = totalMs > 0 ? ((g.ms / totalMs) * 100).toFixed(0) : 0;
         const name = g.name.length > 24 ? g.name.slice(0, 21) + '...' : g.name;
+        const hours = (g.ms / (1000 * 60 * 60)).toFixed(1);
         ctx.fillStyle = colors[i % colors.length];
-        ctx.fillRect(CHART_PADDING.left, legendY + i * lineH, 14, 14);
-        ctx.fillStyle = '#e6edf3';
-        ctx.font = '12px sans-serif';
+        ctx.fillRect(CHART_PADDING.left, legendY + i * lineH, Math.round(14 * HD_SCALE), Math.round(14 * HD_SCALE));
+        ctx.fillStyle = THEME.text;
+        ctx.font = cf(12);
         ctx.textAlign = 'left';
-        ctx.fillText(`${name} — ${pct}%`, CHART_PADDING.left + 20, legendY + i * lineH + 12);
+        ctx.fillText(`${name} — ${pct}% (${hours} h)`, CHART_PADDING.left + Math.round(22 * HD_SCALE), legendY + i * lineH + Math.round(12 * HD_SCALE));
     }
     return canvas;
 }
 
-function drawWordCloudChart(data) {
+/** wordcloud (wordcloud2.js) expects browser globals — set once before first require. See https://www.npmjs.com/package/wordcloud */
+let wordCloudGlobalsReady = false;
+function ensureWordCloudBrowserGlobals() {
+    if (wordCloudGlobalsReady) return;
+    const nodeCanvas = require('canvas');
+    const { JSDOM } = require('jsdom');
+    const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>', { canvas: nodeCanvas });
+    global.window = dom.window;
+    global.document = dom.window.document;
+    global.navigator = dom.window.navigator;
+    global.CustomEvent = dom.window.CustomEvent;
+    wordCloudGlobalsReady = true;
+}
+
+function getWordCloud() {
+    ensureWordCloudBrowserGlobals();
+    return require('wordcloud');
+}
+
+function runWordCloudOnCanvas(el, options) {
+    const WordCloud = getWordCloud();
+    return new Promise(resolve => {
+        el.addEventListener('wordcloudstop', () => resolve(), { once: true });
+        el.addEventListener('wordcloudabort', () => resolve(), { once: true });
+        WordCloud(el, options);
+    });
+}
+
+function wordColorFromPalette(word, palette) {
+    let h = 2166136261;
+    for (let i = 0; i < word.length; i++) {
+        h ^= word.charCodeAt(i);
+        h = Math.imul(h, 16777619);
+    }
+    return palette[(h >>> 0) % palette.length];
+}
+
+async function drawWordCloudChart(data) {
     const { allGames } = data;
-    const canvas = createCanvas(CHART_WIDTH, CHART_HEIGHT);
-    const ctx = canvas.getContext('2d');
+    const out = createCanvas(CHART_WIDTH, CHART_HEIGHT);
+    const octx = out.getContext('2d');
 
-    ctx.fillStyle = '#0d1117';
-    ctx.fillRect(0, 0, CHART_WIDTH, CHART_HEIGHT);
-    ctx.fillStyle = '#e6edf3';
-    ctx.font = 'bold 20px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('All games played (word cloud — size = play time)', CHART_WIDTH / 2, 32);
+    octx.fillStyle = THEME.bg;
+    octx.fillRect(0, 0, CHART_WIDTH, CHART_HEIGHT);
 
-    const chartLeft = CHART_PADDING.left;
-    const chartRight = CHART_WIDTH - CHART_PADDING.right;
-    const chartTop = CHART_PADDING.top;
-    const chartBottom = CHART_HEIGHT - CHART_PADDING.bottom;
-    const chartWidth = chartRight - chartLeft;
-    const chartHeight = chartBottom - chartTop;
+    const vignette = octx.createRadialGradient(
+        CHART_WIDTH / 2, CHART_HEIGHT / 2, 0,
+        CHART_WIDTH / 2, CHART_HEIGHT / 2, Math.max(CHART_WIDTH, CHART_HEIGHT) * 0.65,
+    );
+    vignette.addColorStop(0, 'rgba(30, 41, 59, 0)');
+    vignette.addColorStop(1, 'rgba(15, 23, 42, 0.55)');
+    octx.fillStyle = vignette;
+    octx.fillRect(0, 0, CHART_WIDTH, CHART_HEIGHT);
+
+    const header = Math.round(40 * HD_SCALE);
+    const footer = Math.round(26 * HD_SCALE);
+    const wcW = CHART_WIDTH;
+    const wcH = Math.max(80, CHART_HEIGHT - header - footer);
 
     if (allGames.length === 0) {
-        ctx.fillStyle = '#8b949e';
-        ctx.font = '16px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText('No game data for the past year', CHART_WIDTH / 2, CHART_HEIGHT / 2);
-        return canvas;
+        octx.fillStyle = THEME.text;
+        octx.font = `bold ${Math.round(20 * HD_SCALE)}px sans-serif`;
+        octx.textAlign = 'center';
+        octx.fillText('All games played', CHART_WIDTH / 2, Math.round(32 * HD_SCALE));
+        octx.fillStyle = THEME.textMuted;
+        octx.font = cf(16);
+        octx.fillText('No game data for the past year', CHART_WIDTH / 2, CHART_HEIGHT / 2);
+        return out;
     }
 
-    const maxMs = Math.max(...allGames.map(g => g.ms), 1);
-    const minFont = 9;
-    const maxFont = 20;
-    const pad = 8;
-    let x = chartLeft;
-    let y = chartTop;
-    let lineHeight = 0;
-    const greenShades = ['#9be9a8', '#56d364', '#40c463', '#30a14e', '#238636', '#216e39', '#125a1e'];
+    ensureWordCloudBrowserGlobals();
+    const wcEl = global.document.createElement('canvas');
+    wcEl.width = wcW;
+    wcEl.height = wcH;
 
-    for (const g of allGames) {
-        const ratio = maxMs > 0 ? Math.sqrt(g.ms / maxMs) : 0;
-        const fontSize = Math.round(minFont + ratio * (maxFont - minFont));
-        const name = g.name.length > 25 ? g.name.slice(0, 22) + '...' : g.name;
+    const maxWords = 52;
+    const games = allGames.slice(0, maxWords);
+    const maxMs = Math.max(...games.map(g => g.ms), 1);
+    const palette = [...BAR_PALETTE, '#5eead4', '#93c5fd', '#fcd34d', '#fca5a5', '#cbd5e1'];
+
+    const list = games.map(g => {
         const hours = g.ms / (1000 * 60 * 60);
         const minutes = Math.floor(g.ms / (1000 * 60));
         const timeStr = hours >= 0.05 ? `${hours.toFixed(1)}h` : minutes >= 1 ? `${minutes}m` : `${Math.round(g.ms / 1000)}s`;
-        const text = `${name} ${timeStr}`;
-        ctx.font = `${fontSize}px sans-serif`;
-        const metrics = ctx.measureText(text);
-        const w = metrics.width;
-        if (x + w > chartRight && x > chartLeft) {
-            x = chartLeft;
-            y += lineHeight + 4;
-            lineHeight = 0;
-        }
-        lineHeight = Math.max(lineHeight, fontSize);
-        const colorIndex = Math.min(Math.floor(ratio * greenShades.length), greenShades.length - 1);
-        ctx.fillStyle = greenShades[colorIndex];
-        ctx.textAlign = 'left';
-        ctx.fillText(text, x, y + fontSize);
-        x += w + pad;
-    }
+        const suffix = ` · ${timeStr}`;
+        const maxName = Math.max(12, 48 - suffix.length);
+        const name = g.name.length > maxName ? `${g.name.slice(0, maxName - 1)}…` : g.name;
+        const label = `${name}${suffix}`;
+        const weight = Math.max(1, Math.round((g.ms / maxMs) * 100));
+        return [label, weight];
+    });
 
-    return canvas;
+    await runWordCloudOnCanvas(wcEl, {
+        list,
+        gridSize: Math.max(4, Math.round(8 * HD_SCALE)),
+        weightFactor(w) {
+            return Math.max(
+                Math.round(10 * HD_SCALE),
+                Math.min(Math.round(34 * HD_SCALE), w * (0.28 * HD_SCALE)),
+            );
+        },
+        fontFamily: 'sans-serif',
+        fontWeight: 'normal',
+        color(word) {
+            return wordColorFromPalette(String(word), palette);
+        },
+        backgroundColor: THEME.bg,
+        minSize: Math.round(8 * HD_SCALE),
+        rotateRatio: 0.35,
+        rotationSteps: 2,
+        minRotation: -Math.PI / 5,
+        maxRotation: Math.PI / 5,
+        shrinkToFit: true,
+        drawOutOfBound: false,
+        ellipticity: 0.65,
+        shape: 'circle',
+        wait: 0,
+        clearCanvas: true,
+    });
+
+    const b64 = wcEl.toDataURL('image/png').replace(/^data:image\/png;base64,/, '');
+    const img = await loadImage(Buffer.from(b64, 'base64'));
+    octx.drawImage(img, 0, header, wcW, wcH);
+
+    octx.fillStyle = THEME.text;
+    octx.font = `bold ${Math.round(20 * HD_SCALE)}px sans-serif`;
+    octx.textAlign = 'center';
+    octx.fillText('All games played (wordcloud)', CHART_WIDTH / 2, Math.round(28 * HD_SCALE));
+
+    octx.fillStyle = THEME.textMuted;
+    octx.font = cf(11);
+    octx.fillText('wordcloud — each tag: game · hours played (size ∝ time)', CHART_WIDTH / 2, CHART_HEIGHT - Math.round(10 * HD_SCALE));
+
+    return out;
 }
 
-// Combined image: all charts in one PNG (2 columns x 6 rows, 600x350 per cell)
-const COMBINED_CELL_W = 600;
-const COMBINED_CELL_H = 350;
+// Combined image: full-width header + 2×6 grid (row 0 uses COMBINED_CELL_H_TOP; others COMBINED_CELL_H).
 const COMBINED_COLS = 2;
 const COMBINED_ROWS = 6;
 
-function buildCombinedGraph(data) {
+const COMBINED_TITLE_PAD_TOP = Math.round(14 * HD_SCALE);
+const COMBINED_HEADER_H = (() => {
+    const vs = 1;
+    const off = COMBINED_TITLE_PAD_TOP;
+    const line1 = off + Math.round(38 * HD_SCALE * vs);
+    const subtitlePx = Math.round(19 * HD_SCALE * vs);
+    const line2 = line1 + Math.round(subtitlePx * 1.28) + Math.round(6 * HD_SCALE * vs);
+    const namePx = Math.round(34 * HD_SCALE * vs);
+    return line2 + Math.round(namePx * 0.35) + Math.round(14 * HD_SCALE);
+})();
+
+async function buildCombinedGraph(data, userLabel) {
     const width = COMBINED_CELL_W * COMBINED_COLS;
-    const height = COMBINED_CELL_H * COMBINED_ROWS;
+    const height =
+        COMBINED_HEADER_H +
+        COMBINED_CELL_H_TOP +
+        COMBINED_CELL_H * (COMBINED_ROWS - 1);
     const canvas = createCanvas(width, height);
     const ctx = canvas.getContext('2d');
 
     ctx.fillStyle = '#0d1117';
     ctx.fillRect(0, 0, width, height);
+    ctx.fillStyle = THEME.bg;
+    ctx.fillRect(0, 0, width, COMBINED_HEADER_H);
+    drawYearInALifeTitle(ctx, width, userLabel, COMBINED_TITLE_PAD_TOP, 1);
 
     const charts = [
-        () => drawYearInALifeGraph(data),
+        () => drawYearInALifeGraph(data, userLabel, { omitTitle: true }),
         () => drawMonthlyChart(data),
         () => drawTopGamesChart(data),
         () => drawWeekdayChart(data),
@@ -926,9 +1296,13 @@ function buildCombinedGraph(data) {
         const col = i % COMBINED_COLS;
         const row = Math.floor(i / COMBINED_COLS);
         const px = col * COMBINED_CELL_W;
-        const py = row * COMBINED_CELL_H;
-        const chartCanvas = charts[i]();
-        ctx.drawImage(chartCanvas, 0, 0, chartCanvas.width, chartCanvas.height, px, py, COMBINED_CELL_W, COMBINED_CELL_H);
+        const py =
+            row === 0
+                ? COMBINED_HEADER_H
+                : COMBINED_HEADER_H + COMBINED_CELL_H_TOP + (row - 1) * COMBINED_CELL_H;
+        const cellH = row === 0 ? COMBINED_CELL_H_TOP : COMBINED_CELL_H;
+        const chartCanvas = await Promise.resolve(charts[i]());
+        ctx.drawImage(chartCanvas, 0, 0, chartCanvas.width, chartCanvas.height, px, py, COMBINED_CELL_W, cellH);
     }
 
     return canvas;
@@ -960,13 +1334,13 @@ module.exports = {
 
         try {
             const data = await fetchYearData(userId);
-            const canvas = buildCombinedGraph(data);
+            const canvas = await buildCombinedGraph(data, userLabel);
             const buffer = canvas.toBuffer('image/png');
             const attachment = new AttachmentBuilder(buffer, { name: 'yitlpp.png' });
 
             const totalHours = (data.totalMs / (1000 * 60 * 60)).toFixed(1);
             const embed = new EmbedBuilder()
-                .setColor(0x238636)
+                .setColor(0x22c55e)
                 .setTitle(`Year in the life of PP — ${userLabel} (all stats)`)
                 .setDescription(`**${totalHours}** hours in the past 365 days. All graphs in one image below.`)
                 .setImage('attachment://yitlpp.png')
