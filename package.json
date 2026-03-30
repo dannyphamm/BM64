@@ -19,6 +19,7 @@
         "@napi-rs/canvas": "^0.1.77",
         "axios": "^1.11.0",
         "chart.js": "^4.5.0",
+        "chartjs-node-canvas": "^5.0.0",
         "cheerio": "^1.1.2",
         "deep-object-diff": "^1.1.9",
         "distube": "^5.0.7",
@@ -30,7 +31,8 @@
         "npm": "^11.5.2",
         "sharp": "^0.34.3",
         "socket.io": "^4.8.1",
-        "spotify-web-api-node": "^5.0.2"
+        "spotify-web-api-node": "^5.0.2",
+        "wordcloud": "^1.2.3"
     },
     "devDependencies": {
         "@discordjs/rest": "^2.6.0",
