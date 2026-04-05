@@ -81,14 +81,26 @@ function parseDailySummaryMessage(content, messageCreatedAt) {
         dateString = d.toISOString().split('T')[0];
     }
 
+    // Same line as pp.js: `🎮 **Games Played:** ${n}\n\n` then per-game blocks.
+    // Do not parse the header with the game regex: with /s, (.+?) can span lines and pair
+    // the first ** with **Fortnite**'s closer, producing a bogus first "game".
+    let gameSection = content;
+    const headerRe = /🎮\s*\*\*Games Played:\*\*\s*\d+\s*\n\s*\n/;
+    const headerMatch = headerRe.exec(content);
+    if (headerMatch) {
+        gameSection = content.slice(headerMatch.index + headerMatch[0].length);
+    }
+
     const games = [];
-    const gameRe = /🎮\s*\*\*(.+?)\*\*\s*\n⏱️\s*Total time:\s*([^\n]+)\n📈\s*Sessions:\s*(\d+)/gs;
+    // No dotAll: game title must stay on one line (matches pp.js output).
+    const gameRe = /🎮\s*\*\*(.+?)\*\*\s*\n⏱️\s*Total time:\s*([^\n]+)\n📈\s*Sessions:\s*(\d+)/g;
     let gm;
-    while ((gm = gameRe.exec(content)) !== null) {
+    while ((gm = gameRe.exec(gameSection)) !== null) {
         const name = gm[1].trim();
         const totalDuration = parseTimeToMs(gm[2]);
         const sessions = parseInt(gm[3], 10);
         if (!name || Number.isNaN(sessions)) continue;
+        if (/^Games Played$/i.test(name)) continue;
         games.push({ name, totalDuration, sessions });
     }
 
