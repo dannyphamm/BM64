@@ -41,10 +41,13 @@ function getDailyGameStats(userId) {
 }
 
 // Persist current in-memory stats to DB (no Discord message). Run periodically so DB is updated during the day.
+// Skip when there is nothing to flush: after midnight, sendDailyGameSummary() clears memory; a flush with an
+// empty map would upsert zeros and wipe the row the summary just wrote for that calendar day.
 async function flushDailyStatsToDatabase() {
     if (config.mode === 'DEV') return;
     for (const u of getTrackedUsers()) {
         const stats = getDailyGameStats(u.userId);
+        if (stats.games.size === 0) continue;
         const gamesArray = Array.from(stats.games.entries()).map(([gameName, s]) => ({
             name: gameName,
             totalDuration: s.totalDuration,
@@ -54,8 +57,9 @@ async function flushDailyStatsToDatabase() {
     }
 }
 
-// Every 15 minutes: save current daily stats to DB so YITLPP and history stay up to date
-const flushStatsJob = schedule.scheduleJob('*/15 * * * *', async () => {
+// ~Every 15 minutes: save current daily stats to DB so YITLPP and history stay up to date.
+// Use minutes 5,20,35,50 (not :00) so this never runs in the same minute as the midnight daily summary.
+const flushStatsJob = schedule.scheduleJob('5,20,35,50 * * * *', async () => {
     await flushDailyStatsToDatabase();
 });
 
@@ -117,14 +121,12 @@ global.sendDailyGameSummary = async function() {
         }
 
         for (const u of getTrackedUsers()) {
-            const channel = global.discordClient.channels.cache.get(u.channelId);
-            if (!channel) continue;
-
             const stats = getDailyGameStats(u.userId);
 
             if (stats.games.size === 0) {
-                await channel.send('📊 **Daily Gaming Summary**\nNo games were played today.');
                 await saveDailyStatsToDatabase([], u.userId, u.username);
+                const channel = global.discordClient.channels.cache.get(u.channelId);
+                if (channel) await channel.send('📊 **Daily Gaming Summary**\nNo games were played today.');
                 continue;
             }
 
@@ -152,8 +154,9 @@ global.sendDailyGameSummary = async function() {
                 summaryMessage += `📈 Sessions: ${game.sessions}\n\n`;
             }
 
-            await channel.send(summaryMessage);
             await saveDailyStatsToDatabase(gamesArray, u.userId, u.username);
+            const channel = global.discordClient.channels.cache.get(u.channelId);
+            if (channel) await channel.send(summaryMessage);
         }
     } catch (err) {
         error('Error sending daily game summary:', err);
