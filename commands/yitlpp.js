@@ -515,6 +515,10 @@ function getYitlppChartRenderer() {
             height: CHART_HEIGHT,
             backgroundColour: THEME.bg,
             chartCallback: (ChartJS) => {
+                // Force Node/basic platform so Chart.js never switches to DOM canvas APIs.
+                if (typeof ChartJS.BasicPlatform === 'function') {
+                    ChartJS._detectPlatform = () => ChartJS.BasicPlatform;
+                }
                 ChartJS.defaults.font.family = 'sans-serif';
                 ChartJS.defaults.font.size = Math.round(11 * HD_SCALE);
                 ChartJS.defaults.color = THEME.textMuted;
