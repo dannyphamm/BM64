@@ -2,6 +2,7 @@ const { SlashCommandBuilder } = require('@discordjs/builders');
 const { AttachmentBuilder, EmbedBuilder } = require('discord.js');
 const { createCanvas, loadImage } = require('@napi-rs/canvas');
 const { ChartJSNodeCanvas } = require('chartjs-node-canvas');
+const nodeCanvas = require('canvas');
 const db = require('../utils/db');
 const config = require('../config.json');
 const { error } = require('../utils/utils');
@@ -508,17 +509,45 @@ function runWordcloud2OnCanvas(wcCanvas, options) {
 }
 
 let yitlppChartRenderer = null;
+let yitlppBasicPlatform = null;
+let nodeCanvasDomShimReady = false;
+
+function ensureNodeCanvasDomShim() {
+    if (nodeCanvasDomShimReady || !nodeCanvas || !nodeCanvas.Canvas) return;
+    const proto = nodeCanvas.Canvas.prototype;
+    if (typeof proto.getAttribute !== 'function') {
+        proto.getAttribute = function(name) {
+            if (name === 'width') return String(this.width);
+            if (name === 'height') return String(this.height);
+            return null;
+        };
+    }
+    if (typeof proto.setAttribute !== 'function') {
+        proto.setAttribute = function(name, value) {
+            if (name === 'width') this.width = Number(value);
+            if (name === 'height') this.height = Number(value);
+        };
+    }
+    if (typeof proto.removeAttribute !== 'function') {
+        proto.removeAttribute = function(name) {
+            if (name === 'width' || name === 'height') {
+                // Keep current numeric dimensions for node-canvas.
+                return;
+            }
+        };
+    }
+    nodeCanvasDomShimReady = true;
+}
+
 function getYitlppChartRenderer() {
     if (!yitlppChartRenderer) {
+        ensureNodeCanvasDomShim();
         yitlppChartRenderer = new ChartJSNodeCanvas({
             width: CHART_WIDTH,
             height: CHART_HEIGHT,
             backgroundColour: THEME.bg,
             chartCallback: (ChartJS) => {
-                // Force Node/basic platform so Chart.js never switches to DOM canvas APIs.
-                if (typeof ChartJS.BasicPlatform === 'function') {
-                    ChartJS._detectPlatform = () => ChartJS.BasicPlatform;
-                }
+                if (typeof ChartJS.BasicPlatform === 'function') yitlppBasicPlatform = ChartJS.BasicPlatform;
                 ChartJS.defaults.font.family = 'sans-serif';
                 ChartJS.defaults.font.size = Math.round(11 * HD_SCALE);
                 ChartJS.defaults.color = THEME.textMuted;
@@ -530,7 +559,12 @@ function getYitlppChartRenderer() {
 
 async function renderChartJsToNapiCanvas(configuration) {
     const renderer = getYitlppChartRenderer();
-    const buf = await renderer.renderToBuffer(configuration);
+    const safeConfig = { ...configuration };
+    if (yitlppBasicPlatform) {
+        // Explicitly bypass platform auto-detection on every chart render.
+        safeConfig.platform = yitlppBasicPlatform;
+    }
+    const buf = await renderer.renderToBuffer(safeConfig);
     const img = await loadImage(buf);
     const canvas = createCanvas(CHART_WIDTH, CHART_HEIGHT);
     const ctx = canvas.getContext('2d');
