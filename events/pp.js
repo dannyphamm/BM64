@@ -40,6 +40,25 @@ function getDailyGameStats(userId) {
     return dailyGameStats.get(userId);
 }
 
+/** YYYY-MM-DD in the process's local timezone (matches node-schedule midnight cron). */
+function formatLocalYYYYMMDD(d) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+}
+
+function getLocalDateTodayString() {
+    return formatLocalYYYYMMDD(new Date());
+}
+
+/** Calendar day that just ended when the daily summary runs at local midnight. */
+function getLocalDateYesterdayString() {
+    const d = new Date();
+    d.setDate(d.getDate() - 1);
+    return formatLocalYYYYMMDD(d);
+}
+
 // Persist current in-memory stats to DB (no Discord message). Run periodically so DB is updated during the day.
 // Skip when there is nothing to flush: after midnight, sendDailyGameSummary() clears memory; a flush with an
 // empty map would upsert zeros and wipe the row the summary just wrote for that calendar day.
@@ -53,7 +72,7 @@ async function flushDailyStatsToDatabase() {
             totalDuration: s.totalDuration,
             sessions: s.sessions
         }));
-        await saveDailyStatsToDatabase(gamesArray, u.userId, u.username);
+        await saveDailyStatsToDatabase(gamesArray, u.userId, u.username, { dateMode: 'rolling' });
     }
 }
 
@@ -74,14 +93,15 @@ const dailySummaryJob = schedule.scheduleJob('0 0 * * *', async () => {
     }
 });
 
-// Function to save daily stats to database (per user)
-async function saveDailyStatsToDatabase(statsData, userId, username) {
+// dateMode: 'rolling' = today's in-progress totals (flush). 'closing' = day that ended at midnight (summary).
+async function saveDailyStatsToDatabase(statsData, userId, username, options = {}) {
     try {
         await db.connect();
         const collection = db.db.collection('daily_gaming_stats');
         const uid = String(userId);
-        const today = new Date();
-        const dateString = today.toISOString().split('T')[0]; // YYYY-MM-DD format
+        const dateMode = options.dateMode || 'rolling';
+        const dateString =
+            dateMode === 'closing' ? getLocalDateYesterdayString() : getLocalDateTodayString();
 
         const document = {
             date: dateString,
@@ -124,7 +144,7 @@ global.sendDailyGameSummary = async function() {
             const stats = getDailyGameStats(u.userId);
 
             if (stats.games.size === 0) {
-                await saveDailyStatsToDatabase([], u.userId, u.username);
+                await saveDailyStatsToDatabase([], u.userId, u.username, { dateMode: 'closing' });
                 const channel = global.discordClient.channels.cache.get(u.channelId);
                 if (channel) await channel.send('📊 **Daily Gaming Summary**\nNo games were played today.');
                 continue;
@@ -141,7 +161,12 @@ global.sendDailyGameSummary = async function() {
             const totalMinutes = Math.floor((totalPlayTime % (1000 * 60 * 60)) / (1000 * 60));
 
             let summaryMessage = '📊 **Daily Gaming Summary**\n\n';
-            summaryMessage += `📅 **Date:** ${new Date().toLocaleDateString()}\n`;
+            const summaryDateLabel = (() => {
+                const d = new Date();
+                d.setDate(d.getDate() - 1);
+                return d.toLocaleDateString();
+            })();
+            summaryMessage += `📅 **Date:** ${summaryDateLabel}\n`;
             summaryMessage += `⏱️ **Total Play Time:** ${totalHours > 0 ? `${totalHours}h ${totalMinutes}m` : `${totalMinutes}m`}\n`;
             summaryMessage += `🎮 **Games Played:** ${gamesArray.length}\n\n`;
 
@@ -154,7 +179,7 @@ global.sendDailyGameSummary = async function() {
                 summaryMessage += `📈 Sessions: ${game.sessions}\n\n`;
             }
 
-            await saveDailyStatsToDatabase(gamesArray, u.userId, u.username);
+            await saveDailyStatsToDatabase(gamesArray, u.userId, u.username, { dateMode: 'closing' });
             const channel = global.discordClient.channels.cache.get(u.channelId);
             if (channel) await channel.send(summaryMessage);
         }
@@ -206,8 +231,8 @@ global.getHistoricalGameStats = async function(days = 7, userId) {
         const stats = await collection.find({
             userId: uid,
             date: {
-                $gte: startDate.toISOString().split('T')[0],
-                $lte: endDate.toISOString().split('T')[0]
+                $gte: formatLocalYYYYMMDD(startDate),
+                $lte: formatLocalYYYYMMDD(endDate),
             }
         }).sort({ date: -1 }).toArray();
         
