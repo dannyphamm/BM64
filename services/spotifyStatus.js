@@ -56,7 +56,7 @@ class SpotifyStatusManager {
         }
         this.timeoutIds.forEach(id => clearTimeout(id));
         this.timeoutIds = [];
-        log("Clearing timeouts");
+        //log("Clearing timeouts");
     }
 
     createTrackedTimeout(callback, ms) {
@@ -67,7 +67,7 @@ class SpotifyStatusManager {
 
     clearAllTimeouts() {
         this.clearTimeouts();
-        log("All timeouts cleared");
+        //log("All timeouts cleared");
     }
 }
 
@@ -125,7 +125,7 @@ class SocketWrapper {
             const socket = await socketIO();
             return await socket.timeout(SOCKET_TIMEOUT).emitWithAck('getQueue');
         } catch (e) {
-            log("Socket failure, retrying in 3 seconds");
+            log("Socket failure getQueue, retrying in 3 seconds");
             error(e);
             await sleep(RETRY_DELAY);
             throw e;
@@ -137,7 +137,7 @@ class SocketWrapper {
             const socket = await socketIO();
             return await socket.timeout(SHORT_SOCKET_TIMEOUT).emitWithAck('getPlayLength');
         } catch (e) {
-            log("Socket failure, retrying in 3 seconds");
+            log("Socket failure getPlayLength, retrying in 3 seconds");
             error(e);
             await sleep(RETRY_DELAY);
             throw e;
@@ -434,7 +434,7 @@ class SpotifyStatusService {
             this.manager.durationMs
         );
 
-        log(`Progress: ${formatDuration(this.manager.progressMs)}, Duration: ${formatDuration(this.manager.durationMs)}, Remaining: ${formatDuration(this.manager.remainingMs)}`);
+        //log(`Progress: ${formatDuration(this.manager.progressMs)}, Duration: ${formatDuration(this.manager.durationMs)}, Remaining: ${formatDuration(this.manager.remainingMs)}`);
 
         if (this.manager.remainingMs > 0) {
             this.manager.currentTimeoutId = this.manager.createTrackedTimeout(
