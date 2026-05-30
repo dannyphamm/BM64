@@ -10,6 +10,7 @@ module.exports = {
         const { client } = message;
         if (message.author.bot) return;
         if (message.type !== 0) return;
+        if (message.groupActivityApplication !== null) return;
         if (message.channel.id === config.misamoVoiceChannel) {
             const song = message.content;
 
