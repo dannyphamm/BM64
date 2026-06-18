@@ -53,6 +53,12 @@ class LoLTracker {
         this.apiCache = new Map(); // Cache for API responses
         this.CACHE_TTL = 5 * 60 * 1000; // 5 minutes cache TTL
         this.cacheCleanupInterval = null;
+        this.tierOrder = ['IRON', 'BRONZE', 'SILVER', 'GOLD', 'PLATINUM', 'EMERALD', 'DIAMOND', 'MASTER', 'GRANDMASTER', 'CHALLENGER'];
+        this.divisionOrder = ['IV', 'III', 'II', 'I'];
+        this.queueIdToQueueType = {
+            420: 'RANKED_SOLO_5x5',
+            440: 'RANKED_FLEX_SR'
+        };
     }
 
     async init() {
@@ -183,6 +189,151 @@ class LoLTracker {
         } catch (e) {
             error('Error fetching account by Riot ID:', e);
             return null;
+        }
+    }
+
+    getQueueTypeFromQueueId(queueId) {
+        return this.queueIdToQueueType[queueId] || null;
+    }
+
+    formatRank(tier, rank) {
+        if (!tier) return 'Unranked';
+        const titleTier = tier.charAt(0) + tier.slice(1).toLowerCase();
+        if (['MASTER', 'GRANDMASTER', 'CHALLENGER'].includes(tier)) {
+            return titleTier;
+        }
+        return `${titleTier} ${rank}`;
+    }
+
+    isRankPromotion(oldRank, newRank) {
+        if (!oldRank?.tier || !newRank?.tier) return false;
+
+        const oldTierIdx = this.tierOrder.indexOf(oldRank.tier);
+        const newTierIdx = this.tierOrder.indexOf(newRank.tier);
+        if (oldTierIdx === -1 || newTierIdx === -1) return false;
+
+        if (newTierIdx > oldTierIdx) return true;
+        if (newTierIdx < oldTierIdx) return false;
+
+        if (newTierIdx >= 7) return false;
+
+        const oldDivIdx = this.divisionOrder.indexOf(oldRank.rank);
+        const newDivIdx = this.divisionOrder.indexOf(newRank.rank);
+        if (oldDivIdx === -1 || newDivIdx === -1) return false;
+
+        return newDivIdx > oldDivIdx;
+    }
+
+    async getLeagueEntries(puuid, region = 'NA', { skipCache = false } = {}) {
+        const cacheKey = `league_${puuid}_${region}`;
+        if (!skipCache) {
+            const cached = this.getCache(cacheKey);
+            if (cached) return cached;
+        }
+
+        try {
+            const baseUrl = this.riotApiRegionalUrls[region];
+            const url = `${baseUrl}/lol/league/v4/entries/by-puuid/${puuid}`;
+
+            const response = await fetch(url, {
+                headers: {
+                    'X-Riot-Token': this.riotApiKey
+                }
+            });
+
+            if (response.status === 404) return [];
+            if (!response.ok) {
+                throw new Error(`Riot API error: ${response.status}`);
+            }
+
+            const data = await response.json();
+            if (!skipCache) {
+                this.setCache(cacheKey, data, 60 * 1000);
+            }
+            return data;
+        } catch (e) {
+            error('Error fetching league entries:', e);
+            return [];
+        }
+    }
+
+    async getLeagueEntryForQueue(puuid, region, queueType) {
+        const entries = await this.getLeagueEntries(puuid, region, { skipCache: true });
+        return entries.find(entry => entry.queueType === queueType) || null;
+    }
+
+    async fetchRankState(puuid, region) {
+        const entries = await this.getLeagueEntries(puuid, region);
+        const rankState = {};
+
+        for (const entry of entries) {
+            if (entry.queueType === 'RANKED_SOLO_5x5' || entry.queueType === 'RANKED_FLEX_SR') {
+                rankState[entry.queueType] = {
+                    tier: entry.tier,
+                    rank: entry.rank,
+                    leaguePoints: entry.leaguePoints
+                };
+            }
+        }
+
+        return rankState;
+    }
+
+    async savePlayerRankState(player) {
+        const collection = db.db.collection('lol_tracked_players');
+        await collection.updateOne(
+            {
+                summonerName: player.summonerName,
+                tag: player.tag,
+                region: player.region
+            },
+            { $set: { rankState: player.rankState || {} } }
+        );
+    }
+
+    async checkRankPromotions(matchData, channel, players) {
+        const queueType = this.getQueueTypeFromQueueId(matchData.info.queueId);
+        if (!queueType) return;
+
+        for (const player of players) {
+            try {
+                const displayName = player.tag
+                    ? `${player.summonerName}#${player.tag}`
+                    : player.summonerName;
+                const oldRank = player.rankState?.[queueType] || null;
+                const newEntry = await this.getLeagueEntryForQueue(player.puuid, player.region, queueType);
+                const newRank = newEntry
+                    ? {
+                        tier: newEntry.tier,
+                        rank: newEntry.rank,
+                        leaguePoints: newEntry.leaguePoints
+                    }
+                    : null;
+
+                if (!oldRank) {
+                    if (newRank) {
+                        if (!player.rankState) player.rankState = {};
+                        player.rankState[queueType] = newRank;
+                        await this.savePlayerRankState(player);
+                    }
+                    continue;
+                }
+
+                if (this.isRankPromotion(oldRank, newRank)) {
+                    const rankDisplay = this.formatRank(newRank.tier, newRank.rank);
+                    await channel.send(`**${displayName}** has promoted to **${rankDisplay}**!`);
+                }
+
+                if (!player.rankState) player.rankState = {};
+                if (newRank) {
+                    player.rankState[queueType] = newRank;
+                } else {
+                    delete player.rankState[queueType];
+                }
+                await this.savePlayerRankState(player);
+            } catch (e) {
+                error(`Error checking rank promotion for ${player.summonerName}:`, e);
+            }
         }
     }
 
@@ -398,6 +549,8 @@ class LoLTracker {
                 return false;
             }
 
+            const rankState = await this.fetchRankState(summonerData.puuid, region);
+
             const playerData = {
                 summonerName: name,
                 tag: tag,
@@ -405,6 +558,7 @@ class LoLTracker {
                 channelId: channelId,
                 puuid: summonerData.puuid,
                 lastGameId: null,
+                rankState,
                 addedAt: new Date()
             };
 
@@ -586,6 +740,7 @@ class LoLTracker {
                 const channel = await client.channels.fetch(channelId);
                 if (channel) {
                     await channel.send({ embeds: [embed] });
+                    await this.checkRankPromotions(matchData, channel, channelPlayers);
                 } else {
                     error(`Channel ${channelId} not found`);
                 }
