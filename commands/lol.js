@@ -84,6 +84,10 @@ module.exports = {
                             { name: 'Russia', value: 'RU' },
                             { name: 'Japan', value: 'JP' }
                         )))
+        .addSubcommand(subcommand =>
+            subcommand
+                .setName('update')
+                .setDescription('Force an immediate check for new games from tracked players'))
         .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels),
 
     async execute(interaction) {
@@ -101,6 +105,9 @@ module.exports = {
                 break;
             case 'check':
                 await this.handleCheck(interaction);
+                break;
+            case 'update':
+                await this.handleUpdate(interaction);
                 break;
             default:
                 await interaction.reply({
@@ -265,6 +272,41 @@ module.exports = {
             console.error('Error in lol check command:', error);
             await interaction.editReply({
                 content: '❌ An error occurred while checking the player\'s latest game.',
+                ephemeral: true
+            });
+        }
+    },
+
+    async handleUpdate(interaction) {
+        await interaction.deferReply();
+
+        try {
+            const trackedPlayers = lolTracker.getTrackedPlayers();
+            if (trackedPlayers.length === 0) {
+                await interaction.editReply({
+                    content: '📋 No players are currently being tracked.',
+                    ephemeral: true
+                });
+                return;
+            }
+
+            const result = await lolTracker.forceUpdate();
+
+            if (result.newGames > 0) {
+                await interaction.editReply({
+                    content: `✅ Check complete. Found and posted **${result.newGames}** new game${result.newGames > 1 ? 's' : ''}.`,
+                    ephemeral: false
+                });
+            } else {
+                await interaction.editReply({
+                    content: '✅ Check complete. No new games found for tracked players.',
+                    ephemeral: true
+                });
+            }
+        } catch (err) {
+            console.error('Error in lol update command:', err);
+            await interaction.editReply({
+                content: '❌ An error occurred while checking for new games.',
                 ephemeral: true
             });
         }

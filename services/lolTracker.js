@@ -59,7 +59,7 @@ class LoLTracker {
             420: 'RANKED_SOLO_5x5',
             440: 'RANKED_FLEX_SR'
         };
-        this.RANK_CHECK_DELAY = 15 * 1000;
+        this.RANK_CHECK_DELAYS = [15 * 1000, 60 * 1000, 120 * 1000];
     }
 
     async init() {
@@ -295,11 +295,17 @@ class LoLTracker {
     }
 
     scheduleRankCheck(matchData, channel, players) {
-        setTimeout(() => {
-            this.checkRankChanges(matchData, channel, players).catch(e => {
-                error('Error checking rank changes:', e);
-            });
-        }, this.RANK_CHECK_DELAY);
+        for (const delay of this.RANK_CHECK_DELAYS) {
+            setTimeout(() => {
+                this.checkRankChanges(matchData, channel, players).catch(e => {
+                    error('Error checking rank changes:', e);
+                });
+            }, delay);
+        }
+    }
+
+    async forceUpdate() {
+        return this.checkForNewGames({ force: true });
     }
 
     async checkRankChanges(matchData, channel, players) {
@@ -663,8 +669,8 @@ class LoLTracker {
         log('⏹️ Stopped LoL Tracker');
     }
 
-    async checkForNewGames() {
-        if (!this.isRunning) return;
+    async checkForNewGames({ force = false } = {}) {
+        if (!force && !this.isRunning) return { newGames: 0 };
 
         //log('🔍 Checking API for new games...');
 
@@ -726,6 +732,8 @@ class LoLTracker {
                 error(`Error processing game group ${gameId}:`, e);
             }
         }
+
+        return { newGames: gameGroups.size };
     }
 
     async sendConsolidatedMatchSummary(matchData, players) {
