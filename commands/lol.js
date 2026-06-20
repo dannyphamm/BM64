@@ -87,7 +87,7 @@ module.exports = {
         .addSubcommand(subcommand =>
             subcommand
                 .setName('update')
-                .setDescription('Force an immediate check for new games from tracked players'))
+                .setDescription('Force an immediate check for new games and rank changes'))
         .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels),
 
     async execute(interaction) {
@@ -278,36 +278,47 @@ module.exports = {
     },
 
     async handleUpdate(interaction) {
-        await interaction.deferReply();
+        await interaction.deferReply({ ephemeral: true });
 
         try {
             const trackedPlayers = lolTracker.getTrackedPlayers();
             if (trackedPlayers.length === 0) {
                 await interaction.editReply({
-                    content: '📋 No players are currently being tracked.',
-                    ephemeral: true
+                    content: '📋 No players are currently being tracked.'
                 });
                 return;
             }
 
             const result = await lolTracker.forceUpdate();
+            const rankChanges = result.promotions + result.demotions;
+            const lines = ['✅ Check complete.'];
 
             if (result.newGames > 0) {
-                await interaction.editReply({
-                    content: `✅ Check complete. Found and posted **${result.newGames}** new game${result.newGames > 1 ? 's' : ''}.`,
-                    ephemeral: false
-                });
+                lines.push(`Found and posted **${result.newGames}** new game${result.newGames > 1 ? 's' : ''}.`);
             } else {
-                await interaction.editReply({
-                    content: '✅ Check complete. No new games found for tracked players.',
-                    ephemeral: true
-                });
+                lines.push('No new games found.');
             }
+
+            if (rankChanges > 0) {
+                const parts = [];
+                if (result.promotions > 0) {
+                    parts.push(`**${result.promotions}** promotion${result.promotions > 1 ? 's' : ''}`);
+                }
+                if (result.demotions > 0) {
+                    parts.push(`**${result.demotions}** demotion${result.demotions > 1 ? 's' : ''}`);
+                }
+                lines.push(`Rank check (${result.playersChecked} player${result.playersChecked > 1 ? 's' : ''}): detected ${parts.join(' and ')}.`);
+            } else {
+                lines.push(`Rank check (${result.playersChecked} player${result.playersChecked > 1 ? 's' : ''}): no rank changes detected.`);
+            }
+
+            await interaction.editReply({
+                content: lines.join('\n')
+            });
         } catch (err) {
             console.error('Error in lol update command:', err);
             await interaction.editReply({
-                content: '❌ An error occurred while checking for new games.',
-                ephemeral: true
+                content: '❌ An error occurred while running the update check.'
             });
         }
     }

@@ -294,6 +294,49 @@ class LoLTracker {
         );
     }
 
+    async updatePlayerRank(player, channel, queueType) {
+        const displayName = player.tag
+            ? `${player.summonerName}#${player.tag}`
+            : player.summonerName;
+        const oldRank = player.rankState?.[queueType] || null;
+        const newEntry = await this.getLeagueEntryForQueue(player.puuid, player.region, queueType);
+        const newRank = newEntry
+            ? {
+                tier: newEntry.tier,
+                rank: newEntry.rank,
+                leaguePoints: newEntry.leaguePoints
+            }
+            : null;
+
+        if (!oldRank) {
+            if (newRank) {
+                if (!player.rankState) player.rankState = {};
+                player.rankState[queueType] = newRank;
+                await this.savePlayerRankState(player);
+            }
+            return null;
+        }
+
+        const rankChange = this.getRankChange(oldRank, newRank);
+        if (rankChange && channel) {
+            const rankDisplay = this.formatRank(newRank.tier, newRank.rank);
+            const message = rankChange === 'promotion'
+                ? `**${displayName}** has promoted to **${rankDisplay}**!`
+                : `**${displayName}** has demoted to **${rankDisplay}**!`;
+            await channel.send(message);
+        }
+
+        if (!player.rankState) player.rankState = {};
+        if (newRank) {
+            player.rankState[queueType] = newRank;
+        } else {
+            delete player.rankState[queueType];
+        }
+        await this.savePlayerRankState(player);
+
+        return rankChange;
+    }
+
     scheduleRankCheck(matchData, channel, players) {
         for (const delay of this.RANK_CHECK_DELAYS) {
             setTimeout(() => {
@@ -304,8 +347,43 @@ class LoLTracker {
         }
     }
 
+    async forceRankUpdate() {
+        const client = global.discordClient;
+        if (!client) {
+            throw new Error('Discord client not available');
+        }
+
+        const results = { promotions: 0, demotions: 0, playersChecked: 0 };
+        const queueTypes = ['RANKED_SOLO_5x5', 'RANKED_FLEX_SR'];
+
+        for (const player of this.getTrackedPlayers()) {
+            results.playersChecked++;
+
+            let channel = null;
+            try {
+                channel = await client.channels.fetch(player.channelId);
+            } catch (e) {
+                error(`Channel ${player.channelId} not found for ${player.summonerName}:`, e);
+            }
+
+            for (const queueType of queueTypes) {
+                try {
+                    const rankChange = await this.updatePlayerRank(player, channel, queueType);
+                    if (rankChange === 'promotion') results.promotions++;
+                    if (rankChange === 'demotion') results.demotions++;
+                } catch (e) {
+                    error(`Error checking rank for ${player.summonerName} (${queueType}):`, e);
+                }
+            }
+        }
+
+        return results;
+    }
+
     async forceUpdate() {
-        return this.checkForNewGames({ force: true });
+        const newGames = await this.checkForNewGames({ force: true });
+        const rankResults = await this.forceRankUpdate();
+        return { newGames, ...rankResults };
     }
 
     async checkRankChanges(matchData, channel, players) {
@@ -314,44 +392,7 @@ class LoLTracker {
 
         for (const player of players) {
             try {
-                const displayName = player.tag
-                    ? `${player.summonerName}#${player.tag}`
-                    : player.summonerName;
-                const oldRank = player.rankState?.[queueType] || null;
-                const newEntry = await this.getLeagueEntryForQueue(player.puuid, player.region, queueType);
-                const newRank = newEntry
-                    ? {
-                        tier: newEntry.tier,
-                        rank: newEntry.rank,
-                        leaguePoints: newEntry.leaguePoints
-                    }
-                    : null;
-
-                if (!oldRank) {
-                    if (newRank) {
-                        if (!player.rankState) player.rankState = {};
-                        player.rankState[queueType] = newRank;
-                        await this.savePlayerRankState(player);
-                    }
-                    continue;
-                }
-
-                const rankChange = this.getRankChange(oldRank, newRank);
-                if (rankChange) {
-                    const rankDisplay = this.formatRank(newRank.tier, newRank.rank);
-                    const message = rankChange === 'promotion'
-                        ? `**${displayName}** has promoted to **${rankDisplay}**!`
-                        : `**${displayName}** has demoted to **${rankDisplay}**!`;
-                    await channel.send(message);
-                }
-
-                if (!player.rankState) player.rankState = {};
-                if (newRank) {
-                    player.rankState[queueType] = newRank;
-                } else {
-                    delete player.rankState[queueType];
-                }
-                await this.savePlayerRankState(player);
+                await this.updatePlayerRank(player, channel, queueType);
             } catch (e) {
                 error(`Error checking rank change for ${player.summonerName}:`, e);
             }
@@ -670,7 +711,7 @@ class LoLTracker {
     }
 
     async checkForNewGames({ force = false } = {}) {
-        if (!force && !this.isRunning) return { newGames: 0 };
+        if (!force && !this.isRunning) return 0;
 
         //log('🔍 Checking API for new games...');
 
@@ -733,7 +774,7 @@ class LoLTracker {
             }
         }
 
-        return { newGames: gameGroups.size };
+        return gameGroups.size;
     }
 
     async sendConsolidatedMatchSummary(matchData, players) {
