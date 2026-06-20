@@ -59,6 +59,7 @@ class LoLTracker {
             420: 'RANKED_SOLO_5x5',
             440: 'RANKED_FLEX_SR'
         };
+        this.RANK_CHECK_DELAY = 15 * 1000;
     }
 
     async init() {
@@ -291,6 +292,14 @@ class LoLTracker {
             },
             { $set: { rankState: player.rankState || {} } }
         );
+    }
+
+    scheduleRankCheck(matchData, channel, players) {
+        setTimeout(() => {
+            this.checkRankChanges(matchData, channel, players).catch(e => {
+                error('Error checking rank changes:', e);
+            });
+        }, this.RANK_CHECK_DELAY);
     }
 
     async checkRankChanges(matchData, channel, players) {
@@ -746,7 +755,7 @@ class LoLTracker {
                 const channel = await client.channels.fetch(channelId);
                 if (channel) {
                     await channel.send({ embeds: [embed] });
-                    await this.checkRankChanges(matchData, channel, channelPlayers);
+                    this.scheduleRankCheck(matchData, channel, channelPlayers);
                 } else {
                     error(`Channel ${channelId} not found`);
                 }
