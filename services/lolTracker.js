@@ -227,6 +227,29 @@ class LoLTracker {
         return null;
     }
 
+    calculateLpChange(oldRank, newRank, rankChange) {
+        if (!oldRank?.tier || !newRank?.tier) return null;
+
+        const masterPlus = this.tierOrder.indexOf(oldRank.tier) >= 7;
+        if (masterPlus) {
+            return newRank.leaguePoints - oldRank.leaguePoints;
+        }
+
+        if (rankChange === 'promotion') {
+            return newRank.leaguePoints - oldRank.leaguePoints + 100;
+        }
+        if (rankChange === 'demotion') {
+            return newRank.leaguePoints - oldRank.leaguePoints - 100;
+        }
+        return newRank.leaguePoints - oldRank.leaguePoints;
+    }
+
+    formatLpChange(lpChange) {
+        if (lpChange === null || lpChange === undefined) return '';
+        const sign = lpChange > 0 ? '+' : '';
+        return ` ${sign}${lpChange} LP`;
+    }
+
     async getLeagueEntries(puuid, region = 'NA', { skipCache = false } = {}) {
         const cacheKey = `league_${puuid}_${region}`;
         if (!skipCache) {
@@ -314,10 +337,12 @@ class LoLTracker {
                 player.rankState[queueType] = newRank;
                 await this.savePlayerRankState(player);
             }
-            return null;
+            return { rankChange: null, lpChange: null };
         }
 
         const rankChange = this.getRankChange(oldRank, newRank);
+        const lpChange = this.calculateLpChange(oldRank, newRank, rankChange);
+
         if (rankChange && channel) {
             const rankDisplay = this.formatRank(newRank.tier, newRank.rank);
             const message = rankChange === 'promotion'
@@ -334,13 +359,14 @@ class LoLTracker {
         }
         await this.savePlayerRankState(player);
 
-        return rankChange;
+        return { rankChange, lpChange };
     }
 
-    scheduleRankCheck(matchData, channel, players) {
+    scheduleRankCheck(matchData, channel, players, message) {
+        const context = { lpApplied: false };
         for (const delay of this.RANK_CHECK_DELAYS) {
             setTimeout(() => {
-                this.checkRankChanges(matchData, channel, players).catch(e => {
+                this.checkRankChanges(matchData, channel, players, message, context).catch(e => {
                     error('Error checking rank changes:', e);
                 });
             }, delay);
@@ -368,7 +394,7 @@ class LoLTracker {
 
             for (const queueType of queueTypes) {
                 try {
-                    const rankChange = await this.updatePlayerRank(player, channel, queueType);
+                    const { rankChange } = await this.updatePlayerRank(player, channel, queueType);
                     if (rankChange === 'promotion') results.promotions++;
                     if (rankChange === 'demotion') results.demotions++;
                 } catch (e) {
@@ -386,15 +412,32 @@ class LoLTracker {
         return { newGames, ...rankResults };
     }
 
-    async checkRankChanges(matchData, channel, players) {
+    async checkRankChanges(matchData, channel, players, message, context = {}) {
         const queueType = this.getQueueTypeFromQueueId(matchData.info.queueId);
         if (!queueType) return;
 
+        const lpChanges = {};
+        let shouldUpdateEmbed = false;
+
         for (const player of players) {
             try {
-                await this.updatePlayerRank(player, channel, queueType);
+                const { rankChange, lpChange } = await this.updatePlayerRank(player, channel, queueType);
+                if (lpChange !== null && (lpChange !== 0 || rankChange)) {
+                    lpChanges[player.puuid] = lpChange;
+                    shouldUpdateEmbed = true;
+                }
             } catch (e) {
                 error(`Error checking rank change for ${player.summonerName}:`, e);
+            }
+        }
+
+        if (shouldUpdateEmbed && message && !context.lpApplied) {
+            try {
+                const embed = await this.createConsolidatedMatchEmbed(matchData, players, lpChanges);
+                await message.edit({ embeds: [embed] });
+                context.lpApplied = true;
+            } catch (e) {
+                error('Error updating match embed with LP:', e);
             }
         }
     }
@@ -564,7 +607,7 @@ class LoLTracker {
         return embed;
     }
 
-    async createTeamField(participants, teamName, trackedPlayerPuuids) {
+    async createTeamField(participants, teamName, trackedPlayerPuuids, lpChanges = {}) {
         const sortedParticipants = participants.sort((a, b) => {
             // Sort by damage dealt to champions (descending)
             return b.totalDamageDealtToChampions - a.totalDamageDealtToChampions;
@@ -583,8 +626,11 @@ class LoLTracker {
 
             // Add indicator for tracked player
             const indicator = isTrackedPlayer ? '👁️ ' : '';
+            const lpSuffix = isTrackedPlayer && lpChanges[p.puuid] !== undefined
+                ? ` |${this.formatLpChange(lpChanges[p.puuid])}`
+                : '';
 
-            return `${indicator}**${playerName}** (${champion})\n└ KDA: ${kda} | DMG: ${damage}`;
+            return `${indicator}**${playerName}** (${champion})${lpSuffix}\n└ KDA: ${kda} | DMG: ${damage}`;
         }));
 
         return {
@@ -803,8 +849,8 @@ class LoLTracker {
                 const embed = await this.createConsolidatedMatchEmbed(matchData, channelPlayers);
                 const channel = await client.channels.fetch(channelId);
                 if (channel) {
-                    await channel.send({ embeds: [embed] });
-                    this.scheduleRankCheck(matchData, channel, channelPlayers);
+                    const message = await channel.send({ embeds: [embed] });
+                    this.scheduleRankCheck(matchData, channel, channelPlayers, message);
                 } else {
                     error(`Channel ${channelId} not found`);
                 }
@@ -814,7 +860,7 @@ class LoLTracker {
         }
     }
 
-    async createConsolidatedMatchEmbed(matchData, players) {
+    async createConsolidatedMatchEmbed(matchData, players, lpChanges = {}) {
         const info = matchData.info;
 
         // Find all tracked participants
@@ -855,8 +901,8 @@ class LoLTracker {
         const team2 = info.participants.filter(p => p.teamId === 200);
 
         // Create team fields with async champion name resolution
-        const team1Field = await this.createTeamField(team1, 'Blue Team', players.map(p => p.puuid));
-        const team2Field = await this.createTeamField(team2, 'Red Team', players.map(p => p.puuid));
+        const team1Field = await this.createTeamField(team1, 'Blue Team', players.map(p => p.puuid), lpChanges);
+        const team2Field = await this.createTeamField(team2, 'Red Team', players.map(p => p.puuid), lpChanges);
 
         // Create tracked players summary with async champion names
         const trackedPlayersSummary = await Promise.all(trackedParticipants.map(async (tp) => {
@@ -864,7 +910,10 @@ class LoLTracker {
             const champion = await this.getChampionName(tp.participant.championId);
             const kda = `${tp.participant.kills}/${tp.participant.deaths}/${tp.participant.assists}`;
             const result = tp.participant.win ? '✅' : '❌';
-            return `${result} **${displayName}** (${champion}) - ${kda}`;
+            const lpSuffix = lpChanges[tp.player.puuid] !== undefined
+                ? ` |${this.formatLpChange(lpChanges[tp.player.puuid])}`
+                : '';
+            return `${result} **${displayName}** (${champion}) - ${kda}${lpSuffix}`;
         }));
 
         const embed = new EmbedBuilder()
