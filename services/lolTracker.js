@@ -244,10 +244,13 @@ class LoLTracker {
         return newRank.leaguePoints - oldRank.leaguePoints;
     }
 
-    formatLpChange(lpChange) {
-        if (lpChange === null || lpChange === undefined) return '';
-        const sign = lpChange > 0 ? '+' : '';
-        return ` ${sign}${lpChange} LP`;
+    formatLpDisplay(lpData) {
+        if (!lpData || lpData.change === null || lpData.change === undefined) return '';
+        const sign = lpData.change > 0 ? '+' : '';
+        if (lpData.current !== null && lpData.current !== undefined) {
+            return ` ${sign}${lpData.change} LP (${lpData.current} LP)`;
+        }
+        return ` ${sign}${lpData.change} LP`;
     }
 
     async getLeagueEntries(puuid, region = 'NA', { skipCache = false } = {}) {
@@ -337,11 +340,12 @@ class LoLTracker {
                 player.rankState[queueType] = newRank;
                 await this.savePlayerRankState(player);
             }
-            return { rankChange: null, lpChange: null };
+            return { rankChange: null, lpChange: null, currentLp: null };
         }
 
         const rankChange = this.getRankChange(oldRank, newRank);
         const lpChange = this.calculateLpChange(oldRank, newRank, rankChange);
+        const currentLp = newRank?.leaguePoints ?? null;
 
         if (rankChange && channel) {
             const rankDisplay = this.formatRank(newRank.tier, newRank.rank);
@@ -359,7 +363,7 @@ class LoLTracker {
         }
         await this.savePlayerRankState(player);
 
-        return { rankChange, lpChange };
+        return { rankChange, lpChange, currentLp };
     }
 
     scheduleRankCheck(matchData, channel, players, message) {
@@ -421,9 +425,9 @@ class LoLTracker {
 
         for (const player of players) {
             try {
-                const { rankChange, lpChange } = await this.updatePlayerRank(player, channel, queueType);
+                const { rankChange, lpChange, currentLp } = await this.updatePlayerRank(player, channel, queueType);
                 if (lpChange !== null && (lpChange !== 0 || rankChange)) {
-                    lpChanges[player.puuid] = lpChange;
+                    lpChanges[player.puuid] = { change: lpChange, current: currentLp };
                     shouldUpdateEmbed = true;
                 }
             } catch (e) {
@@ -627,7 +631,7 @@ class LoLTracker {
             // Add indicator for tracked player
             const indicator = isTrackedPlayer ? '👁️ ' : '';
             const lpSuffix = isTrackedPlayer && lpChanges[p.puuid] !== undefined
-                ? ` |${this.formatLpChange(lpChanges[p.puuid])}`
+                ? ` |${this.formatLpDisplay(lpChanges[p.puuid])}`
                 : '';
 
             return `${indicator}**${playerName}** (${champion})${lpSuffix}\n└ KDA: ${kda} | DMG: ${damage}`;
@@ -911,7 +915,7 @@ class LoLTracker {
             const kda = `${tp.participant.kills}/${tp.participant.deaths}/${tp.participant.assists}`;
             const result = tp.participant.win ? '✅' : '❌';
             const lpSuffix = lpChanges[tp.player.puuid] !== undefined
-                ? ` |${this.formatLpChange(lpChanges[tp.player.puuid])}`
+                ? ` |${this.formatLpDisplay(lpChanges[tp.player.puuid])}`
                 : '';
             return `${result} **${displayName}** (${champion}) - ${kda}${lpSuffix}`;
         }));
