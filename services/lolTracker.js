@@ -59,7 +59,7 @@ class LoLTracker {
             420: 'RANKED_SOLO_5x5',
             440: 'RANKED_FLEX_SR'
         };
-        this.RANK_CHECK_DELAYS = [15 * 1000, 60 * 1000, 120 * 1000];
+        this.RANK_CHECK_DELAYS = [15 * 1000, 60 * 1000, 120 * 1000, 5 * 60 * 1000];
     }
 
     async init() {
@@ -244,13 +244,25 @@ class LoLTracker {
         return newRank.leaguePoints - oldRank.leaguePoints;
     }
 
+    getQueueTypeLabel(queueType) {
+        const labels = {
+            'RANKED_SOLO_5x5': 'Ranked Solo/Duo',
+            'RANKED_FLEX_SR': 'Ranked Flex'
+        };
+        return labels[queueType] || queueType;
+    }
+
     formatLpDisplay(lpData) {
         if (!lpData || lpData.change === null || lpData.change === undefined) return '';
         const sign = lpData.change > 0 ? '+' : '';
-        if (lpData.current !== null && lpData.current !== undefined) {
-            return ` ${sign}${lpData.change} LP (${lpData.current} LP)`;
+        const lpPart = lpData.current !== null && lpData.current !== undefined
+            ? `${sign}${lpData.change} LP (${lpData.current} LP)`
+            : `${sign}${lpData.change} LP`;
+        if (lpData.tier) {
+            const rankLabel = this.formatRank(lpData.tier, lpData.rank);
+            return ` ${rankLabel} · ${lpPart}`;
         }
-        return ` ${sign}${lpData.change} LP`;
+        return ` ${lpPart}`;
     }
 
     async getLeagueEntries(puuid, region = 'NA', { skipCache = false } = {}) {
@@ -320,10 +332,11 @@ class LoLTracker {
         );
     }
 
-    async updatePlayerRank(player, channel, queueType) {
+    async updatePlayerRank(player, channel, queueType, gameMode = null) {
         const displayName = player.tag
             ? `${player.summonerName}#${player.tag}`
             : player.summonerName;
+        const modeLabel = gameMode || this.getQueueTypeLabel(queueType);
         const oldRank = player.rankState?.[queueType] || null;
         const newEntry = await this.getLeagueEntryForQueue(player.puuid, player.region, queueType);
         const newRank = newEntry
@@ -340,7 +353,7 @@ class LoLTracker {
                 player.rankState[queueType] = newRank;
                 await this.savePlayerRankState(player);
             }
-            return { rankChange: null, lpChange: null, currentLp: null };
+            return { rankChange: null, lpChange: null, currentLp: null, tier: null, rank: null };
         }
 
         const rankChange = this.getRankChange(oldRank, newRank);
@@ -350,8 +363,8 @@ class LoLTracker {
         if (rankChange && channel) {
             const rankDisplay = this.formatRank(newRank.tier, newRank.rank);
             const message = rankChange === 'promotion'
-                ? `**${displayName}** has promoted to **${rankDisplay}**!`
-                : `**${displayName}** has demoted to **${rankDisplay}**!`;
+                ? `**${displayName}** has promoted to **${rankDisplay}** in **${modeLabel}**!`
+                : `**${displayName}** has demoted to **${rankDisplay}** in **${modeLabel}**!`;
             await channel.send(message);
         }
 
@@ -363,7 +376,13 @@ class LoLTracker {
         }
         await this.savePlayerRankState(player);
 
-        return { rankChange, lpChange, currentLp };
+        return {
+            rankChange,
+            lpChange,
+            currentLp,
+            tier: newRank?.tier ?? null,
+            rank: newRank?.rank ?? null
+        };
     }
 
     scheduleRankCheck(matchData, channel, players, message) {
@@ -420,14 +439,17 @@ class LoLTracker {
         const queueType = this.getQueueTypeFromQueueId(matchData.info.queueId);
         if (!queueType) return;
 
+        const gameMode = this.getGameMode(matchData.info.queueId);
         const lpChanges = {};
         let shouldUpdateEmbed = false;
 
         for (const player of players) {
             try {
-                const { rankChange, lpChange, currentLp } = await this.updatePlayerRank(player, channel, queueType);
+                const { rankChange, lpChange, currentLp, tier, rank } = await this.updatePlayerRank(
+                    player, channel, queueType, gameMode
+                );
                 if (lpChange !== null && (lpChange !== 0 || rankChange)) {
-                    lpChanges[player.puuid] = { change: lpChange, current: currentLp };
+                    lpChanges[player.puuid] = { change: lpChange, current: currentLp, tier, rank };
                     shouldUpdateEmbed = true;
                 }
             } catch (e) {
@@ -611,7 +633,7 @@ class LoLTracker {
         return embed;
     }
 
-    async createTeamField(participants, teamName, trackedPlayerPuuids, lpChanges = {}) {
+    async createTeamField(participants, teamName, trackedPlayerPuuids) {
         const sortedParticipants = participants.sort((a, b) => {
             // Sort by damage dealt to champions (descending)
             return b.totalDamageDealtToChampions - a.totalDamageDealtToChampions;
@@ -630,11 +652,8 @@ class LoLTracker {
 
             // Add indicator for tracked player
             const indicator = isTrackedPlayer ? '👁️ ' : '';
-            const lpSuffix = isTrackedPlayer && lpChanges[p.puuid] !== undefined
-                ? ` |${this.formatLpDisplay(lpChanges[p.puuid])}`
-                : '';
 
-            return `${indicator}**${playerName}** (${champion})${lpSuffix}\n└ KDA: ${kda} | DMG: ${damage}`;
+            return `${indicator}**${playerName}** (${champion})\n└ KDA: ${kda} | DMG: ${damage}`;
         }));
 
         return {
@@ -905,8 +924,8 @@ class LoLTracker {
         const team2 = info.participants.filter(p => p.teamId === 200);
 
         // Create team fields with async champion name resolution
-        const team1Field = await this.createTeamField(team1, 'Blue Team', players.map(p => p.puuid), lpChanges);
-        const team2Field = await this.createTeamField(team2, 'Red Team', players.map(p => p.puuid), lpChanges);
+        const team1Field = await this.createTeamField(team1, 'Blue Team', players.map(p => p.puuid));
+        const team2Field = await this.createTeamField(team2, 'Red Team', players.map(p => p.puuid));
 
         // Create tracked players summary with async champion names
         const trackedPlayersSummary = await Promise.all(trackedParticipants.map(async (tp) => {
