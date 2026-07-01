@@ -1,148 +1,144 @@
 const axios = require('axios');
 const config = require('../config.json');
 const { log, error } = require('./utils');
-
-const API_BASE = 'https://openapi.tidal.com/v2';
-const TOKEN_URL = 'https://auth.tidal.com/v1/oauth2/token';
+const {
+    API_V1,
+    apiHeaders,
+    refreshAccessToken,
+    fetchSession,
+} = require('./tidalAuth');
 
 let accessToken = null;
 let tokenExpiresAt = 0;
+let sessionId = config.tidalPrivateSessionId || null;
+let countryCode = config.tidalCountryCode || 'AU';
 let refreshInterval = null;
 
-const countryCode = () => config.tidalCountryCode || 'AU';
-
-const tidalHeaders = (token) => ({
-    Authorization: `Bearer ${token}`,
-    Accept: 'application/vnd.api+json',
-    'Content-Type': 'application/vnd.api+json',
-});
-
-async function fetchClientCredentialsToken() {
-    const credentials = Buffer.from(
-        `${config.tidalPrivateClientID}:${config.tidalPrivateClientSecret}`
-    ).toString('base64');
-
-    const { data } = await axios.post(
-        TOKEN_URL,
-        'grant_type=client_credentials',
-        {
-            headers: {
-                Authorization: `Basic ${credentials}`,
-                'Content-Type': 'application/x-www-form-urlencoded',
-            },
-        }
-    );
-    return data;
+async function ensureSession(accessTokenValue) {
+    if (!sessionId) {
+        const session = await fetchSession(accessTokenValue);
+        sessionId = session.sessionId;
+        countryCode = session.countryCode || countryCode;
+    }
 }
 
-async function refreshAccessToken() {
-    if (config.tidalPrivateRefreshToken) {
-        const { data } = await axios.post(
-            TOKEN_URL,
-            new URLSearchParams({
-                grant_type: 'refresh_token',
-                refresh_token: config.tidalPrivateRefreshToken,
-                client_id: config.tidalPrivateClientID,
-            }).toString(),
-            { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
-        );
-        accessToken = data.access_token;
-        tokenExpiresAt = Date.now() + (data.expires_in - 300) * 1000;
-        log('Tidal: access token refreshed');
-        return accessToken;
+async function refreshTokens() {
+    if (!config.tidalPrivateRefreshToken) {
+        throw new Error('Missing tidalPrivateRefreshToken. Run: node scripts/get-tidal-token.js');
     }
 
-    const data = await fetchClientCredentialsToken();
+    const data = await refreshAccessToken(config.tidalPrivateRefreshToken);
     accessToken = data.access_token;
     tokenExpiresAt = Date.now() + (data.expires_in - 300) * 1000;
-    log('Tidal: client credentials token obtained');
+    await ensureSession(accessToken);
+    log('Tidal: access token refreshed');
     return accessToken;
 }
 
 async function getToken() {
     if (!accessToken || Date.now() >= tokenExpiresAt) {
-        await refreshAccessToken();
+        await refreshTokens();
     }
     return accessToken;
 }
 
 async function tidalRequest(method, path, options = {}) {
     const token = await getToken();
+    const params = {
+        sessionId,
+        countryCode,
+        limit: 1000,
+        ...(options.params || {}),
+    };
+
     return axios({
         method,
-        url: `${API_BASE}${path}`,
-        headers: tidalHeaders(token),
-        ...options,
+        url: `${API_V1}${path}`,
+        headers: apiHeaders(token, options.headers || {}),
+        params,
+        data: options.data,
+        validateStatus: options.validateStatus,
     });
 }
 
-async function searchTracks(query) {
-    const encoded = encodeURIComponent(query.trim());
-    const { data } = await tidalRequest('GET', `/searchResults/${encoded}`, {
-        params: {
-            countryCode: countryCode(),
-            include: 'tracks,tracks.artists',
-        },
-    });
-
-    const trackRels = data?.data?.relationships?.tracks?.data || [];
-    if (!trackRels.length) return null;
-
-    const included = data.included || [];
-    const track = included.find((item) => item.type === 'tracks' && item.id === trackRels[0].id);
-    if (!track) return null;
-
-    const artistIds = track.relationships?.artists?.data?.map((artist) => artist.id) || [];
-    const artists = included
-        .filter((item) => item.type === 'artists' && artistIds.includes(item.id))
-        .map((artist) => artist.attributes?.name)
+function parseTrack(item) {
+    const artists = (item.artists || [])
+        .map((artist) => artist.name)
         .filter(Boolean)
         .join(', ');
-
     return {
-        id: track.id,
-        name: track.attributes?.title,
+        id: String(item.id),
+        name: item.title,
         artists,
     };
 }
 
-async function addTrackToPlaylist(playlistId, trackId) {
-    await tidalRequest('POST', `/playlists/${playlistId}/relationships/items`, {
-        params: { countryCode: countryCode() },
-        data: {
-            data: [{ id: String(trackId), type: 'tracks' }],
+async function searchTracks(query) {
+    const { data } = await tidalRequest('GET', 'search', {
+        params: {
+            query: query.trim(),
+            types: 'tracks',
+            limit: 1,
+            offset: 0,
         },
+    });
+
+    const rawTracks = data?.tracks?.items || data?.tracks || [];
+    if (!rawTracks.length) return null;
+
+    const first = rawTracks[0];
+    const track = first.item || first;
+    if (!track?.id) return null;
+
+    return parseTrack(track);
+}
+
+async function getPlaylistEtag(playlistId) {
+    const { headers } = await tidalRequest('GET', `playlists/${playlistId}`);
+    return headers.etag || headers.ETag || null;
+}
+
+async function addTrackToPlaylist(playlistId, trackId) {
+    const etag = await getPlaylistEtag(playlistId);
+    const headers = etag ? { 'If-None-Match': etag } : {};
+
+    await tidalRequest('POST', `playlists/${playlistId}/items`, {
+        headers: {
+            ...headers,
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        data: new URLSearchParams({
+            onArtifactNotFound: 'SKIP',
+            trackIds: String(trackId),
+            onDupes: 'SKIP',
+        }).toString(),
+        params: { limit: 100 },
     });
 }
 
 async function getAllPlaylistSongs(playlistId) {
     const songs = [];
-    let cursor = null;
+    let offset = 0;
 
-    do {
-        const params = {
-            countryCode: countryCode(),
-            include: 'items',
-        };
-        if (cursor) params['page[cursor]'] = cursor;
+    while (true) {
+        const { data } = await tidalRequest('GET', `playlists/${playlistId}/tracks`, {
+            params: { offset, limit: 100 },
+        });
 
-        const { data } = await tidalRequest(
-            'GET',
-            `/playlists/${playlistId}/relationships/items`,
-            { params }
-        );
+        const items = data?.items || [];
+        if (!items.length) break;
 
-        for (const item of data.data || []) {
+        for (const entry of items) {
+            const track = entry.item || entry;
             songs.push({
-                id: item.meta?.itemId || item.id,
-                type: item.type,
+                id: String(track.id),
+                name: track.title,
             });
         }
 
-        cursor = data.links?.next
-            ? new URL(data.links.next).searchParams.get('page[cursor]')
-            : null;
-    } while (cursor);
+        if (items.length < 100) break;
+        offset += items.length;
+    }
 
     return songs;
 }
@@ -152,7 +148,7 @@ async function tidal() {
     if (!refreshInterval) {
         refreshInterval = setInterval(async () => {
             try {
-                await refreshAccessToken();
+                await refreshTokens();
             } catch (e) {
                 error('Tidal: failed to refresh access token', e);
             }
