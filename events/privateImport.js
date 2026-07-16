@@ -1,5 +1,5 @@
 const config = require('../config.json');
-const { tidal, searchTracks, addTrackToPlaylist } = require('../utils/tidalprivate.js');
+const { tidal, searchTracks, addTrackToPlaylists } = require('../utils/tidalprivate.js');
 const { error, log } = require('../utils/utils.js');
 
 module.exports = {
@@ -18,12 +18,14 @@ module.exports = {
 
                 const songInCollection = await privatedb.findOne({ id: song.id });
                 if (!songInCollection) {
+                    // Main playlist: append. Sister playlist: prepend (inverted for Tesla).
                     log('TRACK ADD', song.id);
-                    await addTrackToPlaylist(config.tidalPrivatePlaylist, song.id);
+                    await addTrackToPlaylists(song.id);
                     await privatedb.insertOne({
                         id: song.id,
                         name: song.name,
                         artists: song.artists,
+                        addedAt: new Date(),
                     });
                     await message.reactions.removeAll();
                     await message.react('✅');

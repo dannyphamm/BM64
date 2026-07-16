@@ -8,6 +8,10 @@ const {
     fetchSession,
 } = require('./tidalAuth');
 
+const API_V2 = 'https://api.tidal.com/v2/';
+const ADD_CHUNK_SIZE = 20;
+const CLEAR_CHUNK_SIZE = 20;
+
 let accessToken = null;
 let tokenExpiresAt = 0;
 let sessionId = config.tidalPrivateSessionId || null;
@@ -53,7 +57,7 @@ async function tidalRequest(method, path, options = {}) {
 
     return axios({
         method,
-        url: `${API_V1}${path}`,
+        url: `${options.baseUrl || API_V1}${path}`,
         headers: apiHeaders(token, options.headers || {}),
         params,
         data: options.data,
@@ -98,24 +102,6 @@ async function getPlaylistEtag(playlistId) {
     return headers.etag || headers.ETag || null;
 }
 
-async function addTrackToPlaylist(playlistId, trackId) {
-    const etag = await getPlaylistEtag(playlistId);
-    const headers = etag ? { 'If-None-Match': etag } : {};
-
-    await tidalRequest('POST', `playlists/${playlistId}/items`, {
-        headers: {
-            ...headers,
-            'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        data: new URLSearchParams({
-            onArtifactNotFound: 'SKIP',
-            trackIds: String(trackId),
-            onDupes: 'SKIP',
-        }).toString(),
-        params: { limit: 100 },
-    });
-}
-
 async function getAllPlaylistSongs(playlistId) {
     const songs = [];
     let offset = 0;
@@ -143,6 +129,171 @@ async function getAllPlaylistSongs(playlistId) {
     return songs;
 }
 
+/**
+ * Add a track to a playlist.
+ * @param {number} [position] - Insert index. Omit to append. Use 0 to prepend.
+ */
+async function addTrackToPlaylist(playlistId, trackId, position) {
+    const etag = await getPlaylistEtag(playlistId);
+    const body = {
+        onArtifactNotFound: 'SKIP',
+        trackIds: String(trackId),
+        onDupes: 'SKIP',
+    };
+    if (typeof position === 'number' && position >= 0) {
+        body.toIndex = String(position);
+    }
+
+    await tidalRequest('POST', `playlists/${playlistId}/items`, {
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            ...(etag ? { 'If-None-Match': etag } : {}),
+        },
+        data: new URLSearchParams(body).toString(),
+        params: { limit: 100 },
+    });
+}
+
+/**
+ * Main playlist: append (normal order).
+ * Sister playlist: prepend so it stays inverted (newest first for Tesla).
+ */
+async function addTrackToPlaylists(trackId) {
+    await addTrackToPlaylist(config.tidalPrivatePlaylist, trackId);
+    if (config.tidalSisterPlaylist) {
+        await addTrackToPlaylist(config.tidalSisterPlaylist, trackId, 0);
+    }
+}
+
+async function addTracksToPlaylist(playlistId, trackIds, position = -1) {
+    for (let i = 0; i < trackIds.length; i += ADD_CHUNK_SIZE) {
+        const chunk = trackIds.slice(i, i + ADD_CHUNK_SIZE);
+        const etag = await getPlaylistEtag(playlistId);
+        const body = {
+            onArtifactNotFound: 'SKIP',
+            trackIds: chunk.join(','),
+            onDupes: 'SKIP',
+        };
+        if (position >= 0) {
+            body.toIndex = String(position + i);
+        }
+
+        await tidalRequest('POST', `playlists/${playlistId}/items`, {
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                ...(etag ? { 'If-None-Match': etag } : {}),
+            },
+            data: new URLSearchParams(body).toString(),
+            params: { limit: 100 },
+        });
+    }
+}
+
+/**
+ * Build inverted order reliably: walk main order (oldest→newest) and prepend each.
+ * Batch add can scramble order on Tidal's API.
+ */
+async function addTracksNewestFirst(playlistId, songsOldestFirst) {
+    log(`Tidal: adding ${songsOldestFirst.length} tracks newest-first to ${playlistId}`);
+    for (let i = 0; i < songsOldestFirst.length; i++) {
+        await addTrackToPlaylist(playlistId, songsOldestFirst[i].id, 0);
+        if ((i + 1) % 25 === 0 || i + 1 === songsOldestFirst.length) {
+            log(`Tidal: ${i + 1}/${songsOldestFirst.length}`);
+        }
+    }
+}
+
+async function clearPlaylist(playlistId) {
+    while (true) {
+        const songs = await getAllPlaylistSongs(playlistId);
+        if (!songs.length) break;
+
+        const count = Math.min(songs.length, CLEAR_CHUNK_SIZE);
+        const indices = Array.from({ length: count }, (_, i) => i).join(',');
+        const etag = await getPlaylistEtag(playlistId);
+
+        await tidalRequest('DELETE', `playlists/${playlistId}/items/${indices}`, {
+            headers: etag ? { 'If-None-Match': etag } : {},
+        });
+    }
+}
+
+/**
+ * Rebuild playlist so the first song in songsOldestFirst ends up last
+ * (newest / last-added is song #1).
+ */
+async function rebuildPlaylistNewestFirst(playlistId, songsOldestFirst) {
+    log(`Tidal: rebuilding playlist ${playlistId} (${songsOldestFirst.length} tracks, newest-first)`);
+    await clearPlaylist(playlistId);
+    if (songsOldestFirst.length) {
+        await addTracksNewestFirst(playlistId, songsOldestFirst);
+    }
+}
+
+/** @deprecated use rebuildPlaylistNewestFirst */
+async function rebuildPlaylist(playlistId, trackIds) {
+    await rebuildPlaylistNewestFirst(
+        playlistId,
+        [...trackIds].reverse().map((id) => ({ id }))
+    );
+}
+
+/** Reverse current playlist order in place (oldest becomes last / newest becomes #1). */
+async function reversePlaylist(playlistId) {
+    const songs = await getAllPlaylistSongs(playlistId);
+    await rebuildPlaylistNewestFirst(playlistId, songs);
+    return songs.length;
+}
+
+async function createPlaylist(title, description = '') {
+    const token = await getToken();
+    const { data } = await axios({
+        method: 'PUT',
+        url: `${API_V2}my-collection/playlists/folders/create-playlist`,
+        headers: apiHeaders(token),
+        params: {
+            name: title,
+            description,
+            folderId: 'root',
+            countryCode,
+        },
+    });
+
+    const uuid = data?.data?.uuid || data?.uuid;
+    if (!uuid) {
+        throw new Error(`Failed to create playlist: ${JSON.stringify(data)}`);
+    }
+    return uuid;
+}
+
+/**
+ * Create a new playlist with the source playlist's tracks inverted
+ * (newest first for Tesla).
+ */
+async function createReversedPlaylist(sourcePlaylistId, title, description = '') {
+    const songs = await getAllPlaylistSongs(sourcePlaylistId);
+    const newId = await createPlaylist(title, description);
+    if (songs.length) {
+        await addTracksNewestFirst(newId, songs);
+    }
+
+    // Sanity check: sister #1 should match main's last track
+    const sisterSongs = await getAllPlaylistSongs(newId);
+    const mainFirst = songs[0]?.id;
+    const mainLast = songs[songs.length - 1]?.id;
+    const sisterFirst = sisterSongs[0]?.id;
+    const sisterLast = sisterSongs[sisterSongs.length - 1]?.id;
+    log(`Tidal: main first=${mainFirst} last=${mainLast}`);
+    log(`Tidal: sister first=${sisterFirst} last=${sisterLast}`);
+    if (sisterFirst !== mainLast || sisterLast !== mainFirst) {
+        throw new Error(
+            `Invert failed: expected sister first=${mainLast} last=${mainFirst}, got first=${sisterFirst} last=${sisterLast}`
+        );
+    }
+
+    return { playlistId: newId, trackCount: songs.length };
+}
+
 async function tidal() {
     await getToken();
     if (!refreshInterval) {
@@ -154,12 +305,28 @@ async function tidal() {
             }
         }, 3500000);
     }
-    return { searchTracks, addTrackToPlaylist, getAllPlaylistSongs };
+    return {
+        searchTracks,
+        addTrackToPlaylist,
+        addTrackToPlaylists,
+        getAllPlaylistSongs,
+        reversePlaylist,
+        createReversedPlaylist,
+        rebuildPlaylist,
+        rebuildPlaylistNewestFirst,
+    };
 }
 
 module.exports = {
     tidal,
     searchTracks,
     addTrackToPlaylist,
+    addTrackToPlaylists,
     getAllPlaylistSongs,
+    reversePlaylist,
+    createReversedPlaylist,
+    rebuildPlaylist,
+    rebuildPlaylistNewestFirst,
+    clearPlaylist,
+    createPlaylist,
 };

@@ -11,6 +11,7 @@ const { loadSpotify } = require('../services/spotifyStatus');
 const { socketIO } = require('../utils/socket');
 //const { misamoAutoImport } = require('../services/misamoAutoImport');
 const { uniqloStreamService } = require('../services/uniqlostream');
+const { palworldUpdateService } = require('../services/palworldUpdate');
 
 module.exports = {
     name: 'clientReady',
@@ -66,6 +67,19 @@ module.exports = {
                     error(e, "TRY UNIQLO SINGLE ITEMS");
                 }
             });
+
+            log("Palworld Steam update check: every 10 minutes.")
+            schedule.scheduleJob('0 */10 * * * *', async () => {
+                try {
+                    await palworldUpdateService(client);
+                } catch (e) {
+                    error(e, "TRY PALWORLD UPDATE");
+                }
+            });
+            // Seed / check once shortly after boot
+            setTimeout(() => {
+                palworldUpdateService(client).catch((e) => error(e, "TRY PALWORLD UPDATE BOOT"));
+            }, 15000);
 
             log("Spotify Restart browser every 12 hours")
             schedule.scheduleJob('0 0 */8 * * *', async () => {
