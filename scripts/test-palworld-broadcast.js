@@ -1,8 +1,10 @@
 /**
- * Send a single test Broadcast to the Palworld server (no restart).
+ * Send a single test Broadcast via Pelican console (no restart).
  *
  *   node scripts/test-palworld-broadcast.js
  *   node scripts/test-palworld-broadcast.js "Custom test message"
+ *
+ * Spaces are replaced with underscores (Palworld truncates Broadcast at spaces).
  */
 const { fetchPelicanServer, sendPelicanCommand, broadcastCommand } = require('../services/palworldUpdate');
 const { log, error } = require('../utils/utils');

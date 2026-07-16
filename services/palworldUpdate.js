@@ -86,12 +86,11 @@ async function sendPelicanCommand(command) {
 }
 
 /**
- * Palworld Broadcast only keeps the first "word" unless spaces are NBSP.
- * See: https://github.com/Darkhand81/Palworld_broadcast_encoding_bug
+ * Palworld Broadcast truncates at spaces via Pelican console.
+ * Use underscores so the full message is visible in-game.
  */
 function broadcastCommand(message) {
-    const nbsp = '\xA0';
-    return `Broadcast ${String(message).replace(/ /g, nbsp)}`;
+    return `Broadcast ${String(message).replace(/ /g, '_')}`;
 }
 
 function warningMinutes() {
