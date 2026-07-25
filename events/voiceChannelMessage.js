@@ -1,26 +1,35 @@
-const {log} = require('../utils/utils')
-const config = require('../config.json')
+const { log, error } = require('../utils/utils');
+const config = require('../config.json');
+
+const SESSION_NOTICE = 'All messages sent in this text channel will automatically disappear after 15 minutes.';
+
 module.exports = {
-    name: 'voiceStateUpdate',
-    async execute(oldState, newState) {
-        if (config.mode !== 'DEV') {
-            const oldChannel = oldState.channel;
-            const newChannel = newState.channel;
+	name: 'voiceStateUpdate',
+	async execute(oldState, newState) {
+		if (config.mode === 'DEV') return;
 
-            // Check if the user has joined an empty channel
-            if (newChannel && newChannel.members.size === 1 && newState.channelId !== oldState.channelId && newState.channelId !== '1145310513232891955') {
-                log(`Session Created in ${newChannel.name} (${newChannel.id})`)
-                const channelMessage = await newChannel.send('All messages sent in this text channel will automatically disappear after 15 minutes.');
-                channelMessage.channelId = newChannel.id; // save the channel ID on the message
-            }
+		const misamoChannelId = config.misamoVoiceChannel;
+		const oldChannel = oldState.channel;
+		const newChannel = newState.channel;
 
-            // Check if the user has left an empty channel
-            if (oldChannel && oldChannel.members.size === 0 && oldChannel.id !== '1145310513232891955') {
-                log(`Session complete in ${oldChannel.name} (${oldChannel.id}). Deleting message`)
-                const fetchedMessages = await oldChannel.messages.fetch();
-                const firstMessage = fetchedMessages.last();
-                firstMessage.delete();
-            }
-        }
-    },
+		// User joined an empty channel (session start)
+		if (newChannel && newChannel.members.size === 1 && newState.channelId !== oldState.channelId && newState.channelId !== misamoChannelId) {
+			log(`Session Created in ${newChannel.name} (${newChannel.id})`);
+			await newChannel.send(SESSION_NOTICE).catch((e) => error(e, 'VOICE_SESSION_NOTICE'));
+		}
+
+		// Last user left — remove the session notice if present
+		if (oldChannel && oldChannel.members.size === 0 && oldChannel.id !== misamoChannelId) {
+			log(`Session complete in ${oldChannel.name} (${oldChannel.id}). Deleting message`);
+			try {
+				const fetchedMessages = await oldChannel.messages.fetch({ limit: 20 });
+				const notice = fetchedMessages.find((m) => m.content === SESSION_NOTICE && m.author.id === oldState.client.user.id);
+				if (notice) {
+					await notice.delete();
+				}
+			} catch (e) {
+				error(e, 'VOICE_SESSION_CLEANUP');
+			}
+		}
+	},
 };

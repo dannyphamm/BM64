@@ -3,20 +3,23 @@ const { SlashCommandBuilder } = require('@discordjs/builders');
 module.exports = {
 	data: new SlashCommandBuilder()
 		.setName('play')
-		.setDescription('Display info about this server.')
+		.setDescription('Play a song in your current voice channel.')
 		.addStringOption(option =>
-			option.setName("name").setDescription("The name of the song to play.")
-
+			option.setName('name').setDescription('The name of the song to play.').setRequired(true)
 		),
 	async execute(interaction) {
 		const { client } = interaction;
-		client.distube.play(interaction.member.voice.channel,
-		 	interaction.options.getString("name")
-			, {
-				textChannel: interaction.channel,
-			}
-		 )
-		 return interaction.reply(`${interaction.options.getString("name")} added!`, { ephemeral: true });
+		const query = interaction.options.getString('name');
+		const voiceChannel = interaction.member.voice.channel;
+
+		if (!voiceChannel) {
+			return interaction.reply({ content: 'Join a voice channel first.', ephemeral: true });
+		}
+
+		await client.distube.play(voiceChannel, query, {
+			textChannel: interaction.channel,
+			member: interaction.member,
+		});
+		return interaction.reply({ content: `${query} added!`, ephemeral: true });
 	},
 };
-

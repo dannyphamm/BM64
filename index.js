@@ -21,6 +21,12 @@ const client = new Client(
 // Make client available globally for scheduled tasks
 global.discordClient = client;
 
+// Discord.js enables captureRejections — async event handler rejections become Client 'error'.
+// Without a listener, Node crashes with: Emitted 'error' event on Client instance.
+client.on('error', (err) => {
+    error('Discord client error:', err);
+});
+
 const connectToDB = async () => {
     try {
         await MongoConnection.connect();
@@ -42,10 +48,14 @@ const loadEvents = async () => {
             const filePath = path.join(eventPath, file);
             const event = require(filePath);
             log(`Loaded Event: ${event.name}`);
+            const run = (...args) =>
+                Promise.resolve(event.execute(...args)).catch((err) => {
+                    error(`Unhandled error in event ${event.name}:`, err);
+                });
             if (event.once) {
-                client.once(event.name, (...args) => event.execute(...args));
+                client.once(event.name, run);
             } else {
-                client.on(event.name, (...args) => event.execute(...args));
+                client.on(event.name, run);
             }
         });
     } catch (err) {
@@ -107,7 +117,7 @@ const distube = new DisTube(client, {
     // }
 })
 distube.on('error', (channel, e) => {
-    if (channel) channel.send(`An error encountered: ${e}`)
+    if (channel) channel.send(`An error encountered: ${e}`).catch(() => {});
     else error(e, "DISTUBE_ERROR")
 })
 distube.on("initQueue", queue => {
@@ -121,12 +131,12 @@ distube.on("empty", queue => {
 distube.on("finish", queue => {
     queue.voice.setSelfDeaf(true)
 })
-distube.on("addSong", (queue, song) => queue.textChannel.send(
+distube.on("addSong", (queue, song) => queue.textChannel?.send(
     `Added ${song.name} - \`${song.formattedDuration}\` to the queue by ${song.user}.`
-));
-distube.on("playSong", (queue, song) => queue.textChannel.send(
+).catch(() => {}));
+distube.on("playSong", (queue, song) => queue.textChannel?.send(
     `Playing \`${song.name}\` - \`${song.formattedDuration}\`\nRequested by: ${song.user}`
-));
+).catch(() => {}));
 
 client.genius = GeniusClient;
 client.distube = distube;

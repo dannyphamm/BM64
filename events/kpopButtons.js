@@ -37,15 +37,16 @@ module.exports = {
             }
             if (interaction.customId === 'skip') {
                 await interaction.reply({content:'Running...', ephemeral: true });
-                await socketIO().then((socket) => {
-                    const play = socket.timeout(10000).emitWithAck('skipMusic');
-                    if (play) {
-                        loadSpotify(client, true)
-                    }
-
-                })
-
-                await interaction.editReply({ content: 'Skipped!', ephemeral: true });
+                try {
+                    await socketIO().then((socket) =>
+                        socket.timeout(10000).emitWithAck('skipMusic')
+                    );
+                    await loadSpotify(client, true);
+                    await interaction.editReply({ content: 'Skipped!', ephemeral: true });
+                } catch (e) {
+                    error(e);
+                    await interaction.editReply({ content: 'Skip failed (Spotify client timed out).', ephemeral: true }).catch(() => {});
+                }
             }
 
             if (interaction.customId === 'remove') {
@@ -90,15 +91,19 @@ module.exports = {
 
             if (interaction.customId === 'reset') {
                 await interaction.reply({content:'Running...', ephemeral: true });
-                await socketIO().then(async(socket) => {
-                    const play = await socket.timeout(10000).emitWithAck('playMusic');
-                    console.log(play)
+                try {
+                    const play = await socketIO().then((socket) =>
+                        socket.timeout(10000).emitWithAck('playMusic')
+                    );
+                    console.log(play);
                     if (play) {
-                        loadSpotify(client, true)
+                        await loadSpotify(client, true);
                     }
-                })
-
-                await interaction.editReply({ content: 'Reset Triggered', ephemeral: true });
+                    await interaction.editReply({ content: 'Reset Triggered', ephemeral: true });
+                } catch (e) {
+                    error(e);
+                    await interaction.editReply({ content: 'Reset failed (Spotify client timed out).', ephemeral: true }).catch(() => {});
+                }
             }
         }
 

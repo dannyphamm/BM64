@@ -1,4 +1,3 @@
-//const { spotify } = require('../utils/spotify.js_deprecate');
 const { ActionRowBuilder, ButtonBuilder } = require('@discordjs/builders');
 const { ButtonStyle } = require('discord.js');
 const { error, log } = require('../utils/utils');
@@ -120,58 +119,68 @@ const formatDuration = (ms) => {
 
 // Socket API wrapper (replaces deprecated Spotify Web API for current/previous track)
 class SocketWrapper {
-    static async getQueue() {
+    static async getServer() {
         try {
-            const socket = await socketIO();
-            return await socket.timeout(SOCKET_TIMEOUT).emitWithAck('getQueue');
+            return await socketIO();
         } catch (e) {
-            log("Socket failure getQueue, retrying in 3 seconds");
-            error(e);
-            await sleep(RETRY_DELAY);
-            throw e;
+            error('Failed to get socket.io server:', e);
+            return null;
         }
     }
 
-    static async getPlayLength() {
+    static async hasClients(io) {
         try {
-            const socket = await socketIO();
-            return await socket.timeout(SHORT_SOCKET_TIMEOUT).emitWithAck('getPlayLength');
+            const sockets = await io.fetchSockets();
+            return sockets.length > 0;
         } catch (e) {
-            log("Socket failure getPlayLength, retrying in 3 seconds");
-            error(e);
-            await sleep(RETRY_DELAY);
-            throw e;
+            error('Failed to fetch socket clients:', e);
+            return false;
         }
     }
 
-    static async getCurrentSong() {
+    /**
+     * Broadcast with ack. Never throws — returns null on timeout / no clients.
+     * (Timeouts previously rejected and could crash Discord.js Client via captureRejections.)
+     */
+    static async emitWithAck(event, timeoutMs = SHORT_SOCKET_TIMEOUT, ...args) {
+        const io = await this.getServer();
+        if (!io) return null;
+
+        if (!(await this.hasClients(io))) {
+            log(`Socket skip ${event}: no clients connected`);
+            return null;
+        }
+
         try {
-            const socket = await socketIO();
-            return await socket.timeout(SHORT_SOCKET_TIMEOUT).emitWithAck('getCurrentSong');
+            return await io.timeout(timeoutMs).emitWithAck(event, ...args);
         } catch (e) {
-            log("Socket failure getCurrentSong, retrying in 3 seconds");
-            error(e);
-            await sleep(RETRY_DELAY);
-            throw e;
+            // Typical when Spotify browser tab is on an ad / unresponsive: responses: []
+            log(`Socket failure ${event}: ${e?.message || e}`);
+            return null;
         }
     }
 
-    static async getPrevious() {
-        try {
-            const socket = await socketIO();
-            return await socket.timeout(SHORT_SOCKET_TIMEOUT).emitWithAck('getPrevious');
-        } catch (e) {
-            log("Socket failure getPrevious, retrying in 3 seconds");
-            error(e);
-            await sleep(RETRY_DELAY);
-            throw e;
-        }
+    static getQueue() {
+        return this.emitWithAck('getQueue', SOCKET_TIMEOUT);
+    }
+
+    static getPlayLength() {
+        return this.emitWithAck('getPlayLength', SHORT_SOCKET_TIMEOUT);
+    }
+
+    static getCurrentSong() {
+        return this.emitWithAck('getCurrentSong', SHORT_SOCKET_TIMEOUT);
+    }
+
+    static getPrevious() {
+        return this.emitWithAck('getPrevious', SHORT_SOCKET_TIMEOUT);
     }
 
     static async skipMusic() {
         try {
-            const socket = await socketIO();
-            socket.emit('skipMusic');
+            const io = await this.getServer();
+            if (!io || !(await this.hasClients(io))) return;
+            io.emit('skipMusic');
         } catch (e) {
             error('Failed to skip music:', e);
         }
@@ -297,6 +306,16 @@ class MessageManager {
 class SpotifyStatusService {
     constructor() {
         this.manager = new SpotifyStatusManager();
+        this.running = false;
+        this.pendingReload = null;
+    }
+
+    /** Schedule a future loadSpotify without growing an async recursive stack. */
+    scheduleReload(client, ms, clear = true) {
+        this.manager.clearTimeouts();
+        this.manager.currentTimeoutId = this.manager.createTrackedTimeout(() => {
+            this.loadSpotify(client, clear).catch((e) => error('Error in scheduled loadSpotify:', e));
+        }, ms);
     }
 
     async loadSpotify(client, clear = false) {
@@ -304,6 +323,14 @@ class SpotifyStatusService {
             error('Client is required for loadSpotify');
             return;
         }
+
+        // Coalesce overlapping calls; run one more pass after the in-flight cycle finishes.
+        if (this.running) {
+            this.pendingReload = { client, clear: clear || this.pendingReload?.clear };
+            if (clear) this.manager.clearTimeouts();
+            return;
+        }
+        this.running = true;
 
         if (clear) {
             this.manager.clearTimeouts();
@@ -314,8 +341,8 @@ class SpotifyStatusService {
             const voiceChannel = await this.getVoiceChannel(client);
             if (!voiceChannel) {
                 log('Voice channel not found, retrying in 5 seconds');
-                await sleep(AD_RETRY_DELAY);
-                return this.loadSpotify(client, true);
+                this.scheduleReload(client, AD_RETRY_DELAY, true);
+                return;
             }
 
             // Check for stuck state
@@ -324,8 +351,8 @@ class SpotifyStatusService {
                 await SocketWrapper.skipMusic();
             }
 
-            const currentSongRaw = await SocketWrapper.getCurrentSong().catch(() => null);
-            const previousRaw = await SocketWrapper.getPrevious().catch(() => null);
+            const currentSongRaw = await SocketWrapper.getCurrentSong();
+            const previousRaw = await SocketWrapper.getPrevious();
             const currentSong = currentSongRaw?.[0] ?? currentSongRaw;
             // getPrevious returns an array of { name, artist } (up to 10); ack may wrap as [array]
             const previousTracks = Array.isArray(previousRaw?.[0]) ? previousRaw[0] : Array.isArray(previousRaw) ? previousRaw : previousRaw ? [previousRaw] : [];
@@ -337,8 +364,14 @@ class SpotifyStatusService {
             }
         } catch (e) {
             error('Error in loadSpotify:', e);
-            await sleep(RETRY_DELAY);
-            return this.loadSpotify(client, true);
+            this.scheduleReload(client, RETRY_DELAY, true);
+        } finally {
+            this.running = false;
+            if (this.pendingReload) {
+                const pending = this.pendingReload;
+                this.pendingReload = null;
+                this.scheduleReload(pending.client, CLEAR_DELAY, pending.clear);
+            }
         }
     }
 
@@ -367,7 +400,7 @@ class SpotifyStatusService {
             await updateVoiceChannelStatus(activityText);
         }
 
-        const queueData = await SocketWrapper.getQueue().catch(() => null);
+        const queueData = await SocketWrapper.getQueue();
         const queue = DataProcessor.processQueueData(queueData);
 
         const embeds = [
@@ -378,7 +411,7 @@ class SpotifyStatusService {
 
         await MessageManager.sendOrEditMessage(voiceChannel, client, embeds, [this.manager.buttons]);
 
-        this.scheduleNextUpdate(progress_ms, duration_ms);
+        this.scheduleNextUpdate(client, progress_ms, duration_ms);
     }
 
     async handleAdOrPaused(client, voiceChannel, previousTracks) {
@@ -394,8 +427,8 @@ class SpotifyStatusService {
         await updateVoiceChannelStatus('');
 
         const [queueData, playLengthData] = await Promise.all([
-            SocketWrapper.getQueue().catch(() => null),
-            SocketWrapper.getPlayLength().catch(() => null)
+            SocketWrapper.getQueue(),
+            SocketWrapper.getPlayLength()
         ]);
 
         const queue = DataProcessor.processQueueData(queueData);
@@ -422,11 +455,10 @@ class SpotifyStatusService {
         await MessageManager.sendOrEditMessage(voiceChannel, client, embeds, [this.manager.buttons]);
 
         log("No track playing, retrying in 5 seconds");
-        await sleep(AD_RETRY_DELAY);
-        return this.loadSpotify(client, true);
+        this.scheduleReload(client, AD_RETRY_DELAY, true);
     }
 
-    scheduleNextUpdate(progressMs, durationMs) {
+    scheduleNextUpdate(client, progressMs, durationMs) {
         this.manager.progressMs = progressMs ?? 0;
         this.manager.durationMs = durationMs ?? 0;
         this.manager.remainingMs = DataProcessor.calculateRemainingTime(
@@ -437,10 +469,10 @@ class SpotifyStatusService {
         //log(`Progress: ${formatDuration(this.manager.progressMs)}, Duration: ${formatDuration(this.manager.durationMs)}, Remaining: ${formatDuration(this.manager.remainingMs)}`);
 
         if (this.manager.remainingMs > 0) {
-            this.manager.currentTimeoutId = this.manager.createTrackedTimeout(
-                () => this.loadSpotify(global.discordClient, true),
-                this.manager.remainingMs
-            );
+            this.scheduleReload(client || global.discordClient, this.manager.remainingMs, true);
+        } else {
+            // No valid remaining time — poll again shortly instead of stalling
+            this.scheduleReload(client || global.discordClient, AD_RETRY_DELAY, true);
         }
     }
 }

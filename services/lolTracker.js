@@ -108,7 +108,14 @@ class LoLTracker {
 
     async _loadChampionNamesInternal() {
         try {
-            const response = await fetch('https://ddragon.leagueoflegends.com/cdn/14.1.1/data/en_US/champion.json');
+            const versionsResponse = await fetch('https://ddragon.leagueoflegends.com/api/versions.json');
+            if (!versionsResponse.ok) {
+                throw new Error(`Failed to fetch Data Dragon versions: ${versionsResponse.status}`);
+            }
+            const versions = await versionsResponse.json();
+            const patch = versions[0] || '14.1.1';
+
+            const response = await fetch(`https://ddragon.leagueoflegends.com/cdn/${patch}/data/en_US/champion.json`);
             if (!response.ok) {
                 throw new Error(`Failed to fetch champion data: ${response.status}`);
             }
@@ -119,7 +126,7 @@ class LoLTracker {
                 this.championNames[parseInt(champion.key)] = champion.name;
             }
 
-            log(`✅ Loaded ${Object.keys(this.championNames).length} champion names`);
+            log(`✅ Loaded ${Object.keys(this.championNames).length} champion names (patch ${patch})`);
         } catch (e) {
             error('Error loading champion names:', e);
             // Don't throw - we can still function without champion names

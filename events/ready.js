@@ -81,7 +81,7 @@ module.exports = {
                 palworldUpdateService(client).catch((e) => error(e, "TRY PALWORLD UPDATE BOOT"));
             }, 15000);
 
-            log("Spotify Restart browser every 12 hours")
+            log("Spotify Restart browser every 8 hours")
             schedule.scheduleJob('0 0 */8 * * *', async () => {
                 try {
                     log("Refreshing Page")
@@ -136,13 +136,13 @@ module.exports = {
             //     }
             // });
             socketIO();
-            log("Socket.io listening on port 3000")
+            log(`Socket.io listening on ${process.env.SOCKET_HOST || '127.0.0.1'}:${process.env.SOCKET_PORT || 3000}`)
             const delay = async () => {
                 // await spotify();
                 await new Promise(resolve => { setTimeout(resolve, 5000) });
-                loadSpotify(client, true)
+                await loadSpotify(client, true);
             }
-            delay();
+            delay().catch((e) => error(e, "Spotify status boot"));
             uniqloStreamService(client);
             
             // Start LoL Tracker service
