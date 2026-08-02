@@ -9,7 +9,7 @@ async function processItemsInBatches(items, batchSize, delayMs, processor) {
     const results = [];
     for (let i = 0; i < items.length; i += batchSize) {
         const batch = items.slice(i, i + batchSize);
-        log(`Processing batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(items.length / batchSize)} (${batch.length} items)`);
+        //log(`Processing batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(items.length / batchSize)} (${batch.length} items)`);
         
         const batchResults = await Promise.allSettled(
             batch.map(item => processor(item))
@@ -127,7 +127,7 @@ async function fetchSaleItems(client, gender, discordId) {
                 hasMoreItems = (offset + limit) < totalItems && response.result.items.length === limit;
                 offset += limit;
 
-                log(`Fetched ${response.result.items.length} items for ${gender}, total so far: ${allItems.length}`);
+                //log(`Fetched ${response.result.items.length} items for ${gender}, total so far: ${allItems.length}`);
             } else {
                 hasMoreItems = false;
             }
@@ -138,7 +138,7 @@ async function fetchSaleItems(client, gender, discordId) {
             return error("No sale items found", gender);
         }
 
-        log(`Total items fetched for ${gender}: ${allItems.length}`);
+        //log(`Total items fetched for ${gender}: ${allItems.length}`);
         // Retrieve the previous state of the sale items from your database
         const collection = await client.mongodb.db.collection(`sale-items-${gender}`);
         const previousState = await collection.find().toArray();
@@ -357,7 +357,7 @@ async function fetchSaleItems(client, gender, discordId) {
                 color: 0x0099ff,
                 title: `Added items (${i + 1}-${i + batch.length})`,
                 description: batch.map(item => {
-                    log("Added ITEM", item.name)
+                    //log("Added ITEM", item.name)
                     const colorSizes = item.l2s.reduce((acc, l2) => {
                         // Skip items with 0 stock
                         if (l2.stock.quantity === 0) {
@@ -396,7 +396,7 @@ async function fetchSaleItems(client, gender, discordId) {
                 .setColor('#0099ff')
                 .setTitle(`Removed items (${i + 1}-${i + batch.length})`)
                 .setDescription(batch.map(item => {
-                    log("Removed ITEM", item.name, item.productId)
+                    //log("Removed ITEM", item.name, item.productId)
                     return `**[${item.name}](https://www.uniqlo.com/au/en/products/${item.productId})**\nBase: ${pricePrecision(item.prices.base.value)}\nPromo: ${pricePrecision(item.prices.promo?.value)}`
                 }).join('\n\n') || 'None')
                 .setImage(`attachment://removed-items.png`)
@@ -418,7 +418,7 @@ async function fetchSaleItems(client, gender, discordId) {
                 .setColor('#0099ff')
                 .setTitle(`Changed items (${i + 1}-${i + batch.length})`)
                 .setDescription(batch.map(item => {
-                    log("Changed ITEM", item[1].name)
+                    //log("Changed ITEM", item[1].name)
                     const colorSizes = item[1].l2s.reduce((acc, l2) => {
                         // Use actual color name from details API
                         const colorKey = l2.color.name || l2.color.displayCode;
