@@ -60,11 +60,36 @@ module.exports = {
                         await interaction.editReply({ content: 'Cannot remove: no track playing or ad is playing.', ephemeral: true });
                         return;
                     }
-                    const result = await socketIO().then((socket) =>
-                        socket.timeout(10000).emitWithAck('removeCurrentSongFromPlaylist')
-                    );
-                    const resolved = result?.[0] ?? result;
-                    if (resolved) {
+
+                    // SpotifyControl2 returns { ok, reason? }; legacy clients may still ack true/false.
+                    const callRemove = async () => {
+                        const result = await socketIO().then((socket) =>
+                            socket.timeout(10000).emitWithAck('removeCurrentSongFromPlaylist')
+                        );
+                        return result?.[0] ?? result;
+                    };
+                    const normalizeRemoveResult = (resolved) => {
+                        if (resolved === true) return { ok: true };
+                        if (resolved === false || resolved == null) return { ok: false, reason: 'ui_error' };
+                        if (typeof resolved === 'object') {
+                            if (resolved.ok) return { ok: true };
+                            return { ok: false, reason: resolved.reason || 'ui_error' };
+                        }
+                        return { ok: false, reason: 'ui_error' };
+                    };
+
+                    let outcome = normalizeRemoveResult(await callRemove());
+                    // One retry for flaky queue UI (panel just opened / Now playing not ready yet)
+                    if (!outcome.ok && outcome.reason === 'ui_error') {
+                        outcome = normalizeRemoveResult(await callRemove());
+                    }
+
+                    const skipAndRefresh = async () => {
+                        await socketIO().then((socket) => socket.timeout(10000).emitWithAck('skipMusic'));
+                        loadSpotify(client, true);
+                    };
+
+                    if (outcome.ok) {
                         const misamo = client.mongodb.db.collection(config.mongodbDBMiSaMo);
                         const updateResult = await misamo.updateOne(
                             { name: currentSong.name, artists: currentSong.artist },
@@ -77,11 +102,18 @@ module.exports = {
                             );
                         }
                         log('REMOVE', currentSong.name, currentSong.artist);
-                        await socketIO().then((socket) => socket.timeout(10000).emitWithAck('skipMusic'));
-                        loadSpotify(client, true);
+                        await skipAndRefresh();
                         await interaction.editReply({ content: 'Removed from playlist and skipped!', ephemeral: true });
+                    } else if (outcome.reason === 'not_in_playlist') {
+                        // Priority-queue / Add to Queue tracks aren't on the playlist — just skip
+                        log('REMOVE_SKIP_PRIO', currentSong.name, currentSong.artist);
+                        await skipAndRefresh();
+                        await interaction.editReply({
+                            content: 'Not a playlist track (e.g. priority queue) — skipped without removing.',
+                            ephemeral: true,
+                        });
                     } else {
-                        await interaction.editReply({ content: 'Could not remove (e.g. not playing a track from playlist).', ephemeral: true });
+                        await interaction.editReply({ content: 'Could not remove (queue UI failed). Try again.', ephemeral: true });
                     }
                 } catch (e) {
                     error(e);
