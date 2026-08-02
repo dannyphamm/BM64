@@ -81,40 +81,40 @@ module.exports = {
                 palworldUpdateService(client).catch((e) => error(e, "TRY PALWORLD UPDATE BOOT"));
             }, 15000);
 
-            log("Spotify Restart browser every 8 hours")
-            schedule.scheduleJob('0 0 */8 * * *', async () => {
-                try {
-                    log("Refreshing Page")
-                    const refreshResponse = await socketIO().then((socket) => {
-                        return socket.timeout(3000).emitWithAck('refreshPage');
-                    })
+            // log("Spotify Restart browser every 8 hours")
+            // schedule.scheduleJob('0 0 */8 * * *', async () => {
+            //     try {
+            //         log("Refreshing Page")
+            //         const refreshResponse = await socketIO().then((socket) => {
+            //             return socket.timeout(3000).emitWithAck('refreshPage');
+            //         })
 
-                    if (refreshResponse) {
-                        log("Refreshing Page Success, loading spotify queue")
-                        const play = await socketIO().then(async (socket) => {
-                            // wait 3 seconds
-                            await new Promise(resolve => { 
-                                log("Waiting 3 seconds to play music")
-                                setTimeout(resolve, 3000) });
-                                log("Playing Music socket call")
-                            return socket.timeout(3000).emitWithAck('playMusic');
-                        })
-                        log("PlayMusic Response",play)
-                        if (play) {
-                            //wait 3 seconds
-                            await new Promise(resolve => {
-                                log("Waiting 3 seconds to load spotify")
-                                setTimeout(resolve, 3000) });
+            //         if (refreshResponse) {
+            //             log("Refreshing Page Success, loading spotify queue")
+            //             const play = await socketIO().then(async (socket) => {
+            //                 // wait 3 seconds
+            //                 await new Promise(resolve => { 
+            //                     log("Waiting 3 seconds to play music")
+            //                     setTimeout(resolve, 3000) });
+            //                     log("Playing Music socket call")
+            //                 return socket.timeout(3000).emitWithAck('playMusic');
+            //             })
+            //             log("PlayMusic Response",play)
+            //             if (play) {
+            //                 //wait 3 seconds
+            //                 await new Promise(resolve => {
+            //                     log("Waiting 3 seconds to load spotify")
+            //                     setTimeout(resolve, 3000) });
                             
-                            log("PlayMusic Success, loading spotify queue")
-                            loadSpotify(client, true)
-                        }
-                    }
-                    //misamoAutoImport(client);
-                } catch (e) {
-                    error(e, "Refresh Spotify");
-                }
-            });
+            //                 log("PlayMusic Success, loading spotify queue")
+            //                 loadSpotify(client, true)
+            //             }
+            //         }
+            //         //misamoAutoImport(client);
+            //     } catch (e) {
+            //         error(e, "Refresh Spotify");
+            //     }
+            // });
 
             log("UniqloTracker: Scheduled job to run 15 minutes.")
             schedule.scheduleJob('0 */15 * * * *', async () => {
@@ -143,7 +143,7 @@ module.exports = {
                 await loadSpotify(client, true);
             }
             delay().catch((e) => error(e, "Spotify status boot"));
-            uniqloStreamService(client);
+            uniqloStreamService(client).catch((e) => error(e, "TRY UNIQLO STREAM"));
             
             // Start LoL Tracker service
             if (client.lolTracker) {

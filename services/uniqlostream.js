@@ -1,7 +1,9 @@
-const { WebhookClient, EmbedBuilder } = require('discord.js');
+const { EmbedBuilder } = require('discord.js');
 const config = require("../config.json");
 const { error, log, fetchAllMessages, pricePrecision } = require('../utils/utils');
 
+const RECONNECT_BASE_MS = 5000;
+const RECONNECT_MAX_MS = 60000;
 
 const cleanupOldMessages = async (channel, itemId) => {
     try {
@@ -24,143 +26,208 @@ const cleanupOldMessages = async (channel, itemId) => {
     }
 };
 
+/**
+ * Watch a collection with automatic reconnect on stream errors/closes.
+ * Unhandled ChangeStream 'error' events crash the Node process.
+ */
+function watchWithReconnect(collection, label, onChange) {
+    let stream = null;
+    let resumeToken = null;
+    let reconnectTimer = null;
+    let stopped = false;
+    let attempt = 0;
+
+    const clearReconnectTimer = () => {
+        if (reconnectTimer) {
+            clearTimeout(reconnectTimer);
+            reconnectTimer = null;
+        }
+    };
+
+    const closeStream = async () => {
+        if (!stream) return;
+        const current = stream;
+        stream = null;
+        current.removeAllListeners();
+        try {
+            await current.close();
+        } catch (_) {
+            // Stream may already be closed after an error
+        }
+    };
+
+    const isNonResumableError = (err) => {
+        const message = String(err?.message || err || '');
+        const code = err?.code;
+        // Resume token expired / not found in oplog — restart without resumeAfter
+        return code === 286 || /resume|ChangeStreamHistoryLost|cannot resume/i.test(message);
+    };
+
+    const scheduleReconnect = (reason, err) => {
+        if (stopped || reconnectTimer) return;
+
+        if (err && isNonResumableError(err) && resumeToken) {
+            error(`${label} change stream resume token is no longer valid; restarting without resume`);
+            resumeToken = null;
+        }
+
+        const delay = Math.min(RECONNECT_BASE_MS * Math.pow(2, attempt), RECONNECT_MAX_MS);
+        attempt += 1;
+        error(`${label} change stream ${reason}; reconnecting in ${delay}ms (attempt ${attempt})`);
+
+        reconnectTimer = setTimeout(async () => {
+            reconnectTimer = null;
+            await closeStream();
+            start();
+        }, delay);
+    };
+
+    const start = () => {
+        if (stopped) return;
+
+        try {
+            const options = { fullDocument: 'updateLookup' };
+            if (resumeToken) {
+                options.resumeAfter = resumeToken;
+            }
+
+            stream = collection.watch([], options);
+
+            stream.on('change', async (change) => {
+                if (change?._id) {
+                    resumeToken = change._id;
+                }
+                try {
+                    await onChange(change);
+                } catch (err) {
+                    error(`Error in ${label} change stream:`, err);
+                }
+            });
+
+            stream.on('error', (err) => {
+                error(`${label} change stream error:`, err);
+                scheduleReconnect('errored', err);
+            });
+
+            stream.on('close', () => {
+                // 'close' often follows 'error'; only reconnect if we didn't already schedule
+                if (!stopped && !reconnectTimer) {
+                    scheduleReconnect('closed');
+                }
+            });
+
+            if (attempt > 0) {
+                log(`${label} change stream reconnected`);
+            }
+            attempt = 0;
+        } catch (err) {
+            error(`Failed to start ${label} change stream:`, err);
+            scheduleReconnect('failed to start', err);
+        }
+    };
+
+    start();
+
+    return {
+        stop: async () => {
+            stopped = true;
+            clearReconnectTimer();
+            await closeStream();
+        }
+    };
+}
+
+function buildColorSizes(item) {
+    if (!item.l2s || item.l2s.length === 0) {
+        return null;
+    }
+
+    const colorSizes = item.l2s.reduce((acc, l2) => {
+        // Handle both enhanced structure and fallback to display codes
+        const colorName = l2.color.name || l2.color.displayCode || 'Unknown Color';
+        const sizeName = l2.size.name || l2.size.displayCode || 'Unknown Size';
+        const stockQuantity = l2.stock?.quantity || 0;
+        const promoValue = l2.prices?.promo?.value || l2.prices?.base?.value || 0;
+
+        // Skip items with 0 stock
+        if (stockQuantity === 0) {
+            return acc;
+        }
+
+        if (!acc[colorName]) {
+            acc[colorName] = [];
+        }
+        acc[colorName].push(`${sizeName} (${stockQuantity}) (${pricePrecision(promoValue)})`);
+        return acc;
+    }, {});
+
+    if (Object.keys(colorSizes).length === 0) {
+        return null;
+    }
+
+    return colorSizes;
+}
+
+async function handleSaleChange(client, channelId, change, genderLabel, embedColor) {
+    const channel = client.channels.cache.find(c => c.id === channelId);
+    if (!channel) return;
+
+    if (change.operationType === 'delete') {
+        const itemId = change.documentKey._id;
+        await cleanupOldMessages(channel, itemId);
+        return;
+    }
+
+    if (change.operationType !== 'insert' && change.operationType !== 'update') {
+        return;
+    }
+
+    const item = change.fullDocument;
+    if (!item) return;
+
+    await cleanupOldMessages(channel, item._id);
+
+    const colorSizes = buildColorSizes(item);
+    if (!colorSizes) {
+        log(`Skipping ${genderLabel} item ${item.productId} - no in-stock l2s data available`);
+        return;
+    }
+
+    const colorSizeLines = Object.entries(colorSizes)
+        .map(([color, sizes]) => `**${color}**: ${sizes.join(', ')}`)
+        .join('\n');
+
+    const embed = new EmbedBuilder()
+        .setTitle(item.name)
+        .setDescription(`**Base:** ${pricePrecision(item.prices.base.value)}\n**Promo:** ${pricePrecision(item.prices.promo?.value)}\n${colorSizeLines}`)
+        .setColor(embedColor)
+        .setURL(`https://www.uniqlo.com/au/en/products/${item.productId}`)
+        .setTimestamp()
+        .setFooter({ text: `Uniqlo ${genderLabel} Sale Updates | ID: ${item._id}` });
+
+    if (item.images?.main) {
+        const firstImage = Object.values(item.images.main)[0];
+        if (firstImage?.image) {
+            embed.setImage(firstImage.image);
+        }
+    }
+
+    await channel.send({ embeds: [embed] });
+}
+
 async function uniqloStreamService(client) {
     try {
         // Get collections using the singleton pattern
-        const maleCollection = await client.mongodb.db.collection(config.mongodbDBUniqloMaleCurrent);
-        const femaleCollection = await client.mongodb.db.collection(config.mongodbDBUniqloFemaleCurrent);
+        const maleCollection = client.mongodb.db.collection(config.mongodbDBUniqloMaleCurrent);
+        const femaleCollection = client.mongodb.db.collection(config.mongodbDBUniqloFemaleCurrent);
 
-        // Male items change stream
-        const maleStream = maleCollection.watch([], { fullDocument: 'updateLookup' });
-        maleStream.on('change', async (change) => {
-            try {
-                const channel = await client.channels.cache.find(c => c.id === config.maleCurrentChannelId);
-                if (!channel) return;
-                if (change.operationType === 'delete') {
-                    // For deletions, we only have the _id in change.documentKey
-                    const itemId = change.documentKey._id;
-                    await cleanupOldMessages(channel, itemId);
-                } else if (change.operationType === 'insert' || change.operationType === 'update') {
-                    const item = change.fullDocument;
-                    // Clean up old messages before sending new one
-                    await cleanupOldMessages(channel, item._id);
-                    
-                    // Skip if no l2s data available
-                    if (!item.l2s || item.l2s.length === 0) {
-                        log(`Skipping male item ${item.productId} - no l2s data available`);
-                        return;
-                    }
-                    
-                    const colorSizes = item.l2s.reduce((acc, l2) => {
-                        // Handle both enhanced structure and fallback to display codes
-                        const colorName = l2.color.name || l2.color.displayCode || 'Unknown Color';
-                        const sizeName = l2.size.name || l2.size.displayCode || 'Unknown Size';
-                        const stockQuantity = l2.stock?.quantity || 0;
-                        const promoValue = l2.prices?.promo?.value || l2.prices?.base?.value || 0;
-                        
-                        // Skip items with 0 stock
-                        if (stockQuantity === 0) {
-                            return acc;
-                        }
-                        
-                        if (!acc[colorName]) {
-                            acc[colorName] = [];
-                        }
-                        acc[colorName].push(`${sizeName} (${stockQuantity}) (${pricePrecision(promoValue)})`);
-                        return acc;
-                    }, {});
-                    
-                    // Skip if no in-stock items to display
-                    if (Object.keys(colorSizes).length === 0) {
-                        log(`Skipping male item ${item.productId} - no in-stock items`);
-                        return;
-                    }
-                    
-                    const colorSizeLines = Object.entries(colorSizes).map(([color, sizes]) => `**${color}**: ${sizes.join(', ')}`).join('\n');
+        watchWithReconnect(maleCollection, 'Uniqlo male', (change) =>
+            handleSaleChange(client, config.maleCurrentChannelId, change, "Men's", 0x0066cc)
+        );
 
-                    const embed = new EmbedBuilder()
-                        .setTitle(item.name)
-                        .setDescription(`**Base:** ${pricePrecision(item.prices.base.value)}\n**Promo:** ${pricePrecision(item.prices.promo?.value)}\n${colorSizeLines}`)
-                        .setColor(0x0066cc) // Uniqlo blue
-                        .setURL(`https://www.uniqlo.com/au/en/products/${item.productId}`)
-                        .setImage(item.images && item.images.main ? Object.values(item.images.main)[0]?.image : null)
-                        .setTimestamp()
-                        .setFooter({ text: `Uniqlo Men's Sale Updates | ID: ${item._id}` });
-                    await channel.send({ embeds: [embed] });
-                }
-            } catch (err) {
-                error('Error in male items change stream:', err);
-            }
-        });
-
-        // Female items change stream
-        const femaleStream = femaleCollection.watch([], { fullDocument: 'updateLookup' });
-        femaleStream.on('change', async (change) => {
-            try {
-                const channel = await client.channels.cache.find(c => c.id === config.femaleCurrentChannelId);
-                if (!channel) return;
-
-                if (change.operationType === 'delete') {
-                    // For deletions, we only have the _id in change.documentKey
-                    const itemId = change.documentKey._id;
-                    await cleanupOldMessages(channel, itemId);
-                } else if (change.operationType === 'insert' || change.operationType === 'update') {
-                    const item = change.fullDocument;
-                    // Clean up old messages before sending new one
-                    await cleanupOldMessages(channel, item._id);
-                    
-                    // Skip if no l2s data available
-                    if (!item.l2s || item.l2s.length === 0) {
-                        log(`Skipping female item ${item.productId} - no l2s data available`);
-                        return;
-                    }
-                    
-                    const colorSizes = item.l2s.reduce((acc, l2) => {
-                        // Handle both enhanced structure and fallback to display codes
-                        const colorName = l2.color.name || l2.color.displayCode || 'Unknown Color';
-                        const sizeName = l2.size.name || l2.size.displayCode || 'Unknown Size';
-                        const stockQuantity = l2.stock?.quantity || 0;
-                        const promoValue = l2.prices?.promo?.value || l2.prices?.base?.value || 0;
-                        
-                        // Skip items with 0 stock
-                        if (stockQuantity === 0) {
-                            return acc;
-                        }
-                        
-                        if (!acc[colorName]) {
-                            acc[colorName] = [];
-                        }
-                        acc[colorName].push(`${sizeName} (${stockQuantity}) (${pricePrecision(promoValue)})`);
-                        return acc;
-                    }, {});
-                    
-                    // Skip if no in-stock items to display
-                    if (Object.keys(colorSizes).length === 0) {
-                        log(`Skipping female item ${item.productId} - no in-stock items`);
-                        return;
-                    }
-                    
-                    const colorSizeLines = Object.entries(colorSizes).map(([color, sizes]) => `**${color}**: ${sizes.join(', ')}`).join('\n');
-
-                    const embed = new EmbedBuilder()
-                        .setTitle(item.name)
-                        .setDescription(`**Base:** ${pricePrecision(item.prices.base.value)}\n**Promo:** ${pricePrecision(item.prices.promo?.value)}\n${colorSizeLines}`)
-                        .setColor(0xff69b4) // Pink
-                        .setURL(`https://www.uniqlo.com/au/en/products/${item.productId}`)
-                        .setTimestamp()
-                        .setFooter({ text: `Uniqlo Women's Sale Updates | ID: ${item._id}` });
-                    if (item.images && item.images.main) {
-                        const firstImage = Object.values(item.images.main)[0];
-                        if (firstImage?.image) {
-                            embed.setImage(firstImage.image);
-                        }
-                    }           
-                    await channel.send({ embeds: [embed] });
-                }
-            } catch (err) {
-                error('Error in female items change stream:', err);
-            }
-        });
+        watchWithReconnect(femaleCollection, 'Uniqlo female', (change) =>
+            handleSaleChange(client, config.femaleCurrentChannelId, change, "Women's", 0xff69b4)
+        );
 
         await cleanChannelOrphans(client, config.maleCurrentChannelId, maleCollection);
         await cleanChannelOrphans(client, config.femaleCurrentChannelId, femaleCollection);
@@ -177,7 +244,7 @@ async function uniqloStreamService(client) {
 
 async function cleanChannelOrphans(client, channelId, collection) {
     try {
-        const channel = await client.channels.cache.find(c => c.id === channelId);
+        const channel = client.channels.cache.find(c => c.id === channelId);
         if (!channel) {
             error(`Channel ${channelId} not found`);
             return;
@@ -241,7 +308,7 @@ async function cleanChannelOrphans(client, channelId, collection) {
 
 async function preloadChannelItems(client, channelId, collection) {
     try {
-        const channel = await client.channels.cache.find(c => c.id === channelId);
+        const channel = client.channels.cache.find(c => c.id === channelId);
         if (!channel) {
             error(`Channel ${channelId} not found`);
             return;
@@ -272,34 +339,9 @@ async function preloadChannelItems(client, channelId, collection) {
             const itemId = item._id.toString();
             log(`Checking DB item: ${itemId}, Exists: ${existingIds.has(itemId)}`);
             if (!existingIds.has(itemId)) {
-                // Skip if no l2s data available
-                if (!item.l2s || item.l2s.length === 0) {
-                    log(`Skipping preload item ${item.productId} - no l2s data available`);
-                    continue;
-                }
-                
-                const colorSizes = item.l2s.reduce((acc, l2) => {
-                    // Handle both enhanced structure and fallback to display codes
-                    const colorName = l2.color.name || l2.color.displayCode || 'Unknown Color';
-                    const sizeName = l2.size.name || l2.size.displayCode || 'Unknown Size';
-                    const stockQuantity = l2.stock?.quantity || 0;
-                    const promoValue = l2.prices?.promo?.value || l2.prices?.base?.value || 0;
-                    
-                    // Skip items with 0 stock
-                    if (stockQuantity === 0) {
-                        return acc;
-                    }
-                    
-                    if (!acc[colorName]) {
-                        acc[colorName] = [];
-                    }
-                    acc[colorName].push(`${sizeName} (${stockQuantity}) (${pricePrecision(promoValue)})`);
-                    return acc;
-                }, {});
-                
-                // Skip if no in-stock items to display
-                if (Object.keys(colorSizes).length === 0) {
-                    log(`Skipping preload item ${item.productId} - no in-stock items`);
+                const colorSizes = buildColorSizes(item);
+                if (!colorSizes) {
+                    log(`Skipping preload item ${item.productId} - no in-stock l2s data available`);
                     continue;
                 }
                 
@@ -336,4 +378,3 @@ module.exports = {
     cleanChannelOrphans,
     preloadChannelItems
 };
-
