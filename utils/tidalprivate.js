@@ -156,12 +156,13 @@ async function addTrackToPlaylist(playlistId, trackId, position) {
 
 /**
  * Main playlist: append (normal order).
- * Sister playlist: prepend so it stays inverted (newest first for Tesla).
+ * Sister playlist: clear + rebuild newest-first from main (for Tesla).
  */
 async function addTrackToPlaylists(trackId) {
     await addTrackToPlaylist(config.tidalPrivatePlaylist, trackId);
     if (config.tidalSisterPlaylist) {
-        await addTrackToPlaylist(config.tidalSisterPlaylist, trackId, 0);
+        const songs = await getAllPlaylistSongs(config.tidalPrivatePlaylist);
+        await rebuildPlaylistNewestFirst(config.tidalSisterPlaylist, songs);
     }
 }
 

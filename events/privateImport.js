@@ -18,7 +18,7 @@ module.exports = {
 
                 const songInCollection = await privatedb.findOne({ id: song.id });
                 if (!songInCollection) {
-                    // Main playlist: append. Sister playlist: prepend (inverted for Tesla).
+                    // Main: append. Sister: clear + rebuild newest-first for Tesla.
                     log('TRACK ADD', song.id);
                     await addTrackToPlaylists(song.id);
                     await privatedb.insertOne({
