@@ -35,7 +35,12 @@ module.exports = {
                 }
             } catch (e) {
                 await message.reactions.removeAll();
-                error(e);
+                error(
+                    'Tidal privateImport failed',
+                    e.response?.status,
+                    e.response?.data || e.message,
+                    e.stack
+                );
                 await message.react('❌');
             }
         }

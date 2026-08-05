@@ -11,6 +11,17 @@ const {
 const API_V2 = 'https://api.tidal.com/v2/';
 const ADD_CHUNK_SIZE = 20;
 const CLEAR_CHUNK_SIZE = 20;
+const RETRY_ATTEMPTS = 4;
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+function tidalErrorDetail(err) {
+    if (!err) return '';
+    if (err.response) {
+        return `status=${err.response.status} data=${JSON.stringify(err.response.data)}`;
+    }
+    return err.message || String(err);
+}
 
 let accessToken = null;
 let tokenExpiresAt = 0;
@@ -159,10 +170,46 @@ async function addTrackToPlaylist(playlistId, trackId, position) {
  * Sister playlist: clear + rebuild newest-first from main (for Tesla).
  */
 async function addTrackToPlaylists(trackId) {
-    await addTrackToPlaylist(config.tidalPrivatePlaylist, trackId);
-    if (config.tidalSisterPlaylist) {
-        const songs = await getAllPlaylistSongs(config.tidalPrivatePlaylist);
-        await rebuildPlaylistNewestFirst(config.tidalSisterPlaylist, songs);
+    const mainId = config.tidalPrivatePlaylist;
+    const sisterId = config.tidalSisterPlaylist;
+
+    log(`Tidal: adding track ${trackId} to main ${mainId}`);
+    await addTrackToPlaylist(mainId, trackId);
+    log(`Tidal: main add ok (${trackId})`);
+
+    if (!sisterId) {
+        log('Tidal sister: skipped (tidalSisterPlaylist not set)');
+        return;
+    }
+
+    log(`Tidal sister: sync start -> ${sisterId}`);
+    const songs = await getAllPlaylistSongs(mainId);
+    log(
+        `Tidal sister: main snapshot count=${songs.length} ` +
+        `first=${songs[0]?.id} last=${songs[songs.length - 1]?.id}`
+    );
+
+    try {
+        await rebuildPlaylistNewestFirst(sisterId, songs);
+        const sisterSongs = await getAllPlaylistSongs(sisterId);
+        const ok =
+            sisterSongs.length === songs.length &&
+            sisterSongs[0]?.id === songs[songs.length - 1]?.id &&
+            sisterSongs[sisterSongs.length - 1]?.id === songs[0]?.id;
+        log(
+            `Tidal sister: sync done count=${sisterSongs.length} ` +
+            `first=${sisterSongs[0]?.id} last=${sisterSongs[sisterSongs.length - 1]?.id} ` +
+            `verified=${ok}`
+        );
+        if (!ok) {
+            throw new Error(
+                `Sister rebuild verify failed. Expected count=${songs.length} ` +
+                `first=${songs[songs.length - 1]?.id} last=${songs[0]?.id}`
+            );
+        }
+    } catch (e) {
+        error(`Tidal sister: sync failed ${tidalErrorDetail(e)}`);
+        throw e;
     }
 }
 
@@ -190,33 +237,126 @@ async function addTracksToPlaylist(playlistId, trackIds, position = -1) {
     }
 }
 
+async function getPlaylistTrackCount(playlistId) {
+    const { data } = await tidalRequest('GET', `playlists/${playlistId}/tracks`, {
+        params: { offset: 0, limit: 1 },
+    });
+    if (typeof data?.totalNumberOfItems === 'number') {
+        return data.totalNumberOfItems;
+    }
+    const songs = await getAllPlaylistSongs(playlistId);
+    return songs.length;
+}
+
+async function deletePlaylistItems(playlistId, indices) {
+    let lastErr;
+    for (let attempt = 1; attempt <= RETRY_ATTEMPTS; attempt++) {
+        try {
+            const etag = await getPlaylistEtag(playlistId);
+            if (!etag) {
+                log(`Tidal: delete warning — no etag for ${playlistId} (attempt ${attempt})`);
+            }
+
+            const res = await tidalRequest('DELETE', `playlists/${playlistId}/items/${indices}`, {
+                headers: etag ? { 'If-None-Match': etag } : {},
+                validateStatus: () => true,
+            });
+
+            if (res.status >= 200 && res.status < 300) {
+                return;
+            }
+
+            lastErr = new Error(
+                `DELETE items/${indices} status=${res.status} data=${JSON.stringify(res.data)}`
+            );
+            log(`Tidal: delete chunk failed (attempt ${attempt}/${RETRY_ATTEMPTS}) ${lastErr.message}`);
+
+            // 412 = stale etag; 429 = rate limit — refresh and retry
+            if ((res.status === 412 || res.status === 429) && attempt < RETRY_ATTEMPTS) {
+                await sleep(300 * attempt);
+                continue;
+            }
+            throw lastErr;
+        } catch (e) {
+            lastErr = e;
+            if (attempt >= RETRY_ATTEMPTS) break;
+            log(`Tidal: delete chunk error (attempt ${attempt}/${RETRY_ATTEMPTS}) ${tidalErrorDetail(e)}`);
+            await sleep(300 * attempt);
+        }
+    }
+    throw lastErr;
+}
+
 /**
  * Build inverted order reliably: walk main order (oldest→newest) and prepend each.
  * Batch add can scramble order on Tidal's API.
  */
 async function addTracksNewestFirst(playlistId, songsOldestFirst) {
-    log(`Tidal: adding ${songsOldestFirst.length} tracks newest-first to ${playlistId}`);
+    log(`Tidal sister: re-adding ${songsOldestFirst.length} tracks newest-first to ${playlistId}`);
     for (let i = 0; i < songsOldestFirst.length; i++) {
-        await addTrackToPlaylist(playlistId, songsOldestFirst[i].id, 0);
+        let lastErr;
+        for (let attempt = 1; attempt <= RETRY_ATTEMPTS; attempt++) {
+            try {
+                await addTrackToPlaylist(playlistId, songsOldestFirst[i].id, 0);
+                lastErr = null;
+                break;
+            } catch (e) {
+                lastErr = e;
+                log(
+                    `Tidal sister: prepend failed track=${songsOldestFirst[i].id} ` +
+                    `(${i + 1}/${songsOldestFirst.length}) attempt ${attempt}/${RETRY_ATTEMPTS} ` +
+                    tidalErrorDetail(e)
+                );
+                if (attempt < RETRY_ATTEMPTS) await sleep(300 * attempt);
+            }
+        }
+        if (lastErr) throw lastErr;
+
         if ((i + 1) % 25 === 0 || i + 1 === songsOldestFirst.length) {
-            log(`Tidal: ${i + 1}/${songsOldestFirst.length}`);
+            log(`Tidal sister: re-add progress ${i + 1}/${songsOldestFirst.length}`);
         }
     }
 }
 
 async function clearPlaylist(playlistId) {
-    while (true) {
-        const songs = await getAllPlaylistSongs(playlistId);
-        if (!songs.length) break;
+    let remaining = await getPlaylistTrackCount(playlistId);
+    log(`Tidal sister: clearing ${playlistId} (${remaining} tracks)`);
 
-        const count = Math.min(songs.length, CLEAR_CHUNK_SIZE);
+    let stagnant = 0;
+    let iteration = 0;
+    while (remaining > 0) {
+        iteration += 1;
+        if (iteration > 500) {
+            throw new Error(`clearPlaylist: aborted after 500 iterations, remaining=${remaining}`);
+        }
+
+        const count = Math.min(remaining, CLEAR_CHUNK_SIZE);
         const indices = Array.from({ length: count }, (_, i) => i).join(',');
-        const etag = await getPlaylistEtag(playlistId);
+        log(`Tidal sister: clear chunk #${iteration} deleting indices 0-${count - 1} (remaining=${remaining})`);
 
-        await tidalRequest('DELETE', `playlists/${playlistId}/items/${indices}`, {
-            headers: etag ? { 'If-None-Match': etag } : {},
-        });
+        await deletePlaylistItems(playlistId, indices);
+        await sleep(150);
+
+        const after = await getPlaylistTrackCount(playlistId);
+        log(`Tidal sister: clear chunk #${iteration} done ${remaining} -> ${after}`);
+
+        if (after >= remaining) {
+            stagnant += 1;
+            if (stagnant >= 3) {
+                throw new Error(
+                    `clearPlaylist: count not decreasing (stuck at ${after}) after ${stagnant} attempts`
+                );
+            }
+            log(`Tidal sister: clear made no progress, retrying (stagnant=${stagnant})`);
+            await sleep(500 * stagnant);
+            continue;
+        }
+
+        stagnant = 0;
+        remaining = after;
     }
+
+    log(`Tidal sister: clear complete (${playlistId})`);
 }
 
 /**
@@ -224,11 +364,22 @@ async function clearPlaylist(playlistId) {
  * (newest / last-added is song #1).
  */
 async function rebuildPlaylistNewestFirst(playlistId, songsOldestFirst) {
-    log(`Tidal: rebuilding playlist ${playlistId} (${songsOldestFirst.length} tracks, newest-first)`);
+    log(
+        `Tidal sister: rebuild start ${playlistId} ` +
+        `(${songsOldestFirst.length} tracks, newest-first)`
+    );
     await clearPlaylist(playlistId);
+
+    const afterClear = await getPlaylistTrackCount(playlistId);
+    if (afterClear !== 0) {
+        throw new Error(`Tidal sister: clear incomplete, still has ${afterClear} tracks`);
+    }
+    log('Tidal sister: verified empty, starting re-add');
+
     if (songsOldestFirst.length) {
         await addTracksNewestFirst(playlistId, songsOldestFirst);
     }
+    log(`Tidal sister: rebuild finished ${playlistId}`);
 }
 
 /** @deprecated use rebuildPlaylistNewestFirst */
