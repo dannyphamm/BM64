@@ -28,6 +28,7 @@ let tokenExpiresAt = 0;
 let sessionId = config.tidalPrivateSessionId || null;
 let countryCode = config.tidalCountryCode || 'AU';
 let refreshInterval = null;
+let sisterSyncQueue = Promise.resolve();
 
 async function ensureSession(accessTokenValue) {
     if (!sessionId) {
@@ -166,17 +167,12 @@ async function addTrackToPlaylist(playlistId, trackId, position) {
 }
 
 /**
- * Main playlist: append (normal order).
- * Sister playlist: clear + rebuild newest-first from main (for Tesla).
+ * Clear + rebuild sister newest-first from current main playlist.
+ * Errors are logged only — callers should not await this for UX.
  */
-async function addTrackToPlaylists(trackId) {
+async function syncSisterPlaylist() {
     const mainId = config.tidalPrivatePlaylist;
     const sisterId = config.tidalSisterPlaylist;
-
-    log(`Tidal: adding track ${trackId} to main ${mainId}`);
-    await addTrackToPlaylist(mainId, trackId);
-    log(`Tidal: main add ok (${trackId})`);
-
     if (!sisterId) {
         log('Tidal sister: skipped (tidalSisterPlaylist not set)');
         return;
@@ -189,28 +185,53 @@ async function addTrackToPlaylists(trackId) {
         `first=${songs[0]?.id} last=${songs[songs.length - 1]?.id}`
     );
 
-    try {
-        await rebuildPlaylistNewestFirst(sisterId, songs);
-        const sisterSongs = await getAllPlaylistSongs(sisterId);
-        const ok =
-            sisterSongs.length === songs.length &&
-            sisterSongs[0]?.id === songs[songs.length - 1]?.id &&
-            sisterSongs[sisterSongs.length - 1]?.id === songs[0]?.id;
-        log(
-            `Tidal sister: sync done count=${sisterSongs.length} ` +
-            `first=${sisterSongs[0]?.id} last=${sisterSongs[sisterSongs.length - 1]?.id} ` +
-            `verified=${ok}`
+    await rebuildPlaylistNewestFirst(sisterId, songs);
+    const sisterSongs = await getAllPlaylistSongs(sisterId);
+    const ok =
+        sisterSongs.length === songs.length &&
+        sisterSongs[0]?.id === songs[songs.length - 1]?.id &&
+        sisterSongs[sisterSongs.length - 1]?.id === songs[0]?.id;
+    log(
+        `Tidal sister: sync done count=${sisterSongs.length} ` +
+        `first=${sisterSongs[0]?.id} last=${sisterSongs[sisterSongs.length - 1]?.id} ` +
+        `verified=${ok}`
+    );
+    if (!ok) {
+        throw new Error(
+            `Sister rebuild verify failed. Expected count=${songs.length} ` +
+            `first=${songs[songs.length - 1]?.id} last=${songs[0]?.id}`
         );
-        if (!ok) {
-            throw new Error(
-                `Sister rebuild verify failed. Expected count=${songs.length} ` +
-                `first=${songs[songs.length - 1]?.id} last=${songs[0]?.id}`
-            );
-        }
-    } catch (e) {
-        error(`Tidal sister: sync failed ${tidalErrorDetail(e)}`);
-        throw e;
     }
+}
+
+/** Queue sister syncs so overlapping imports don't race clears/rebuilds. */
+function queueSisterSync() {
+    sisterSyncQueue = sisterSyncQueue
+        .then(() => syncSisterPlaylist())
+        .catch((e) => {
+            error(`Tidal sister: sync failed ${tidalErrorDetail(e)}`);
+        });
+    return sisterSyncQueue;
+}
+
+/**
+ * Main playlist: append (awaits).
+ * Sister playlist: clear + rebuild newest-first in the background.
+ */
+async function addTrackToPlaylists(trackId) {
+    const mainId = config.tidalPrivatePlaylist;
+
+    log(`Tidal: adding track ${trackId} to main ${mainId}`);
+    await addTrackToPlaylist(mainId, trackId);
+    log(`Tidal: main add ok (${trackId})`);
+
+    if (!config.tidalSisterPlaylist) {
+        log('Tidal sister: skipped (tidalSisterPlaylist not set)');
+        return;
+    }
+
+    log(`Tidal sister: queued async rebuild after track ${trackId}`);
+    queueSisterSync();
 }
 
 async function addTracksToPlaylist(playlistId, trackIds, position = -1) {
@@ -474,6 +495,8 @@ module.exports = {
     searchTracks,
     addTrackToPlaylist,
     addTrackToPlaylists,
+    syncSisterPlaylist,
+    queueSisterSync,
     getAllPlaylistSongs,
     reversePlaylist,
     createReversedPlaylist,
