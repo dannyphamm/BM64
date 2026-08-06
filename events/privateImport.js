@@ -18,7 +18,7 @@ module.exports = {
 
                 const songInCollection = await privatedb.findOne({ id: song.id });
                 if (!songInCollection) {
-                    // Main: append (await). Sister: async rebuild for Tesla.
+                    // Main only — sister rebuilds on daily 6AM cron.
                     log('TRACK ADD', song.id);
                     await addTrackToPlaylists(song.id);
                     await privatedb.insertOne({

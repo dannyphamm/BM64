@@ -12,6 +12,7 @@ const { socketIO } = require('../utils/socket');
 //const { misamoAutoImport } = require('../services/misamoAutoImport');
 const { uniqloStreamService } = require('../services/uniqlostream');
 const { palworldUpdateService } = require('../services/palworldUpdate');
+const { tidal, syncSisterPlaylist } = require('../utils/tidalprivate');
 
 module.exports = {
     name: 'clientReady',
@@ -80,6 +81,17 @@ module.exports = {
             setTimeout(() => {
                 palworldUpdateService(client).catch((e) => error(e, "TRY PALWORLD UPDATE BOOT"));
             }, 15000);
+
+            log("Tidal sister playlist: rebuild daily at 6:00 AM (skip if counts match).")
+            schedule.scheduleJob('0 0 6 * * *', async () => {
+                try {
+                    await tidal();
+                    const result = await syncSisterPlaylist();
+                    log('Tidal sister cron:', result);
+                } catch (e) {
+                    error(e, "TRY TIDAL SISTER SYNC");
+                }
+            });
 
             // log("Spotify Restart browser every 8 hours")
             // schedule.scheduleJob('0 0 */8 * * *', async () => {

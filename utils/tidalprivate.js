@@ -9,8 +9,8 @@ const {
 } = require('./tidalAuth');
 
 const API_V2 = 'https://api.tidal.com/v2/';
-const ADD_CHUNK_SIZE = 20;
-const CLEAR_CHUNK_SIZE = 20;
+const ADD_CHUNK_SIZE = 50;
+const CLEAR_CHUNK_SIZE = 100;
 const RETRY_ATTEMPTS = 4;
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -89,24 +89,54 @@ function parseTrack(item) {
     };
 }
 
-async function searchTracks(query) {
+async function searchTracks(query, { limit = 1 } = {}) {
     const { data } = await tidalRequest('GET', 'search', {
         params: {
             query: query.trim(),
             types: 'tracks',
-            limit: 1,
+            limit,
             offset: 0,
         },
     });
 
     const rawTracks = data?.tracks?.items || data?.tracks || [];
-    if (!rawTracks.length) return null;
+    if (!rawTracks.length) return limit === 1 ? null : [];
 
-    const first = rawTracks[0];
-    const track = first.item || first;
-    if (!track?.id) return null;
+    const tracks = [];
+    for (const entry of rawTracks) {
+        const track = entry.item || entry;
+        if (!track?.id) continue;
+        tracks.push(parseTrack(track));
+    }
 
-    return parseTrack(track);
+    if (limit === 1) return tracks[0] || null;
+    return tracks;
+}
+
+/**
+ * When a direct add is silently skipped (200 but no length change),
+ * search for the track and try alternate IDs.
+ */
+async function findAlternateTrackIds(song) {
+    const query = [song.name, song.artists].filter(Boolean).join(' ').trim();
+    if (!query) return [];
+
+    const results = await searchTracks(query, { limit: 5 });
+    const list = Array.isArray(results) ? results : results ? [results] : [];
+    const ids = [];
+    const seen = new Set();
+    for (const t of list) {
+        if (!t?.id || seen.has(t.id)) continue;
+        seen.add(t.id);
+        ids.push(t);
+    }
+    // Prefer IDs different from the one that failed
+    ids.sort((a, b) => {
+        const aSame = a.id === String(song.id) ? 1 : 0;
+        const bSame = b.id === String(song.id) ? 1 : 0;
+        return aSame - bSame;
+    });
+    return ids;
 }
 
 async function getPlaylistEtag(playlistId) {
@@ -128,10 +158,7 @@ async function getAllPlaylistSongs(playlistId) {
 
         for (const entry of items) {
             const track = entry.item || entry;
-            songs.push({
-                id: String(track.id),
-                name: track.title,
-            });
+            songs.push(parseTrack(track));
         }
 
         if (items.length < 100) break;
@@ -141,9 +168,52 @@ async function getAllPlaylistSongs(playlistId) {
     return songs;
 }
 
+/** Fetch a slice of playlist tracks (offset/limit). */
+async function getPlaylistSongsSlice(playlistId, offset, limit) {
+    const { data } = await tidalRequest('GET', `playlists/${playlistId}/tracks`, {
+        params: { offset, limit },
+    });
+    const items = data?.items || [];
+    return items.map((entry) => {
+        const track = entry.item || entry;
+        return {
+            id: String(track.id),
+            name: track.title,
+        };
+    });
+}
+
+/**
+ * Remove everything from keepCount onward (trim a bad append tail).
+ */
+async function trimPlaylistFrom(playlistId, keepCount) {
+    let count = await getPlaylistTrackCount(playlistId);
+    let stagnant = 0;
+    while (count > keepCount) {
+        const toDelete = Math.min(count - keepCount, CLEAR_CHUNK_SIZE);
+        const indices = Array.from({ length: toDelete }, (_, i) => keepCount + i).join(',');
+        await deletePlaylistItems(playlistId, indices);
+        await sleep(150);
+        const after = await getPlaylistTrackCount(playlistId);
+        if (after >= count) {
+            stagnant += 1;
+            if (stagnant >= 3) {
+                throw new Error(
+                    `trimPlaylistFrom: stuck at ${after}, wanted <= ${keepCount}`
+                );
+            }
+            await sleep(500 * stagnant);
+            continue;
+        }
+        stagnant = 0;
+        count = after;
+    }
+}
+
 /**
  * Add a track to a playlist.
  * @param {number} [position] - Insert index. Omit to append. Use 0 to prepend.
+ * @returns {{ status: number, data: any }}
  */
 async function addTrackToPlaylist(playlistId, trackId, position) {
     const etag = await getPlaylistEtag(playlistId);
@@ -156,26 +226,46 @@ async function addTrackToPlaylist(playlistId, trackId, position) {
         body.toIndex = String(position);
     }
 
-    await tidalRequest('POST', `playlists/${playlistId}/items`, {
+    const res = await tidalRequest('POST', `playlists/${playlistId}/items`, {
         headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
             ...(etag ? { 'If-None-Match': etag } : {}),
         },
         data: new URLSearchParams(body).toString(),
         params: { limit: 100 },
+        validateStatus: () => true,
     });
+
+    if (res.status < 200 || res.status >= 300) {
+        throw new Error(
+            `addTrack ${trackId} status=${res.status} data=${JSON.stringify(res.data)}`
+        );
+    }
+
+    return { status: res.status, data: res.data };
 }
 
 /**
  * Clear + rebuild sister newest-first from current main playlist.
- * Errors are logged only — callers should not await this for UX.
+ * Skips rebuild when main and sister already have the same track count.
  */
 async function syncSisterPlaylist() {
     const mainId = config.tidalPrivatePlaylist;
     const sisterId = config.tidalSisterPlaylist;
     if (!sisterId) {
         log('Tidal sister: skipped (tidalSisterPlaylist not set)');
-        return;
+        return { action: 'skipped', reason: 'no_sister' };
+    }
+
+    const [mainCount, sisterCount] = await Promise.all([
+        getPlaylistTrackCount(mainId),
+        getPlaylistTrackCount(sisterId),
+    ]);
+    log(`Tidal sister: counts main=${mainCount} sister=${sisterCount}`);
+
+    if (mainCount === sisterCount) {
+        log('Tidal sister: counts match — skip rebuild');
+        return { action: 'skipped', reason: 'counts_match', mainCount, sisterCount };
     }
 
     log(`Tidal sister: sync start -> ${sisterId}`);
@@ -187,21 +277,20 @@ async function syncSisterPlaylist() {
 
     await rebuildPlaylistNewestFirst(sisterId, songs);
     const sisterSongs = await getAllPlaylistSongs(sisterId);
-    const ok =
-        sisterSongs.length === songs.length &&
-        sisterSongs[0]?.id === songs[songs.length - 1]?.id &&
-        sisterSongs[sisterSongs.length - 1]?.id === songs[0]?.id;
+    // Count-only verify: search fallbacks can replace unavailable IDs, so
+    // full reverse / first-last ID checks would false-fail (use validate script for that).
+    const ok = sisterSongs.length === songs.length;
     log(
-        `Tidal sister: sync done count=${sisterSongs.length} ` +
+        `Tidal sister: sync done count=${sisterSongs.length} expected=${songs.length} ` +
         `first=${sisterSongs[0]?.id} last=${sisterSongs[sisterSongs.length - 1]?.id} ` +
         `verified=${ok}`
     );
     if (!ok) {
         throw new Error(
-            `Sister rebuild verify failed. Expected count=${songs.length} ` +
-            `first=${songs[songs.length - 1]?.id} last=${songs[0]?.id}`
+            `Sister rebuild verify failed. Expected count=${songs.length}, got ${sisterSongs.length}`
         );
     }
+    return { action: 'rebuilt', mainCount: songs.length, sisterCount: sisterSongs.length };
 }
 
 /** Queue sister syncs so overlapping imports don't race clears/rebuilds. */
@@ -215,23 +304,15 @@ function queueSisterSync() {
 }
 
 /**
- * Main playlist: append (awaits).
- * Sister playlist: clear + rebuild newest-first in the background.
+ * Discord import path: append to main playlist only.
+ * Sister is rebuilt on a daily cron (not on each import).
  */
 async function addTrackToPlaylists(trackId) {
     const mainId = config.tidalPrivatePlaylist;
 
     log(`Tidal: adding track ${trackId} to main ${mainId}`);
-    await addTrackToPlaylist(mainId, trackId);
-    log(`Tidal: main add ok (${trackId})`);
-
-    if (!config.tidalSisterPlaylist) {
-        log('Tidal sister: skipped (tidalSisterPlaylist not set)');
-        return;
-    }
-
-    log(`Tidal sister: queued async rebuild after track ${trackId}`);
-    queueSisterSync();
+    const { status } = await addTrackToPlaylist(mainId, trackId);
+    log(`Tidal: main add ok (${trackId}) status=${status}`);
 }
 
 async function addTracksToPlaylist(playlistId, trackIds, position = -1) {
@@ -309,32 +390,138 @@ async function deletePlaylistItems(playlistId, indices) {
 }
 
 /**
- * Build inverted order reliably: walk main order (oldest→newest) and prepend each.
- * Batch add can scramble order on Tidal's API.
+ * Build inverted order: reverse main (newest→oldest), append one track at a time.
+ * After each add: log response status, verify that position; redo if invalid.
+ * If add returns 200 but length doesn't grow (SKIP dupe / missing artifact),
+ * search for the song and try alternate track IDs.
  */
 async function addTracksNewestFirst(playlistId, songsOldestFirst) {
-    log(`Tidal sister: re-adding ${songsOldestFirst.length} tracks newest-first to ${playlistId}`);
-    for (let i = 0; i < songsOldestFirst.length; i++) {
-        let lastErr;
+    const newestFirst = [...songsOldestFirst].reverse();
+    log(`Tidal sister: re-adding ${newestFirst.length} tracks newest-first to ${playlistId}`);
+
+    for (let i = 0; i < newestFirst.length; i++) {
+        const song = newestFirst[i];
+        const label = [song.name, song.artists].filter(Boolean).join(' — ') || song.id;
+        let trackOk = false;
+        let placedId = song.id;
+
         for (let attempt = 1; attempt <= RETRY_ATTEMPTS; attempt++) {
             try {
-                await addTrackToPlaylist(playlistId, songsOldestFirst[i].id, 0);
-                lastErr = null;
-                break;
+                const beforeCount = await getPlaylistTrackCount(playlistId);
+                if (beforeCount > i) {
+                    log(
+                        `Tidal sister: trimming tail before #${i + 1} ` +
+                        `(have ${beforeCount}, keep ${i})`
+                    );
+                    await trimPlaylistFrom(playlistId, i);
+                } else if (beforeCount < i) {
+                    throw new Error(
+                        `Tidal sister: playlist shorter than expected before #${i + 1} ` +
+                        `(have ${beforeCount}, expected ${i})`
+                    );
+                }
+
+                // Candidates: original id first, then search alternates after a silent skip
+                const candidates = [{ id: song.id, name: song.name, artists: song.artists }];
+                if (attempt > 1) {
+                    const alts = await findAlternateTrackIds(song);
+                    for (const alt of alts) {
+                        if (!candidates.some((c) => c.id === alt.id)) candidates.push(alt);
+                    }
+                    if (alts.length) {
+                        log(
+                            `Tidal sister: search fallback for "${label}" → ` +
+                            alts.map((t) => t.id).join(', ')
+                        );
+                    }
+                }
+
+                let status = null;
+                let count = beforeCount;
+                let used = null;
+
+                for (const candidate of candidates) {
+                    log(
+                        `Tidal sister: importing ${i + 1}/${newestFirst.length} ${label} ` +
+                        `(try id=${candidate.id})`
+                    );
+                    const addResult = await addTrackToPlaylist(playlistId, candidate.id);
+                    status = addResult.status;
+                    log(`Tidal sister: add response ${status} for ${candidate.id}`);
+                    await sleep(100);
+
+                    count = await getPlaylistTrackCount(playlistId);
+                    if (count === beforeCount + 1) {
+                        used = candidate;
+                        break;
+                    }
+
+                    log(
+                        `Tidal sister: add did not grow playlist (status=${status} ` +
+                        `count=${count} still ${beforeCount}) — likely SKIP dupe/missing`
+                    );
+                }
+
+                if (!used) {
+                    // First failure: next attempt will search. Same-id retries alone are useless.
+                    log(
+                        `Tidal sister: #${i + 1} INVALID (attempt ${attempt}/${RETRY_ATTEMPTS}) ` +
+                        `status=${status} count=${count} expected=${i + 1} ` +
+                        `want=${song.id} (no candidate increased length)`
+                    );
+                } else {
+                    const atIndex = await getPlaylistSongsSlice(playlistId, i, 1);
+                    const lengthOk = count === i + 1;
+                    const orderOk = atIndex[0]?.id === used.id;
+
+                    let headOk = true;
+                    if (i === 0) {
+                        headOk = orderOk;
+                    } else if (newestFirst[0]) {
+                        const head = await getPlaylistSongsSlice(playlistId, 0, 1);
+                        headOk = head[0]?.id === String(newestFirst[0].id);
+                    }
+
+                    if (lengthOk && orderOk && headOk) {
+                        placedId = used.id;
+                        if (placedId !== song.id) {
+                            log(
+                                `Tidal sister: #${i + 1} placed via search ` +
+                                `${song.id} → ${placedId}`
+                            );
+                            // Keep later head checks / final verify aligned with what we wrote
+                            newestFirst[i] = { ...song, id: placedId };
+                        }
+                        trackOk = true;
+                        break;
+                    }
+
+                    log(
+                        `Tidal sister: #${i + 1} INVALID (attempt ${attempt}/${RETRY_ATTEMPTS}) ` +
+                        `status=${status} count=${count} expected=${i + 1} ` +
+                        `got=${atIndex[0]?.id} want=${used.id} headOk=${headOk}`
+                    );
+                }
             } catch (e) {
-                lastErr = e;
                 log(
-                    `Tidal sister: prepend failed track=${songsOldestFirst[i].id} ` +
-                    `(${i + 1}/${songsOldestFirst.length}) attempt ${attempt}/${RETRY_ATTEMPTS} ` +
+                    `Tidal sister: #${i + 1} error (attempt ${attempt}/${RETRY_ATTEMPTS}) ` +
                     tidalErrorDetail(e)
                 );
-                if (attempt < RETRY_ATTEMPTS) await sleep(300 * attempt);
+            }
+
+            if (attempt < RETRY_ATTEMPTS) {
+                await trimPlaylistFrom(playlistId, i).catch((e) => {
+                    log(`Tidal sister: trim after failed add: ${tidalErrorDetail(e)}`);
+                });
+                await sleep(400 * attempt);
             }
         }
-        if (lastErr) throw lastErr;
 
-        if ((i + 1) % 25 === 0 || i + 1 === songsOldestFirst.length) {
-            log(`Tidal sister: re-add progress ${i + 1}/${songsOldestFirst.length}`);
+        if (!trackOk) {
+            throw new Error(
+                `Tidal sister: track #${i + 1} (${song.id} "${label}") failed after ${RETRY_ATTEMPTS} attempts ` +
+                `(add returned 200 but playlist did not grow — dupe or unavailable; search fallback exhausted)`
+            );
         }
     }
 }
