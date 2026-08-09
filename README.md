@@ -10,7 +10,7 @@ Discord bot for the BM64 server. Handles music, voice text auto-cleanup, gaming 
 - Uniqlo sale trackers, K-drama episode tracker
 - League of Legends match tracker (`/lol`) — see [README-LOL-TRACKER.md](README-LOL-TRACKER.md)
 - Tidal private playlist import
-- Palworld Steam update checks via Pelican/Pterodactyl
+- Palworld Steam update checks and crash auto-restart via Pelican/Pterodactyl
 
 ## Requirements
 
@@ -44,6 +44,8 @@ Important keys:
 | `riotApiKey` | Riot API key for LoL tracker |
 | `tidalAuthClientID` / `tidalAuthClientSecret` | Tidal device-login app credentials |
 | `pelicanUrl` / `pelicanApiKey` / `pelicanServerId` | Palworld server control |
+| `palworldCrashDetection` | Auto-start Palworld if Pelican reports offline (default `true`) |
+| `palworldCrashCooldownMinutes` | Minutes between start attempts after a crash (default `5`) |
 
 ### Scripts
 

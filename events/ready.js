@@ -12,6 +12,7 @@ const { socketIO } = require('../utils/socket');
 //const { misamoAutoImport } = require('../services/misamoAutoImport');
 const { uniqloStreamService } = require('../services/uniqlostream');
 const { palworldUpdateService } = require('../services/palworldUpdate');
+const { palworldCrashService } = require('../services/palworldCrash');
 const { tidal, syncSisterPlaylist } = require('../utils/tidalprivate');
 
 module.exports = {
@@ -81,6 +82,18 @@ module.exports = {
             setTimeout(() => {
                 palworldUpdateService(client).catch((e) => error(e, "TRY PALWORLD UPDATE BOOT"));
             }, 15000);
+
+            log("Palworld crash detection: every minute.")
+            schedule.scheduleJob('15 * * * * *', async () => {
+                try {
+                    await palworldCrashService(client);
+                } catch (e) {
+                    error(e, "TRY PALWORLD CRASH");
+                }
+            });
+            setTimeout(() => {
+                palworldCrashService(client).catch((e) => error(e, "TRY PALWORLD CRASH BOOT"));
+            }, 20000);
 
             log("Tidal sister playlist: rebuild daily at 6:00 AM (skip if counts match).")
             schedule.scheduleJob('0 0 6 * * *', async () => {

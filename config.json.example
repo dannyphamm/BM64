@@ -63,5 +63,7 @@
     "palworldSteamAppId": 1623730,
     "palworldUpdateAction": "restart",
     "palworldRestartWarnings": [15, 10, 5, 1],
+    "palworldCrashDetection": true,
+    "palworldCrashCooldownMinutes": 5,
     "palworldNotifyChannel": ""
 }

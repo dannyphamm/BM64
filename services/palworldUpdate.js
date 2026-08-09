@@ -10,6 +10,17 @@ const DEFAULT_WARNINGS_MINUTES = [15, 10, 5, 1];
 /** Prevent overlapping countdowns if the scheduler fires again. */
 let countdownInProgress = false;
 
+/** Last time we sent a Pelican power signal (start/restart). Used by crash watcher cooldown. */
+let lastPowerActionAt = 0;
+
+function notePowerAction() {
+    lastPowerActionAt = Date.now();
+}
+
+function getLastPowerActionAt() {
+    return lastPowerActionAt;
+}
+
 function pelicanHeaders() {
     return {
         Authorization: `Bearer ${config.pelicanApiKey}`,
@@ -73,6 +84,26 @@ async function fetchPelicanServer() {
         status: attrs.status || attrs.current_state || null,
         uuid: attrs.uuid || null,
     };
+}
+
+/** Runtime state from Pelican/Pterodactyl resources endpoint. */
+async function fetchPelicanResources() {
+    if (!config.pelicanUrl || !config.pelicanApiKey || !config.pelicanServerId) {
+        throw new Error('pelicanUrl / pelicanApiKey / pelicanServerId not configured');
+    }
+
+    const url = `${pelicanBase()}/api/client/servers/${config.pelicanServerId}/resources`;
+    const { data } = await axios.get(url, { headers: pelicanHeaders(), timeout: 15000 });
+    const attrs = data?.attributes || {};
+    return {
+        currentState: attrs.current_state || null,
+        isSuspended: Boolean(attrs.is_suspended),
+        resources: attrs.resources || null,
+    };
+}
+
+function isCountdownInProgress() {
+    return countdownInProgress;
 }
 
 async function sendPelicanCommand(command) {
@@ -151,7 +182,15 @@ async function runRestartCountdown(finalAction) {
 async function restartPelicanServer() {
     const url = `${pelicanBase()}/api/client/servers/${config.pelicanServerId}/power`;
     await axios.post(url, { signal: 'restart' }, { headers: pelicanHeaders(), timeout: 30000 });
+    notePowerAction();
     log('Palworld: Pelican restart signal sent');
+}
+
+async function startPelicanServer() {
+    const url = `${pelicanBase()}/api/client/servers/${config.pelicanServerId}/power`;
+    await axios.post(url, { signal: 'start' }, { headers: pelicanHeaders(), timeout: 30000 });
+    notePowerAction();
+    log('Palworld: Pelican start signal sent');
 }
 
 async function reinstallPelicanServer() {
@@ -337,8 +376,13 @@ module.exports = {
     palworldUpdateService,
     fetchLatestSteamEvents,
     fetchPelicanServer,
+    fetchPelicanResources,
     pickLatestPatch,
     broadcastCommand,
     sendPelicanCommand,
     runRestartCountdown,
+    startPelicanServer,
+    restartPelicanServer,
+    isCountdownInProgress,
+    getLastPowerActionAt,
 };
