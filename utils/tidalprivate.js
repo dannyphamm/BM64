@@ -10,7 +10,9 @@ const {
 
 const API_V2 = 'https://api.tidal.com/v2/';
 const ADD_CHUNK_SIZE = 50;
-const CLEAR_CHUNK_SIZE = 100;
+// Tidal rejects large DELETE index lists with 400 "Invalid indices" (seen at 100).
+// spotify-to-tidal and our earlier working sync use 20.
+const CLEAR_CHUNK_SIZE = 20;
 const RETRY_ATTEMPTS = 4;
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -185,28 +187,38 @@ async function getPlaylistSongsSlice(playlistId, offset, limit) {
 
 /**
  * Remove everything from keepCount onward (trim a bad append tail).
+ * Sizes each DELETE from an actual tracks page — totalNumberOfItems can lag
+ * and cause 400 Invalid indices if we invent indices past the real end.
  */
 async function trimPlaylistFrom(playlistId, keepCount) {
-    let count = await getPlaylistTrackCount(playlistId);
     let stagnant = 0;
-    while (count > keepCount) {
-        const toDelete = Math.min(count - keepCount, CLEAR_CHUNK_SIZE);
-        const indices = Array.from({ length: toDelete }, (_, i) => keepCount + i).join(',');
-        await deletePlaylistItems(playlistId, indices);
-        await sleep(150);
-        const after = await getPlaylistTrackCount(playlistId);
-        if (after >= count) {
+    let iteration = 0;
+    while (true) {
+        iteration += 1;
+        if (iteration > 500) {
+            throw new Error(`trimPlaylistFrom: aborted after 500 iterations, keepCount=${keepCount}`);
+        }
+
+        const tail = await getPlaylistSongsSlice(playlistId, keepCount, CLEAR_CHUNK_SIZE);
+        if (!tail.length) {
+            const reported = await getPlaylistTrackCount(playlistId);
+            if (reported <= keepCount) return;
             stagnant += 1;
             if (stagnant >= 3) {
-                throw new Error(
-                    `trimPlaylistFrom: stuck at ${after}, wanted <= ${keepCount}`
+                // Stale total with empty page at keepCount — treat as trimmed.
+                log(
+                    `Tidal: trim treating as done (empty at ${keepCount}, reported=${reported})`
                 );
+                return;
             }
             await sleep(500 * stagnant);
             continue;
         }
+
         stagnant = 0;
-        count = after;
+        const indices = Array.from({ length: tail.length }, (_, i) => keepCount + i).join(',');
+        await deletePlaylistItems(playlistId, indices);
+        await sleep(150);
     }
 }
 
@@ -378,10 +390,16 @@ async function deletePlaylistItems(playlistId, indices) {
                 await sleep(300 * attempt);
                 continue;
             }
+            // 400 (e.g. Invalid indices) won't succeed on retry with the same payload
             throw lastErr;
         } catch (e) {
             lastErr = e;
-            if (attempt >= RETRY_ATTEMPTS) break;
+            const msg = e?.message || '';
+            const nonRetryable =
+                e?.response?.status === 400 ||
+                msg.includes('"status":400') ||
+                msg.includes('Invalid indices');
+            if (nonRetryable || attempt >= RETRY_ATTEMPTS) break;
             log(`Tidal: delete chunk error (attempt ${attempt}/${RETRY_ATTEMPTS}) ${tidalErrorDetail(e)}`);
             await sleep(300 * attempt);
         }
@@ -527,32 +545,88 @@ async function addTracksNewestFirst(playlistId, songsOldestFirst) {
 }
 
 async function clearPlaylist(playlistId) {
-    let remaining = await getPlaylistTrackCount(playlistId);
-    log(`Tidal sister: clearing ${playlistId} (${remaining} tracks)`);
+    const reportedStart = await getPlaylistTrackCount(playlistId);
+    log(`Tidal sister: clearing ${playlistId} (reported=${reportedStart} tracks)`);
 
     let stagnant = 0;
     let iteration = 0;
-    while (remaining > 0) {
+    while (true) {
         iteration += 1;
         if (iteration > 500) {
-            throw new Error(`clearPlaylist: aborted after 500 iterations, remaining=${remaining}`);
+            throw new Error(`clearPlaylist: aborted after 500 iterations`);
         }
 
-        const count = Math.min(remaining, CLEAR_CHUNK_SIZE);
-        const indices = Array.from({ length: count }, (_, i) => i).join(',');
-        log(`Tidal sister: clear chunk #${iteration} deleting indices 0-${count - 1} (remaining=${remaining})`);
+        // Size DELETE from a real page of tracks. totalNumberOfItems often lags
+        // after deletes (e.g. reported=121 while only ~21 remain) — using it to
+        // build indices 0..99 causes 400 Invalid indices.
+        const head = await getPlaylistSongsSlice(playlistId, 0, CLEAR_CHUNK_SIZE);
+        const reported = await getPlaylistTrackCount(playlistId);
 
-        await deletePlaylistItems(playlistId, indices);
+        if (!head.length) {
+            if (reported > 0 && stagnant < 3) {
+                stagnant += 1;
+                log(
+                    `Tidal sister: clear empty head but reported=${reported}, ` +
+                    `retrying (stagnant=${stagnant})`
+                );
+                await sleep(500 * stagnant);
+                continue;
+            }
+            if (reported > 0) {
+                log(
+                    `Tidal sister: clear treating as empty ` +
+                    `(head=0 after retries, reported=${reported})`
+                );
+            }
+            break;
+        }
+
+        const count = head.length;
+        const indices = Array.from({ length: count }, (_, i) => i).join(',');
+        log(
+            `Tidal sister: clear chunk #${iteration} deleting indices 0-${count - 1} ` +
+            `(head=${count}, reported=${reported})`
+        );
+
+        try {
+            await deletePlaylistItems(playlistId, indices);
+        } catch (e) {
+            const msg = e?.message || '';
+            if (msg.includes('Invalid indices') && count > 1) {
+                const smaller = Math.max(1, Math.floor(count / 2));
+                log(
+                    `Tidal sister: Invalid indices at size ${count}, ` +
+                    `retrying with ${smaller}`
+                );
+                await deletePlaylistItems(
+                    playlistId,
+                    Array.from({ length: smaller }, (_, i) => i).join(',')
+                );
+            } else {
+                throw e;
+            }
+        }
         await sleep(150);
 
-        const after = await getPlaylistTrackCount(playlistId);
-        log(`Tidal sister: clear chunk #${iteration} done ${remaining} -> ${after}`);
+        const afterHead = await getPlaylistSongsSlice(playlistId, 0, CLEAR_CHUNK_SIZE);
+        const afterReported = await getPlaylistTrackCount(playlistId);
+        log(
+            `Tidal sister: clear chunk #${iteration} done ` +
+            `head ${count} -> ${afterHead.length}, reported ${reported} -> ${afterReported}`
+        );
 
-        if (after >= remaining) {
+        // Progress = head page changed (length or ids) or reported total dropped.
+        // Don't rely on reported alone — it often lags after deletes.
+        const headKey = head.map((s) => s.id).join(',');
+        const afterKey = afterHead.map((s) => s.id).join(',');
+        const progressed = afterKey !== headKey || afterReported < reported;
+
+        if (!progressed) {
             stagnant += 1;
             if (stagnant >= 3) {
                 throw new Error(
-                    `clearPlaylist: count not decreasing (stuck at ${after}) after ${stagnant} attempts`
+                    `clearPlaylist: no progress (head=${afterHead.length}, ` +
+                    `reported=${afterReported}) after ${stagnant} attempts`
                 );
             }
             log(`Tidal sister: clear made no progress, retrying (stagnant=${stagnant})`);
@@ -561,7 +635,6 @@ async function clearPlaylist(playlistId) {
         }
 
         stagnant = 0;
-        remaining = after;
     }
 
     log(`Tidal sister: clear complete (${playlistId})`);

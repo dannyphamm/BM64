@@ -46,6 +46,8 @@ Important keys:
 | `pelicanUrl` / `pelicanApiKey` / `pelicanServerId` | Palworld server control |
 | `palworldCrashDetection` | Auto-start Palworld if Pelican reports offline (default `true`) |
 | `palworldCrashCooldownMinutes` | Minutes between start attempts after a crash (default `5`) |
+| `palworldCrashQuietStart` | Local time (`HH:MM`) to pause crash auto-start for Pelican's daily restart (default `05:55`) |
+| `palworldCrashQuietMinutes` | Quiet-window length in minutes (default `10`) |
 
 ### Scripts
 

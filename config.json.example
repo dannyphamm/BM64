@@ -65,5 +65,7 @@
     "palworldRestartWarnings": [15, 10, 5, 1],
     "palworldCrashDetection": true,
     "palworldCrashCooldownMinutes": 5,
+    "palworldCrashQuietStart": "05:55",
+    "palworldCrashQuietMinutes": 10,
     "palworldNotifyChannel": ""
 }
