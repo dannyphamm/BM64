@@ -6,20 +6,17 @@ const {
     startPelicanServer,
     isCountdownInProgress,
     getLastPowerActionAt,
+    waitUntilOnline,
+    notifyPalworldOnline,
+    notifyPalworldChannel,
 } = require('./palworldUpdate');
 
 const DEFAULT_COOLDOWN_MINUTES = 5;
 const DEFAULT_QUIET_START = '05:55';
 const DEFAULT_QUIET_MINUTES = 10;
-const ONLINE_POLL_MS = 15000;
-const ONLINE_WAIT_MS = 10 * 60 * 1000;
 
 /** Prevent overlapping checks / start spam. */
 let checkInProgress = false;
-
-function sleep(ms) {
-    return new Promise((resolve) => setTimeout(resolve, ms));
-}
 
 function crashDetectionEnabled() {
     // Default on when Pelican is configured; set palworldCrashDetection: false to disable.
@@ -66,68 +63,13 @@ function isInQuietWindow(now = new Date()) {
     return nowTotal >= startTotal || nowTotal < (endTotal % dayMinutes);
 }
 
-async function notifyChannel(client, embed) {
-    const channelId = config.palworldNotifyChannel || config.settingsDiscordId;
-    if (!channelId || !client) return;
-
-    const channel = await client.channels.fetch(channelId).catch(() => null);
-    if (!channel) return;
-
-    await channel.send({ embeds: [embed] });
-}
-
-async function notifyCrashRestart(client, server, state) {
-    await notifyChannel(client, {
-        title: 'Palworld crash detected — starting server',
+async function notifyCrashRestart(client, _server, _state) {
+    await notifyPalworldChannel(client, {
+        title: 'Palworld went down',
+        description: 'The server crashed or stopped — bringing it back up now.',
         color: 0xed4245,
-        fields: [
-            { name: 'Previous state', value: String(state || 'unknown'), inline: true },
-            { name: 'Action', value: 'start', inline: true },
-            ...(server?.name
-                ? [{ name: 'Pelican server', value: server.name, inline: true }]
-                : []),
-        ],
         timestamp: new Date().toISOString(),
-        footer: { text: 'BM64 Palworld crash watcher' },
     });
-}
-
-async function notifyServerOnline(client, server, waitedMs) {
-    const seconds = Math.round(waitedMs / 1000);
-    await notifyChannel(client, {
-        title: 'Palworld is ON',
-        description: 'Server is back online after a crash restart.',
-        color: 0x57f287,
-        fields: [
-            { name: 'State', value: 'running', inline: true },
-            { name: 'Boot wait', value: `${seconds}s`, inline: true },
-            ...(server?.name
-                ? [{ name: 'Pelican server', value: server.name, inline: true }]
-                : []),
-        ],
-        timestamp: new Date().toISOString(),
-        footer: { text: 'BM64 Palworld crash watcher' },
-    });
-}
-
-/**
- * Poll until Pelican reports running, or timeout.
- * @returns {Promise<{ online: boolean, waitedMs: number, state: string|null }>}
- */
-async function waitUntilOnline(timeoutMs = ONLINE_WAIT_MS) {
-    const started = Date.now();
-    let state = null;
-
-    while (Date.now() - started < timeoutMs) {
-        const resources = await fetchPelicanResources();
-        state = resources.currentState;
-        if (state === 'running') {
-            return { online: true, waitedMs: Date.now() - started, state };
-        }
-        await sleep(ONLINE_POLL_MS);
-    }
-
-    return { online: false, waitedMs: Date.now() - started, state };
 }
 
 /**
@@ -180,23 +122,17 @@ async function palworldCrashService(client) {
         const result = await waitUntilOnline();
         if (result.online) {
             log(`Palworld: server online after ${Math.round(result.waitedMs / 1000)}s`);
-            await notifyServerOnline(client, server, result.waitedMs).catch((e) =>
+            await notifyPalworldOnline(client, server, result.waitedMs, 'crash').catch((e) =>
                 error(e, 'Palworld online notify')
             );
         } else {
             log(`Palworld: still not online after ${Math.round(result.waitedMs / 1000)}s (state="${result.state}")`);
-            await notifyChannel(client, {
-                title: 'Palworld start timed out',
-                description: `Sent start after a crash, but Pelican never reported \`running\` within ${Math.round(ONLINE_WAIT_MS / 60000)} minutes.`,
+            await notifyPalworldChannel(client, {
+                title: 'Palworld is taking longer than usual',
+                description:
+                    'A restart was started after the crash, but the server is not back online yet. Hang tight — it may still be loading.',
                 color: 0xfaa61a,
-                fields: [
-                    { name: 'Last state', value: String(result.state || 'unknown'), inline: true },
-                    ...(server?.name
-                        ? [{ name: 'Pelican server', value: server.name, inline: true }]
-                        : []),
-                ],
                 timestamp: new Date().toISOString(),
-                footer: { text: 'BM64 Palworld crash watcher' },
             }).catch((e) => error(e, 'Palworld timeout notify'));
         }
     } finally {

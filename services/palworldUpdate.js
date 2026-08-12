@@ -6,6 +6,9 @@ const STEAM_EVENTS_URL =
     'https://store.steampowered.com/events/ajaxgetadjacentpartnerevents/';
 const COLLECTION = 'PalworldSteamEvents';
 const DEFAULT_WARNINGS_MINUTES = [15, 10, 5, 1];
+const ONLINE_POLL_MS = 15000;
+const ONLINE_WAIT_MS = 10 * 60 * 1000;
+const REINSTALL_ONLINE_WAIT_MS = 30 * 60 * 1000;
 
 /** Prevent overlapping countdowns if the scheduler fires again. */
 let countdownInProgress = false;
@@ -199,79 +202,155 @@ async function reinstallPelicanServer() {
     log('Palworld: Pelican reinstall queued (Steam update via egg install script)');
 }
 
-async function applyUpdateAction() {
-    const action = (config.palworldUpdateAction || 'notify').toLowerCase();
-    const server = await fetchPelicanServer();
+/**
+ * Poll until Pelican reports running, or timeout.
+ * @param {number} [timeoutMs]
+ * @param {{ requireOfflineFirst?: boolean }} [options]
+ *   When true (update restart), wait until the server leaves `running` first
+ *   so we don't treat the pre-restart state as "back online".
+ * @returns {Promise<{ online: boolean, waitedMs: number, state: string|null }>}
+ */
+async function waitUntilOnline(timeoutMs = ONLINE_WAIT_MS, options = {}) {
+    const requireOfflineFirst = Boolean(options.requireOfflineFirst);
+    const started = Date.now();
+    let state = null;
+    let leftRunning = !requireOfflineFirst;
 
-    if (action === 'notify' || action === 'dry-run' || action === 'test') {
-        log(`Palworld: dry-run — Pelican OK, server="${server.name}" — would countdown then restart`);
-        return { action: 'notify', server };
+    while (Date.now() - started < timeoutMs) {
+        const resources = await fetchPelicanResources();
+        state = resources.currentState;
+
+        if (state && state !== 'running') {
+            leftRunning = true;
+        }
+
+        if (state === 'running' && leftRunning) {
+            return { online: true, waitedMs: Date.now() - started, state };
+        }
+        await sleep(ONLINE_POLL_MS);
     }
 
-    if (countdownInProgress) {
-        log('Palworld: countdown already in progress — skipping');
-        return { action: 'skipped', server };
-    }
-
-    countdownInProgress = true;
-    try {
-        const finalAction = action === 'reinstall' ? 'reinstall' : 'restart';
-        const result = await runRestartCountdown(finalAction);
-        return { action: result, server };
-    } finally {
-        countdownInProgress = false;
-    }
+    return { online: false, waitedMs: Date.now() - started, state };
 }
 
-async function notifyDiscord(client, event, action, server, extra = {}) {
+async function notifyPalworldChannel(client, embedOrEmbeds) {
     const channelId = config.palworldNotifyChannel || config.settingsDiscordId;
     if (!channelId || !client) return;
 
     const channel = await client.channels.fetch(channelId).catch(() => null);
     if (!channel) return;
 
-    const headline = event.announcement_body?.headline || event.event_name || 'Palworld update';
-    const body = (event.announcement_body?.body || '')
-        .replace(/\[\/?p\]/g, '\n')
+    const embeds = Array.isArray(embedOrEmbeds) ? embedOrEmbeds : [embedOrEmbeds];
+    // One embed per message keeps us under Discord's 6000-char total embed limit.
+    for (const embed of embeds) {
+        await channel.send({ embeds: [embed] });
+    }
+}
+
+async function notifyPalworldOnline(client, _server, _waitedMs, reason = 'crash') {
+    const description =
+        reason === 'update'
+            ? 'The update restart finished — you can hop back on.'
+            : 'The server recovered — you can hop back on.';
+
+    await notifyPalworldChannel(client, {
+        title: 'Palworld is ON',
+        description,
+        color: 0x57f287,
+        timestamp: new Date().toISOString(),
+    });
+}
+
+function formatPatchNotes(event) {
+    const raw = event?.announcement_body?.body || '';
+    return raw
+        .replace(/\[\/?p\]/gi, '\n')
+        .replace(/\[\/?h\d\]/gi, '\n')
+        .replace(/\[\*\]/g, '• ')
+        .replace(/\[\/?(list|olist|b|i|u|url[^\]]*)\]/gi, '')
         .replace(/\[\/?[^\]]+\]/g, '')
-        .trim()
-        .slice(0, 1500);
+        .replace(/\n{3,}/g, '\n\n')
+        .trim();
+}
+
+/** Split text into Discord-safe embed description chunks (prefer newline breaks). */
+function splitTextIntoChunks(text, maxLen = 4096) {
+    if (!text) return [];
+    if (text.length <= maxLen) return [text];
+
+    const chunks = [];
+    let remaining = text;
+
+    while (remaining.length > 0) {
+        if (remaining.length <= maxLen) {
+            chunks.push(remaining);
+            break;
+        }
+
+        let splitAt = remaining.lastIndexOf('\n', maxLen);
+        if (splitAt <= 0 || splitAt < maxLen * 0.5) {
+            splitAt = remaining.lastIndexOf(' ', maxLen);
+        }
+        if (splitAt <= 0) {
+            splitAt = maxLen;
+        }
+
+        chunks.push(remaining.slice(0, splitAt).trimEnd());
+        remaining = remaining.slice(splitAt).trimStart();
+    }
+
+    return chunks;
+}
+
+async function notifyDiscord(client, event, action, _server, extra = {}) {
+    const headline = event.announcement_body?.headline || event.event_name || 'a new patch';
+    const minutes = warningMinutes()[0] || 15;
+    const notes = formatPatchNotes(event);
+    const steamUrl = `https://store.steampowered.com/news/app/${config.palworldSteamAppId || 1623730}`;
 
     let title;
+    let intro;
+    let color = 0x66c0f4;
+
     if (action === 'notify') {
-        title = 'Palworld update detected — dry-run (no restart)';
+        title = 'Palworld update available';
+        intro = `**${headline}**\n\nDetected a new patch (test mode — server will not restart).`;
+        color = 0xfaa61a;
     } else if (extra.countdownStarted) {
-        title = `Palworld update — restart in ${warningMinutes()[0] || 15} minutes`;
+        title = 'Palworld update — restart soon';
+        intro =
+            `**${headline}**\n\n` +
+            `The server will restart in **${minutes} minutes** for a game update.\n` +
+            `Please find a safe spot and log off before then.`;
     } else {
-        title = `Palworld update detected — server ${action}`;
+        title = 'Palworld update';
+        intro = `**${headline}**`;
     }
 
-    const fields = [
-        { name: 'Event GID', value: String(event.gid), inline: true },
-        { name: 'Action', value: action, inline: true },
-    ];
-    if (server?.name) {
-        fields.push({ name: 'Pelican server', value: server.name, inline: true });
+    if (notes) {
+        intro += '\n\n_Release notes follow in the next message(s)._';
     }
-    if (action === 'restart' || action === 'reinstall' || extra.countdownStarted) {
-        fields.push({
-            name: 'Warnings',
-            value: `${warningMinutes().join(', ')} minutes`,
-            inline: true,
+
+    const embeds = [{
+        title,
+        description: intro,
+        color,
+        url: steamUrl,
+        timestamp: new Date().toISOString(),
+    }];
+
+    const noteChunks = splitTextIntoChunks(notes);
+    noteChunks.forEach((chunk, i) => {
+        const part = noteChunks.length > 1 ? ` (${i + 1}/${noteChunks.length})` : '';
+        embeds.push({
+            title: `Release notes${part}`,
+            description: chunk,
+            color,
+            url: steamUrl,
         });
-    }
-
-    await channel.send({
-        embeds: [{
-            title,
-            description: `**${headline}**\n\n${body || '_No details_'}`,
-            color: action === 'notify' ? 0xfaa61a : 0x66c0f4,
-            fields,
-            url: `https://store.steampowered.com/news/app/${config.palworldSteamAppId || 1623730}`,
-            timestamp: new Date().toISOString(),
-            footer: { text: 'BM64 Palworld update watcher' },
-        }],
     });
+
+    await notifyPalworldChannel(client, embeds);
 }
 
 /**
@@ -351,25 +430,59 @@ async function palworldUpdateService(client, options = {}) {
         return;
     }
 
-    await notifyDiscord(client, latest, actionMode, server, { countdownStarted: true })
-        .catch((e) => error(e, 'Palworld notify'));
-
-    const { action } = await applyUpdateAction();
-
-    if (!options.forceTest) {
-        await state.updateOne(
-            { appId: String(appId) },
-            {
-                $set: {
-                    lastAction: action,
-                    countdownFinishedAt: new Date(),
-                    updatedAt: new Date(),
-                },
-            }
-        );
+    // Hold this for the whole countdown + restart + boot wait so the 10-min
+    // poll and crash watcher cannot re-trigger mid-flow.
+    if (countdownInProgress) {
+        log('Palworld: countdown already in progress — skipping');
+        return;
     }
 
-    await notifyDiscord(client, latest, action, server).catch((e) => error(e, 'Palworld notify'));
+    countdownInProgress = true;
+    try {
+        await notifyDiscord(client, latest, actionMode, server, { countdownStarted: true })
+            .catch((e) => error(e, 'Palworld notify'));
+
+        const finalAction = actionMode === 'reinstall' ? 'reinstall' : 'restart';
+        const action = await runRestartCountdown(finalAction);
+
+        if (!options.forceTest) {
+            await state.updateOne(
+                { appId: String(appId) },
+                {
+                    $set: {
+                        lastAction: action,
+                        countdownFinishedAt: new Date(),
+                        updatedAt: new Date(),
+                    },
+                }
+            );
+        }
+
+        const onlineTimeout =
+            action === 'reinstall' ? REINSTALL_ONLINE_WAIT_MS : ONLINE_WAIT_MS;
+        log(`Palworld: ${action} signaled — waiting for server to come online…`);
+        const result = await waitUntilOnline(onlineTimeout, { requireOfflineFirst: true });
+
+        if (result.online) {
+            log(`Palworld: server online after update (${Math.round(result.waitedMs / 1000)}s)`);
+            await notifyPalworldOnline(client, server, result.waitedMs, 'update').catch((e) =>
+                error(e, 'Palworld update online notify')
+            );
+        } else {
+            log(
+                `Palworld: still not online after update (${Math.round(result.waitedMs / 1000)}s, state="${result.state}")`
+            );
+            await notifyPalworldChannel(client, {
+                title: 'Palworld is taking longer than usual',
+                description:
+                    'The update restart was started, but the server is not back online yet. Hang tight — it may still be loading.',
+                color: 0xfaa61a,
+                timestamp: new Date().toISOString(),
+            }).catch((e) => error(e, 'Palworld update timeout notify'));
+        }
+    } finally {
+        countdownInProgress = false;
+    }
 }
 
 module.exports = {
@@ -385,4 +498,8 @@ module.exports = {
     restartPelicanServer,
     isCountdownInProgress,
     getLastPowerActionAt,
+    waitUntilOnline,
+    notifyPalworldOnline,
+    notifyPalworldChannel,
+    ONLINE_WAIT_MS,
 };
