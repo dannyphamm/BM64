@@ -34,7 +34,7 @@ async function processQueue() {
 
         // Emit the addSongToQueue event
         await socketIO().then(async (socket) => {
-            const result = await socket.timeout(8000).emitWithAck('addSongToQueue', song);
+            const result = await socket.timeout(20000).emitWithAck('addSongToQueue', song);
             log(`addSongToQueue result: ${result}`, result[0])
             if (result[0]) {
                 await loadingReaction.remove().catch((e) => error(e));
