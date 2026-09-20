@@ -70,30 +70,30 @@ module.exports = {
                 }
             });
 
-            log("Palworld Steam update check: every 10 minutes.")
-            schedule.scheduleJob('0 */10 * * * *', async () => {
-                try {
-                    await palworldUpdateService(client);
-                } catch (e) {
-                    error(e, "TRY PALWORLD UPDATE");
-                }
-            });
-            // Seed / check once shortly after boot
-            setTimeout(() => {
-                palworldUpdateService(client).catch((e) => error(e, "TRY PALWORLD UPDATE BOOT"));
-            }, 15000);
+            // log("Palworld Steam update check: every 10 minutes.")
+            // schedule.scheduleJob('0 */10 * * * *', async () => {
+            //     try {
+            //         await palworldUpdateService(client);
+            //     } catch (e) {
+            //         error(e, "TRY PALWORLD UPDATE");
+            //     }
+            // });
+            // // Seed / check once shortly after boot
+            // setTimeout(() => {
+            //     palworldUpdateService(client).catch((e) => error(e, "TRY PALWORLD UPDATE BOOT"));
+            // }, 15000);
 
-            log("Palworld crash detection: every minute.")
-            schedule.scheduleJob('15 * * * * *', async () => {
-                try {
-                    await palworldCrashService(client);
-                } catch (e) {
-                    error(e, "TRY PALWORLD CRASH");
-                }
-            });
-            setTimeout(() => {
-                palworldCrashService(client).catch((e) => error(e, "TRY PALWORLD CRASH BOOT"));
-            }, 20000);
+            // log("Palworld crash detection: every minute.")
+            // schedule.scheduleJob('15 * * * * *', async () => {
+            //     try {
+            //         await palworldCrashService(client);
+            //     } catch (e) {
+            //         error(e, "TRY PALWORLD CRASH");
+            //     }
+            // });
+            // setTimeout(() => {
+            //     palworldCrashService(client).catch((e) => error(e, "TRY PALWORLD CRASH BOOT"));
+            // }, 20000);
 
             log("Tidal sister playlist: rebuild daily at 6:00 AM (skip if counts match).")
             schedule.scheduleJob('0 0 6 * * *', async () => {
