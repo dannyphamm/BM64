@@ -49,7 +49,7 @@ async function refreshTokens() {
     accessToken = data.access_token;
     tokenExpiresAt = Date.now() + (data.expires_in - 300) * 1000;
     await ensureSession(accessToken);
-    log('Tidal: access token refreshed');
+    //log('Tidal: access token refreshed');
     return accessToken;
 }
 

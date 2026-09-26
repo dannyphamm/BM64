@@ -1,8 +1,147 @@
+/**
+ * K-drama tracker (kissasian.cam → MongoDB → #movie-night webhook).
+ *
+ * Scheduled from events/ready.js:
+ *   - kdramaTrackerService   — every 5 minutes
+ *   - kdramaCompleterService — once daily (~33 min past the hour)
+ *
+ * ─── kdramaCompleterService (new-drama discovery) ───────────────────────────
+ * 1. Fetch Historical South-Korea series lists from kissasian.cam:
+ *      - Ongoing (new dramas that are still airing)
+ *      - Completed (dramas that appear already finished — never went Ongoing)
+ * 2. Parse article titles / link / banner from each page.
+ * 3. Load all dramas already stored in MongoDB.
+ * 4. For each scraped title: skip if it already exists.
+ * 5. Insert new titles into DB:
+ *      - Ongoing  → isCompleted:false (+ Discord notify)
+ *      - Completed → isCompleted:true; Discord notify only if ≤3 new titles
+ *        (larger batches are silent backfill so the archive page doesn't spam)
+ * 6. Post a Discord webhook embed to #movie-night when notifying.
+ *
+ * ─── kdramaTrackerService (episode / completion updates) ────────────────────
+ * 1. Fetch kissasian.cam home page (Latest Release section).
+ * 2. Walk articles bottom-up; parse drama title + episode number from img title.
+ * 3. Look up title in MongoDB; only act on tracked, non-completed dramas.
+ * 4a. No episode yet → set initial episode/link/banner and notify ("tracking started").
+ * 4b. Higher episode than DB → update and notify ("new episode").
+ * 5. If the article has a Completed status badge → mark isCompleted in DB and notify.
+ *
+ * ─── sendEpisodeNotification ────────────────────────────────────────────────
+ * Shared helper: download banner, build embed + Watch now button, send via bot webhook.
+ */
+
 const cheerio = require('cheerio');
 const axios = require('axios');
 const config = require('../config');
 const { AttachmentBuilder, ButtonBuilder, WebhookClient, EmbedBuilder, ActionRowBuilder, ButtonStyle } = require('discord.js');
 const { log, error } = require('../utils/utils');
+
+const ONGOING_SERIES_URL =
+    'https://kissasian.cam/series/?genre%5B%5D=historical&country%5B%5D=south-korea&status=Ongoing&type=&order=latest';
+const COMPLETED_SERIES_URL =
+    'https://kissasian.cam/series/?genre%5B%5D=historical&country%5B%5D=south-korea&status=completed&type=drama&order=latest';
+
+async function fetchSeriesPage(url) {
+    try {
+        const response = await axios.get(url);
+        if (response.status !== 200) {
+            error(`Kdrama series fetch failed (${response.status}): ${url}`);
+            return null;
+        }
+        return response.data;
+    } catch (e) {
+        error(`Unable to fetch ${url}`);
+        return null;
+    }
+}
+
+/** Parse series list cards into { title, link, banner }. */
+function parseSeriesArticles(html) {
+    const $ = cheerio.load(html);
+    const seen = new Set();
+    const dramas = [];
+
+    $('article img').each((_, el) => {
+        const title = $(el).attr('title');
+        if (!title || seen.has(title)) return;
+        seen.add(title);
+
+        const dramaElement = $(el).closest('a');
+        dramas.push({
+            title,
+            link: dramaElement.attr('href'),
+            banner: $(el).attr('src') || dramaElement.find('img').attr('src'),
+        });
+    });
+
+    return dramas;
+}
+
+async function getMovieNightWebhook(client) {
+    const channel = await client.channels.cache.find((c) => c.name === 'movie-night');
+    if (!channel) return null;
+
+    const webhooks = await channel.fetchWebhooks();
+    if (webhooks.size === 0) return null;
+
+    const botWebhook = webhooks.find((webhook) => webhook.owner.id === client.user.id);
+    if (!botWebhook) return null;
+
+    return new WebhookClient({ id: botWebhook.id, token: botWebhook.token });
+}
+
+async function announceNewDrama(client, { title, banner, link, isCompleted }) {
+    const webhook = await getMovieNightWebhook(client);
+    if (!webhook) return;
+
+    const files = [];
+    const embed = new EmbedBuilder()
+        .setTitle(isCompleted ? `New Completed Drama:\n${title}` : `New Drama Detected:\n${title}`)
+        .setDescription(
+            isCompleted
+                ? 'This drama appeared as completed (never went Ongoing). Full series is available!'
+                : 'This drama is now available!'
+        )
+        .setColor(isCompleted ? 0x7289da : '#0099ff')
+        .setTimestamp();
+
+    if (banner) {
+        try {
+            const buffer = await axios(banner, { responseType: 'arraybuffer' }).then((r) => r.data);
+            files.push(new AttachmentBuilder(Buffer.from(buffer), { name: 'discordjs.jpg' }));
+            embed.setThumbnail('attachment://discordjs.jpg');
+        } catch (e) {
+            error(e, `Failed to download banner for ${title}`);
+        }
+    }
+
+    const components = [];
+    if (link) {
+        const button = new ButtonBuilder()
+            .setStyle(ButtonStyle.Link)
+            .setLabel('Watch now')
+            .setURL(link);
+        const row = new ActionRowBuilder().addComponents(button);
+
+        if (!isCompleted) {
+            row.addComponents(
+                new ButtonBuilder()
+                    .setCustomId(`markComplete_${title.replace(/[^a-zA-Z0-9]/g, '_')}`)
+                    .setLabel('Mark Complete')
+                    .setStyle(ButtonStyle.Success)
+            );
+        }
+        components.push(row);
+    }
+
+    await webhook.send({
+        embeds: [embed],
+        ...(files.length ? { files } : {}),
+        ...(components.length ? { components } : {}),
+    });
+}
+
+/** Discover new ongoing + instantly-completed dramas and announce them in Discord. */
 const kdramaCompleterService = async (client) => {
     //     const kdramaCollection = client.mongodb.db.collection(config.mongodbDBKDrama);
     //     //Extract the titles and episode numbers from the JSON data
@@ -165,180 +304,64 @@ const kdramaCompleterService = async (client) => {
     //     }
 
     
-    // Code for new drama detection
-        const kdramaCollection = client.mongodb.db.collection(config.mongodbDBKDrama);
-        const url = 'https://kissasian.cam/series/?genre%5B%5D=historical&country%5B%5D=south-korea&status=Ongoing&type=&order=latest';
-        let data, status;
-        try {
-            const response = await axios.get(url);
-            data = response.data;
-            status = response.status;
-            // If status code is not 200, return
-            if (status !== 200) {
-                error(`Error: ${status}`);
-                return;
-            }
-        } catch (e) {
-            error("Unable to fetch https://watchasia.is/category/korean-drama")
-        }
-        if(!data) {
-            return
-        }
-        const $ = cheerio.load(data);
-        const newTitles = $('article img').map((i, el) => $(el).attr('title')).get();
-    
-        // Get all existing titles from database
-        const existingKdramas = await kdramaCollection.find().toArray();
-        const existingTitles = existingKdramas.map(drama => drama.title);
-    
-        // Check for new titles
-        for (const title of newTitles) {
-            // Check if drama exists and is not completed
-            const existingDrama = existingKdramas.find(drama => drama.title === title);
-            if (existingDrama) {
-                if (existingDrama.isCompleted) {
-                    continue; // Skip this title and move to next one
-                }
-                // If it exists but isn't completed, skip it anyway as it's not new
-                continue;
-            }
+    const kdramaCollection = client.mongodb.db.collection(config.mongodbDBKDrama);
+    const existingKdramas = await kdramaCollection.find().toArray();
+    const knownTitles = new Set(existingKdramas.map((drama) => drama.title));
 
-            // If we get here, it's a new drama that needs to be added
-            const dramaElement = $(`img[title="${title}"]`).closest('a');
-            const link = dramaElement.attr('href');
-            const banner = dramaElement.find('img').attr('src');
-            
-            // Insert new drama into database
-            await kdramaCollection.insertOne({ 
-                title, 
-                banner, 
-                link,
-                isCompleted: false 
-            });
-    
-            // Send notification about new drama
-            const buffer = await axios(banner, {
-                responseType: 'arraybuffer'
-            }).then(response => response.data);
-    
-            const imageBuffer = Buffer.from(buffer);
-            const attachment = new AttachmentBuilder(imageBuffer, { name: 'discordjs.jpg' });
-            const embed = new EmbedBuilder()
-                .setTitle(`New Drama Detected:\n${title}`)
-                .setDescription(`This drama is now available!`)
-                .setColor('#0099ff')
-                .setTimestamp()
-                .setThumbnail('attachment://discordjs.jpg');
-    
-            const button = new ButtonBuilder()
-                .setStyle(ButtonStyle.Link)
-                .setLabel('Watch now')
-                .setURL(link);
-            const markCompleteButton = new ButtonBuilder()
-                .setCustomId(`markComplete_${title.replace(/[^a-zA-Z0-9]/g, '_')}`) // sanitize title for custom ID
-                .setLabel('Mark Complete')
-                .setStyle(ButtonStyle.Success);
-            const row = new ActionRowBuilder().addComponents(button,markCompleteButton);
-    
-            const channel = await client.channels.cache.find(c => c.name === 'movie-night');
-            if (!channel) return;
-            let webhooks = await channel.fetchWebhooks();
-            if (webhooks.size === 0) return;
-            
-            // Find first webhook owned by the bot
-            const botWebhook = webhooks.find(webhook => webhook.owner.id === client.user.id);
-            if (!botWebhook) return;
+    const lists = [
+        { url: ONGOING_SERIES_URL, isCompleted: false, label: 'ongoing' },
+        // Instant / dump releases that never appear under Ongoing
+        { url: COMPLETED_SERIES_URL, isCompleted: true, label: 'completed' },
+    ];
 
-            const webhook = new WebhookClient({ id: botWebhook.id, token: botWebhook.token });
-            webhook.send({
-                embeds: [embed],
-                files: [attachment], 
-                components: [row]
+    for (const list of lists) {
+        const html = await fetchSeriesPage(list.url);
+        if (!html) continue;
+
+        const dramas = parseSeriesArticles(html);
+        log(`Kdrama ${list.label} list: ${dramas.length} title(s)`);
+
+        // Completed page can be a long archive. Only notify when a small number of
+        // brand-new titles appear (typical for instant dumps). Larger batches are
+        // treated as a silent DB backfill so we don't spam #movie-night.
+        const newcomers = dramas.filter((d) => !knownTitles.has(d.title));
+        const notifyNewcomers =
+            !list.isCompleted || newcomers.length <= 3;
+
+        if (list.isCompleted && newcomers.length > 3) {
+            log(
+                `Kdrama completed backfill: seeding ${newcomers.length} title(s) without Discord notify`
+            );
+        }
+
+        for (const drama of newcomers) {
+            knownTitles.add(drama.title);
+            await kdramaCollection.insertOne({
+                title: drama.title,
+                banner: drama.banner,
+                link: drama.link,
+                isCompleted: list.isCompleted,
             });
 
-            log(`New entry created for title: ${title}`);
+            if (notifyNewcomers) {
+                await announceNewDrama(client, {
+                    title: drama.title,
+                    banner: drama.banner,
+                    link: drama.link,
+                    isCompleted: list.isCompleted,
+                });
+            }
+
+            log(
+                list.isCompleted
+                    ? `New instantly-completed drama: ${drama.title}${notifyNewcomers ? '' : ' (seeded)'}`
+                    : `New entry created for title: ${drama.title}`
+            );
         }
-        // Filter and get all li tags with class show
-        // const currentTitles = []; // Initialize an array to hold current titles
-        // const titlePromises = $('.block.list > div > .list-content .filter-char li.country_1.status_Ongoing').map(async (index, element) => {
-        //     const genre = $(element).data('genre');
-        //     const title = $(element).find('a').text().trim();
-
-        //     if ((Array.isArray(genre) && genre.includes('Historical')) || await kdramaCollection.findOne({ title, isCustom: true })) {  // Get the title text
-        //         currentTitles.push(title); // Add title to currentTitles array
-        //         //console.log(title)
-        //         const existingKDrama = await kdramaCollection.findOne({ title });
-        //         // If the title is not in the database, add it
-        //         if (!existingKDrama) {
-        //             const link = $(element).find('a').attr('href');
-        //             //Go the link and get the image src url and save it to the database
-        //             const { data, } = await axios.get("https://watchasia.is" + link);
-        //             const $$ = cheerio.load(data);
-        //             const imageURL = $$('.img img').attr('src');
-        //             await kdramaCollection.insertOne({ title, banner: imageURL, isCompleted: false });
-        //             const buffer = await axios(imageURL, {
-        //                 responseType: 'arraybuffer'
-        //             }).then(response => { return response.data })
-        //             const imageBuffer = Buffer.from(buffer);
-        //             const attachment = new AttachmentBuilder(imageBuffer, { name: 'discordjs.jpg' });
-        //             const embed = new EmbedBuilder()
-        //                 .setTitle(`New Drama Detected:\n ${title}`)
-        //                 .setDescription(`This drama is now available!`)
-        //                 .setColor('#0099ff')
-        //                 .setTimestamp()
-        //                 .setThumbnail('attachment://discordjs.jpg')
-
-        //             const button = new ButtonBuilder()
-        //                 .setStyle(ButtonStyle.Link)
-        //                 .setLabel('Watch now')
-        //                 .setURL("https://watchasia.is" + link);
-        //             const row = new ActionRowBuilder().addComponents(button);
-        //             const channel = await client.channels.cache.find(c => c.name === 'movie-night');
-        //             if (!channel) return;
-        //             const webhooks = await channel.fetchWebhooks();
-        //             if (webhooks.size === 0) return;
-        //             const webhook = new WebhookClient({ id: webhooks.first().id, token: webhooks.first().token });
-        //             webhook.send({
-        //                 embeds: [embed],
-        //                 files: [attachment],
-        //                 components: [row]
-        //             });
-        //             log(`New entry created for title: ${title}`);
-        //         }
-        //     }
-        // }).get(); // Get the array of promises
-
-        // await Promise.all(titlePromises); // Wait for all promises to resolve
-
-        // // After the promises resolve, mark titles in the database that are not in the current title list as complete
-        // const allKdramas = await kdramaCollection.find().toArray();
-        // //console.log(currentTitles)
-        // for (const kdrama of allKdramas) {
-        //     if (!currentTitles.includes(kdrama.title) && kdrama.isCompleted === false) {
-
-        //         await kdramaCollection.updateOne({ _id: kdrama._id }, { $set: { isCompleted: true } });
-        //         log(`Marked "${kdrama.title}" as complete.`);
-        //         const embed = new EmbedBuilder()
-        //             .setTitle(`${kdrama.title}`)
-        //             .setDescription(`This drama has completed!`)
-        //             .addFields(
-        //                 { name: 'Total Episodes', value: `${kdrama.episode}`, inline: true },
-        //             )
-        //             .setColor(0x7289da)
-        //             .setThumbnail('attachment://discordjs.jpg')
-        //             .setTimestamp();
-        //         const channel = await client.channels.cache.find(c => c.name === 'movie-night');
-        //         if (!channel) return;
-        //         const webhooks = await channel.fetchWebhooks();
-        //         if (webhooks.size === 0) return;
-        //         const webhook = new WebhookClient({ id: webhooks.first().id, token: webhooks.first().token });
-        //         webhook.send({
-        //             embeds: [embed],
-        //         });
-        //     }
-        // }
+    }
 }
 
+/** Check Latest Release for new episodes / completion on tracked dramas. */
 const kdramaTrackerService = async (client) => {
     const kdramaCollection = client.mongodb.db.collection(config.mongodbDBKDrama);
     const url = 'https://kissasian.cam/';
@@ -473,7 +496,7 @@ const kdramaTrackerService = async (client) => {
     }
 };
 
-// Helper function to send notifications
+/** Post episode (or first-tracking) notification to #movie-night via bot webhook. */
 async function sendEpisodeNotification(client, { title, episode, banner, link, isNew }) {
     try {
         const buffer = await axios(banner, {
