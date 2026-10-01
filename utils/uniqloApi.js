@@ -150,81 +150,89 @@ async function fetchWithRetry(url, options, maxRetries = 3, retryDelay = 1000) {
     }
 }
 
-async function getUniqloItem(itemId, priceGroup = '01') {
-    // Call both APIs in parallel using the specific price group
-    let l2sResponse, detailsResponse;
-    try {
-        [l2sResponse, detailsResponse] = await Promise.all([
-            fetchWithRetry(`${config.uniqloApiUrl}/products/${itemId}/price-groups/${priceGroup}/l2s?withPrices=true&withStocks=true&includePreviousPrice=false&httpFailure=true`, {
-                headers: {
-                    'x-fr-clientid': 'uq.au.web-spa'
-                }
-            }),
-            fetchWithRetry(`${config.uniqloApiUrl}/products/${itemId}/price-groups/${priceGroup}/details?includeModelSize=false&imageRatio=3x4&httpFailure=true`, {
-                headers: {
-                    'x-fr-clientid': 'uq.au.web-spa'
-                }
-            })
-        ]);
-    } catch (err) {
-        error(`[getUniqloItem] Fetch failed for itemId=${itemId}:`, err);
-        return [];
-    }
-    
-    let l2sData, detailsData;
-    try {
-        l2sData = await l2sResponse.json();
-        detailsData = await detailsResponse.json();
-    } catch (e) {
-        return []
-    }
-    
-    if(l2sData.status === 'nok' || detailsData.status === 'nok') {
-        return []
-    }
-    
-    if(!l2sData.result || !detailsData.result) {
-        return []
-    }
-    
-    // Create lookup maps from details data
-    const colorMap = {};
-    const sizeMap = {};
-    
-    if (detailsData.result.colors) {
-        detailsData.result.colors.forEach(color => {
-            colorMap[color.displayCode] = color.name;
-        });
-    }
-    
-    if (detailsData.result.sizes) {
-        detailsData.result.sizes.forEach(size => {
-            sizeMap[size.displayCode] = size.name;
-        });
-    }
-    
-    // Merge the data - enhance l2s with color/size names
-    const enhancedL2s = l2sData.result.l2s ? l2sData.result.l2s.map(l2 => ({
-        ...l2,
-        color: {
-            ...l2.color,
-            name: colorMap[l2.color.displayCode] || l2.color.displayCode
-        },
-        size: {
-            ...l2.size,
-            name: sizeMap[l2.size.displayCode] || l2.size.displayCode
+async function getUniqloItem(itemId, _priceGroup = '01') {
+    // Uniqlo AU items may live under different price groups; try 00 → 05.
+    const priceGroups = ['00', '01', '02', '03', '04', '05'];
+
+    for (const priceGroup of priceGroups) {
+        let l2sResponse, detailsResponse;
+        try {
+            [l2sResponse, detailsResponse] = await Promise.all([
+                fetchWithRetry(`${config.uniqloApiUrl}/products/${itemId}/price-groups/${priceGroup}/l2s?withPrices=true&withStocks=true&includePreviousPrice=false&httpFailure=true`, {
+                    headers: {
+                        'x-fr-clientid': 'uq.au.web-spa'
+                    }
+                }),
+                fetchWithRetry(`${config.uniqloApiUrl}/products/${itemId}/price-groups/${priceGroup}/details?includeModelSize=false&imageRatio=3x4&httpFailure=true`, {
+                    headers: {
+                        'x-fr-clientid': 'uq.au.web-spa'
+                    }
+                })
+            ]);
+        } catch (err) {
+            error(`[getUniqloItem] Fetch failed for itemId=${itemId} priceGroup=${priceGroup}:`, err.message || err);
+            continue;
         }
-    })) : [];
-    
-    // Return merged data structure - preserve l2Id-specific prices and stocks from l2s API
-    const result = {
-        ...detailsData.result,  // Product details (name, images, colors, sizes)
-        ...l2sData.result,      // L2s data (l2s, prices keyed by l2Id, stocks keyed by l2Id)
-        l2s: enhancedL2s,       // Enhanced l2s with color/size names
-        // Keep both pricing structures for flexibility
-        overallPrices: detailsData.result.prices  // Overall product pricing
-    };
-    return result;
+
+        let l2sData, detailsData;
+        try {
+            l2sData = await l2sResponse.json();
+            detailsData = await detailsResponse.json();
+        } catch (e) {
+            error(`[getUniqloItem] JSON parse failed for itemId=${itemId} priceGroup=${priceGroup}`);
+            continue;
+        }
+
+        if (l2sData.status === 'nok' || detailsData.status === 'nok') {
+            continue;
+        }
+
+        if (!l2sData.result || !detailsData.result) {
+            continue;
+        }
+
+        // Create lookup maps from details data
+        const colorMap = {};
+        const sizeMap = {};
+
+        if (detailsData.result.colors) {
+            detailsData.result.colors.forEach(color => {
+                colorMap[color.displayCode] = color.name;
+            });
+        }
+
+        if (detailsData.result.sizes) {
+            detailsData.result.sizes.forEach(size => {
+                sizeMap[size.displayCode] = size.name;
+            });
+        }
+
+        // Merge the data - enhance l2s with color/size names
+        const enhancedL2s = l2sData.result.l2s ? l2sData.result.l2s.map(l2 => ({
+            ...l2,
+            color: {
+                ...l2.color,
+                name: colorMap[l2.color.displayCode] || l2.color.displayCode
+            },
+            size: {
+                ...l2.size,
+                name: sizeMap[l2.size.displayCode] || l2.size.displayCode
+            }
+        })) : [];
+
+        // Return merged data structure - preserve l2Id-specific prices and stocks from l2s API
+        return {
+            ...detailsData.result,  // Product details (name, images, colors, sizes)
+            ...l2sData.result,      // L2s data (l2s, prices keyed by l2Id, stocks keyed by l2Id)
+            l2s: enhancedL2s,       // Enhanced l2s with color/size names
+            // Keep both pricing structures for flexibility
+            overallPrices: detailsData.result.prices,  // Overall product pricing
+            priceGroup,
+        };
+    }
+
+    error(`[getUniqloItem] Failed for itemId=${itemId} after trying price groups 00–05`);
+    return [];
 }
 // getlatestprice
 async function getLatestPrices(itemId, priceGroup = '01') {
