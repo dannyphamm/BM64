@@ -34,6 +34,71 @@ async function processItemsInBatches(items, batchSize, delayMs, processor) {
     return results.filter(r => r !== null); // Filter out failed items
 }
 
+const DISCORD_EMBED_DESC_LIMIT = 4096;
+
+function formatColorSizeLines(l2s, { skipZeroStock = true } = {}) {
+    if (!l2s?.length) return '';
+    const colorSizes = l2s.reduce((acc, l2) => {
+        if (skipZeroStock && (l2.stock?.quantity ?? 0) === 0) {
+            return acc;
+        }
+        const colorKey = l2.color?.name || l2.color?.displayCode || 'Unknown';
+        if (!acc[colorKey]) {
+            acc[colorKey] = [];
+        }
+        const sizeName = l2.size?.name || l2.size?.displayCode || '?';
+        const promoValue = l2.prices?.promo ? l2.prices.promo.value : l2.prices?.base?.value;
+        acc[colorKey].push(`${sizeName} (${l2.stock?.quantity ?? 0}) (${pricePrecision(promoValue)})`);
+        return acc;
+    }, {});
+    return Object.entries(colorSizes)
+        .map(([color, sizes]) => `**${color}**: ${sizes.join(', ')}`)
+        .join('\n');
+}
+
+function truncateEmbedText(text, maxLen = DISCORD_EMBED_DESC_LIMIT) {
+    if (text.length <= maxLen) return text;
+    return `${text.slice(0, maxLen - 15).trimEnd()}\n…(truncated)`;
+}
+
+/** Pack items into batches whose joined descriptions stay under Discord's embed limit. */
+function packItemsByDescription(items, formatItem, maxLen = DISCORD_EMBED_DESC_LIMIT) {
+    const batches = [];
+    let currentItems = [];
+    let currentTexts = [];
+    let currentLen = 0;
+    const sepLen = 2; // '\n\n'
+
+    for (const item of items) {
+        const text = truncateEmbedText(formatItem(item), maxLen);
+        const extra = currentItems.length === 0 ? text.length : sepLen + text.length;
+
+        if (currentItems.length > 0 && currentLen + extra > maxLen) {
+            batches.push({ items: currentItems, texts: currentTexts });
+            currentItems = [item];
+            currentTexts = [text];
+            currentLen = text.length;
+        } else {
+            currentItems.push(item);
+            currentTexts.push(text);
+            currentLen += extra;
+        }
+    }
+
+    if (currentItems.length > 0) {
+        batches.push({ items: currentItems, texts: currentTexts });
+    }
+    return batches;
+}
+
+function itemImageUrl(item) {
+    if (item?.images?.main) {
+        const firstImage = Object.values(item.images.main)[0];
+        return firstImage ? firstImage.image : null;
+    }
+    return null;
+}
+
 async function trackUniqloItems(client) {
     const uniqloCollection = await client.mongodb.db.collection(config.mongodbDBUniqlo);
     const itemIds = await uniqloCollection.distinct('itemId');
@@ -341,103 +406,75 @@ async function fetchSaleItems(client, gender, discordId) {
         const addedItemsEmbeds = [];
         const removedItemsEmbeds = [];
         const changedItemsEmbeds = [];
-        const batchSize = 4;
-        for (let i = 0; i < addedItems.length; i += batchSize) {
-            const batch = addedItems.slice(i, i + batchSize);
-            const addedItemsImageUrls = batch.map(item => {
-                if (item.images && item.images.main) {
-                    // Handle new API structure where main is an object with color codes as keys
-                    const firstImage = Object.values(item.images.main)[0];
-                    return firstImage ? firstImage.image : null;
-                }
-                return null;
-            });
-            const addedItemsImage = await imageAttachment(addedItemsImageUrls, "added-items");
-            const addedItemsEmbed = {
-                color: 0x0099ff,
-                title: `Added items (${i + 1}-${i + batch.length})`,
-                description: batch.map(item => {
-                    //log("Added ITEM", item.name)
-                    const colorSizes = item.l2s.reduce((acc, l2) => {
-                        // Skip items with 0 stock
-                        if (l2.stock.quantity === 0) {
-                            return acc;
-                        }
 
-                        // Use actual color name from details API
-                        const colorKey = l2.color.name || l2.color.displayCode;
-                        if (!acc[colorKey]) {
-                            acc[colorKey] = [];
-                        }
-                        const sizeName = l2.size.name || l2.size.displayCode;
-                        const promoValue = l2.prices.promo ? l2.prices.promo.value : l2.prices.base.value;
-                        acc[colorKey].push(`${sizeName} (${l2.stock.quantity}) (${pricePrecision(promoValue)})`);
-                        return acc;
-                    }, {});
-                    const colorSizeLines = Object.entries(colorSizes).map(([color, sizes]) => `**${color}**: ${sizes.join(', ')}`).join('\n');
-                    return `**[${item.name}](https://www.uniqlo.com/au/en/products/${item.productId})**\nBase: ${pricePrecision(item.prices.base.value)}\nPromo: ${pricePrecision(item.prices.promo?.value)}\n${colorSizeLines}`;
-                }).join('\n\n') || 'None',
-                image: { url: `attachment://added-items.png` }
-            }
-            addedItemsEmbeds.push({ addedItemsEmbed, addedItemsImage });
-        }
-        for (let i = 0; i < removedItems.length; i += batchSize) {
-            const batch = removedItems.slice(i, i + batchSize);
-            const removedItemsImageUrls = batch.map(item => {
-                if (item.images && item.images.main) {
-                    // Handle new API structure where main is an object with color codes as keys
-                    const firstImage = Object.values(item.images.main)[0];
-                    return firstImage ? firstImage.image : null;
-                }
-                return null;
+        const addedBatches = packItemsByDescription(addedItems, (item) => {
+            const colorSizeLines = formatColorSizeLines(item.l2s);
+            return `**[${item.name}](https://www.uniqlo.com/au/en/products/${item.productId})**\nBase: ${pricePrecision(item.prices.base.value)}\nPromo: ${pricePrecision(item.prices.promo?.value)}\n${colorSizeLines}`;
+        });
+        let addedOffset = 0;
+        for (const batch of addedBatches) {
+            const addedItemsImage = await imageAttachment(batch.items.map(itemImageUrl), "added-items");
+            const start = addedOffset + 1;
+            const end = addedOffset + batch.items.length;
+            addedOffset = end;
+            addedItemsEmbeds.push({
+                addedItemsEmbed: {
+                    color: 0x0099ff,
+                    title: `Added items (${start}-${end})`,
+                    description: batch.texts.join('\n\n') || 'None',
+                    image: { url: `attachment://added-items.png` }
+                },
+                addedItemsImage
             });
-            const removedItemsImage = await imageAttachment(removedItemsImageUrls, "removed-items");
-            const removedItemsEmbed = new EmbedBuilder()
-                .setColor('#0099ff')
-                .setTitle(`Removed items (${i + 1}-${i + batch.length})`)
-                .setDescription(batch.map(item => {
-                    //log("Removed ITEM", item.name, item.productId)
-                    return `**[${item.name}](https://www.uniqlo.com/au/en/products/${item.productId})**\nBase: ${pricePrecision(item.prices.base.value)}\nPromo: ${pricePrecision(item.prices.promo?.value)}`
-                }).join('\n\n') || 'None')
-                .setImage(`attachment://removed-items.png`)
+        }
 
-            removedItemsEmbeds.push({ removedItemsEmbed, removedItemsImage });
-        }
-        for (let i = 0; i < changedItems.length; i += batchSize) {
-            const batch = changedItems.slice(i, i + batchSize);
-            const changedItemsImageUrls = batch.map(item => {
-                if (item[1].images && item[1].images.main) {
-                    // Handle new API structure where main is an object with color codes as keys
-                    const firstImage = Object.values(item[1].images.main)[0];
-                    return firstImage ? firstImage.image : null;
-                }
-                return null;
+        const removedBatches = packItemsByDescription(removedItems, (item) =>
+            `**[${item.name}](https://www.uniqlo.com/au/en/products/${item.productId})**\nBase: ${pricePrecision(item.prices.base.value)}\nPromo: ${pricePrecision(item.prices.promo?.value)}`
+        );
+        let removedOffset = 0;
+        for (const batch of removedBatches) {
+            const removedItemsImage = await imageAttachment(batch.items.map(itemImageUrl), "removed-items");
+            const start = removedOffset + 1;
+            const end = removedOffset + batch.items.length;
+            removedOffset = end;
+            removedItemsEmbeds.push({
+                removedItemsEmbed: new EmbedBuilder()
+                    .setColor('#0099ff')
+                    .setTitle(`Removed items (${start}-${end})`)
+                    .setDescription(batch.texts.join('\n\n') || 'None')
+                    .setImage(`attachment://removed-items.png`),
+                removedItemsImage
             });
-            const changedItemsImage = await imageAttachment(changedItemsImageUrls, "changed-items");
-            const changedItemsEmbed = new EmbedBuilder()
-                .setColor('#0099ff')
-                .setTitle(`Changed items (${i + 1}-${i + batch.length})`)
-                .setDescription(batch.map(item => {
-                    //log("Changed ITEM", item[1].name)
-                    const colorSizes = item[1].l2s.reduce((acc, l2) => {
-                        // Use actual color name from details API
-                        const colorKey = l2.color.name || l2.color.displayCode;
-                        if (!acc[colorKey]) {
-                            acc[colorKey] = [];
-                        }
-                        const sizeName = l2.size.name || l2.size.displayCode;
-                        const promoValue = l2.prices.promo ? l2.prices.promo.value : l2.prices.base.value;
-                        acc[colorKey].push(`${sizeName} (${l2.stock.quantity}) (${pricePrecision(promoValue)})`);
-                        return acc;
-                    }, {});
-                    const colorSizeLines = Object.entries(colorSizes).map(([color, sizes]) => `**${color}**: ${sizes.join(', ')}`).join('\n');
-                    return `**[${item[0].name}](https://www.uniqlo.com/au/en/products/${item[0].productId})**\n
-                  **Base:** ${pricePrecision(item[0].prices.base?.value)}\t\t**New Base:** ${pricePrecision(item[1].prices.base?.value)} \t\t **Diff:** ${pricePrecision(parseInt(item[1].prices.base?.value) - parseInt(item[0].prices.base?.value))}\n
-                  **Promo:** ${pricePrecision(item[0].prices.promo?.value)}\t\t**New Promo:** ${pricePrecision(item[1].prices.promo?.value)} **Diff:** ${pricePrecision(parseInt(item[1].prices.promo?.value) - parseInt(item[0].prices.promo?.value))}\n
-                  ${colorSizeLines}`;
-                }).join('\n\n') || 'None')
-                .setImage(`attachment://changed-items.png`)
-            changedItemsEmbeds.push({ changedItemsEmbed, changedItemsImage });
+        }
+
+        const changedBatches = packItemsByDescription(changedItems, (item) => {
+            const colorSizeLines = formatColorSizeLines(item[1].l2s);
+            const baseDiff = parseInt(item[1].prices.base?.value) - parseInt(item[0].prices.base?.value);
+            const promoDiff = parseInt(item[1].prices.promo?.value) - parseInt(item[0].prices.promo?.value);
+            return [
+                `**[${item[0].name}](https://www.uniqlo.com/au/en/products/${item[0].productId})**`,
+                `**Base:** ${pricePrecision(item[0].prices.base?.value)}\t**New Base:** ${pricePrecision(item[1].prices.base?.value)}\t**Diff:** ${pricePrecision(baseDiff)}`,
+                `**Promo:** ${pricePrecision(item[0].prices.promo?.value)}\t**New Promo:** ${pricePrecision(item[1].prices.promo?.value)}\t**Diff:** ${pricePrecision(promoDiff)}`,
+                colorSizeLines
+            ].filter(Boolean).join('\n');
+        });
+        let changedOffset = 0;
+        for (const batch of changedBatches) {
+            const changedItemsImage = await imageAttachment(
+                batch.items.map(([_, next]) => itemImageUrl(next)),
+                "changed-items"
+            );
+            const start = changedOffset + 1;
+            const end = changedOffset + batch.items.length;
+            changedOffset = end;
+            changedItemsEmbeds.push({
+                changedItemsEmbed: new EmbedBuilder()
+                    .setColor('#0099ff')
+                    .setTitle(`Changed items (${start}-${end})`)
+                    .setDescription(batch.texts.join('\n\n') || 'None')
+                    .setImage(`attachment://changed-items.png`),
+                changedItemsImage
+            });
         }
         // not dev move
         if (config.mode !== 'DEV') {
