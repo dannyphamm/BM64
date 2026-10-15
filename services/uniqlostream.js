@@ -29,6 +29,10 @@ const cleanupOldMessages = async (channel, itemId) => {
 /**
  * Watch a collection with automatic reconnect on stream errors/closes.
  * Unhandled ChangeStream 'error' events crash the Node process.
+ *
+ * Resume tokens: prefer the driver's stream.resumeToken (includes
+ * postBatchResumeToken from empty batches). Using only change._id goes
+ * stale on quiet collections and causes ChangeStreamHistoryLost (286).
  */
 function watchWithReconnect(collection, label, onChange) {
     let stream = null;
@@ -41,6 +45,13 @@ function watchWithReconnect(collection, label, onChange) {
         if (reconnectTimer) {
             clearTimeout(reconnectTimer);
             reconnectTimer = null;
+        }
+    };
+
+    const captureResumeToken = () => {
+        // Driver advances this on matched events and empty getMores
+        if (stream?.resumeToken) {
+            resumeToken = stream.resumeToken;
         }
     };
 
@@ -57,21 +68,32 @@ function watchWithReconnect(collection, label, onChange) {
     };
 
     const isNonResumableError = (err) => {
-        const message = String(err?.message || err || '');
-        const code = err?.code;
+        if (!err) return false;
+        const message = String(err.message || err || '');
+        const code = err.code ?? err.errorResponse?.code;
+        const labels = err.errorLabelSet || err.errorLabels || err.errorResponse?.errorLabels;
+        const hasNonResumableLabel = labels?.has?.('NonResumableChangeStreamError')
+            || (Array.isArray(labels) && labels.includes('NonResumableChangeStreamError'));
         // Resume token expired / not found in oplog — restart without resumeAfter
-        return code === 286 || /resume|ChangeStreamHistoryLost|cannot resume/i.test(message);
+        return hasNonResumableLabel
+            || code === 286
+            || /ChangeStreamHistoryLost|resume point may no longer be in the oplog|cannot resume/i.test(message);
     };
 
     const scheduleReconnect = (reason, err) => {
         if (stopped || reconnectTimer) return;
 
-        if (err && isNonResumableError(err) && resumeToken) {
+        if (err && isNonResumableError(err)) {
             error(`${label} change stream resume token is no longer valid; restarting without resume`);
             resumeToken = null;
+        } else {
+            captureResumeToken();
         }
 
-        const delay = Math.min(RECONNECT_BASE_MS * Math.pow(2, attempt), RECONNECT_MAX_MS);
+        // History-lost: retry quickly without the dead token. Other errors: back off.
+        const delay = (err && isNonResumableError(err))
+            ? RECONNECT_BASE_MS
+            : Math.min(RECONNECT_BASE_MS * Math.pow(2, attempt), RECONNECT_MAX_MS);
         attempt += 1;
         error(`${label} change stream ${reason}; reconnecting in ${delay}ms (attempt ${attempt})`);
 
@@ -94,9 +116,7 @@ function watchWithReconnect(collection, label, onChange) {
             stream = collection.watch([], options);
 
             stream.on('change', async (change) => {
-                if (change?._id) {
-                    resumeToken = change._id;
-                }
+                captureResumeToken();
                 try {
                     await onChange(change);
                 } catch (err) {
@@ -117,7 +137,7 @@ function watchWithReconnect(collection, label, onChange) {
             });
 
             if (attempt > 0) {
-                log(`${label} change stream reconnected`);
+                log(`${label} change stream reconnected${resumeToken ? ' (resumed)' : ' (from now)'}`);
             }
             attempt = 0;
         } catch (err) {
