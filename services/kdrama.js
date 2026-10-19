@@ -361,6 +361,34 @@ const kdramaCompleterService = async (client) => {
     }
 }
 
+/** Strip trailing " (YYYY)" so Latest Release titles match series-list titles. */
+function normalizeKdramaTitle(title) {
+    return String(title || '').replace(/\s*\(\d{4}\)\s*$/, '').trim();
+}
+
+function escapeRegex(str) {
+    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * Match a tracked drama by exact title or year-suffix variant,
+ * e.g. Latest Release "Foo" ↔ DB "Foo (2026)".
+ */
+async function findTrackedDrama(collection, scrapedTitle) {
+    const exact = await collection.findOne({ title: scrapedTitle });
+    if (exact) return exact;
+
+    const normalized = normalizeKdramaTitle(scrapedTitle);
+    if (normalized !== scrapedTitle) {
+        const withoutYear = await collection.findOne({ title: normalized });
+        if (withoutYear) return withoutYear;
+    }
+
+    return collection.findOne({
+        title: { $regex: new RegExp(`^${escapeRegex(normalized)}\\s*\\(\\d{4}\\)\\s*$`) },
+    });
+}
+
 /** Check Latest Release for new episodes / completion on tracked dramas. */
 const kdramaTrackerService = async (client) => {
     const kdramaCollection = client.mongodb.db.collection(config.mongodbDBKDrama);
@@ -389,21 +417,24 @@ const kdramaTrackerService = async (client) => {
     
     for (const article of articles) {
         const fullTitle = $(article).find('img').attr('title');
+        if (!fullTitle) continue;
         const title = fullTitle.split(' Episode ')[0];
         const ep = parseInt(fullTitle.split(' Episode ')[1]) || 0;
         // Skip if we can't parse the episode number
         if (isNaN(ep)) continue;
         
-        const existingKDrama = await kdramaCollection.findOne({ title });
+        const existingKDrama = await findTrackedDrama(kdramaCollection, title);
         
         if (existingKDrama && !existingKDrama.isCompleted) {
+            const trackedTitle = existingKDrama.title;
+
             // Handle episode updates first
             if (!existingKDrama.episode) {
                 const link = $(article).find('a').attr('href');
                 const banner = $(article).find('img').attr('src');
                 
                 await kdramaCollection.updateOne(
-                    { title }, 
+                    { _id: existingKDrama._id },
                     { 
                         $set: { 
                             episode: ep,
@@ -415,21 +446,21 @@ const kdramaTrackerService = async (client) => {
                 
                 //Send notification for first episode tracking
                 await sendEpisodeNotification(client, {
-                    title,
+                    title: trackedTitle,
                     episode: ep,
                     banner,
                     link,
                     isNew: false
                 });
                 
-                log(`Set initial episode ${ep} for "${title}"`);
+                log(`Set initial episode ${ep} for "${trackedTitle}"`);
             }
             else if (ep > existingKDrama.episode) {
                 const link = $(article).find('a').attr('href');
                 const banner = $(article).find('img').attr('src');
                 
                 await kdramaCollection.updateOne(
-                    { title }, 
+                    { _id: existingKDrama._id },
                     { 
                         $set: { 
                             episode: ep,
@@ -441,14 +472,14 @@ const kdramaTrackerService = async (client) => {
                 
                 //Send notification for new episode
                 await sendEpisodeNotification(client, {
-                    title,
+                    title: trackedTitle,
                     episode: ep,
                     banner,
                     link,
                     isNew: true
                 });
                 
-                log(`New episode ${ep} found for "${title}"`);
+                log(`New episode ${ep} found for "${trackedTitle}"`);
             }
 
             // Now check for completion status
@@ -457,13 +488,13 @@ const kdramaTrackerService = async (client) => {
             if (isCompleted) {
                 // Update database to mark as completed
                 await kdramaCollection.updateOne(
-                    { title },
+                    { _id: existingKDrama._id },
                     { $set: { isCompleted: true } }
                 );
 
                 // Send completion notification
                 const embed = new EmbedBuilder()
-                    .setTitle(`${title}`)
+                    .setTitle(`${trackedTitle}`)
                     .setDescription(`This drama has completed!`)
                     .addFields(
                         { name: 'Total Episodes', value: `${ep}`, inline: true },
@@ -490,7 +521,7 @@ const kdramaTrackerService = async (client) => {
                     ...(existingKDrama.banner ? { files: [attachment] } : {})
                 });
 
-                log(`Marked "${title}" as completed`);
+                log(`Marked "${trackedTitle}" as completed`);
             }
         }
     }
