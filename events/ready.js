@@ -150,16 +150,16 @@ module.exports = {
                     error(e, "TRY UNIQLO");
                 }
             });
-            // log("Health check for spotify. 1 minute")
-            // schedule.scheduleJob('0 * * * * *', async () => {
-            //     try {
-            //         await socketIO().then(async (socket) => {
-            //             const result = await socket.timeout(10000).emitWithAck('playMusic');
-            //         })
-            //     } catch (e) {
-            //         error(e, "TRY spotify health");
-            //     }
-            // });
+            log("Health check for spotify. 1 minute")
+            schedule.scheduleJob('0 * * * * *', async () => {
+                try {
+                    await socketIO().then(async (socket) => {
+                        const result = await socket.timeout(10000).emitWithAck('playMusic');
+                    })
+                } catch (e) {
+                    error(e, "TRY spotify health");
+                }
+            });
             socketIO();
             log(`Socket.io listening on ${process.env.SOCKET_HOST || '127.0.0.1'}:${process.env.SOCKET_PORT || 3000}`)
             const delay = async () => {
